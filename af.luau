@@ -1,5 +1,5 @@
 -- Advanced Autofarm Script for Dungeon Quest Reborn
--- Bugfix: Robust Fallback Enemy Scanner & Heavy Diagnostic Logging
+-- Bugfix: Eliminated flawed Phase 2 straight-line shortcut to force robust Navmesh routing
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -986,9 +986,12 @@ local function getStandOffPosition(root, enemyRoot)
     return enemyPosition + (directionAway * math.max(safeDistance, 2))
 end
 
--- Primary Wall-Aware Pathfinding Router (Strict Navmesh Execution)
+-- Primary Wall-Aware Pathfinding Router with Debug Output
 local function computePursuitPath(root, enemy, targetPosition)
-    if isComputingPath then return false end
+    if isComputingPath then 
+        heavyDebug("Pathfinding", "Skipped: Already computing path in another thread.")
+        return false 
+    end
     isComputingPath = true
 
     if pathBlockedConnection then
@@ -998,9 +1001,10 @@ local function computePursuitPath(root, enemy, targetPosition)
 
     local groundedStart = projectToGround(root.Position, enemy)
     local groundedTarget = projectToGround(targetPosition, enemy)
-    local inHazard = not isPositionSafeFromDamageBricks(groundedStart, 0.5)
+    local distanceToTarget = (groundedStart - groundedTarget).Magnitude
+    heavyDebug("Pathfinding", string.format("Attempting path to %s. Distance: %.1f studs", enemy.Name, distanceToTarget))
 
-    heavyDebug("Pathfinding", string.format("Computing navmesh path to target: %s. InHazard: %s", tostring(enemy.Name), tostring(inHazard)))
+    local inHazard = not isPositionSafeFromDamageBricks(groundedStart, 0.5)
 
     if inHazard then
         local stagingPointB = findStagingSafePoint(groundedStart, groundedTarget, enemy)
@@ -1050,14 +1054,14 @@ local function computePursuitPath(root, enemy, targetPosition)
         WaypointSpacing = 4
     })
 
-    local success, _ = pcall(function()
+    local success, computeErr = pcall(function()
         path:ComputeAsync(groundedStart, groundedTarget)
     end)
 
     if success and path.Status == Enum.PathStatus.Success then
         local rawWaypoints = path:GetWaypoints()
         if #rawWaypoints > 1 then
-            heavyDebug("Pathfinding", "Navmesh path successfully computed.")
+            heavyDebug("Pathfinding", string.format("SUCCESS: Navmesh path computed with %d waypoints.", #rawWaypoints))
             currentPathWaypoints = rawWaypoints
             currentPathIndex = 2
             currentPathEnemy = enemy
@@ -1074,7 +1078,11 @@ local function computePursuitPath(root, enemy, targetPosition)
             isComputingPath = false
             renderCurrentPath()
             return true
+        else
+            heavyDebug("Pathfinding", "FAILED: Path status was Success, but waypoint count was <= 1.")
         end
+    else
+        heavyDebug("Pathfinding", string.format("FAILED: ComputeAsync error or non-success status. Status: %s | Error: %s", tostring(path.Status), tostring(computeErr)))
     end
 
     isComputingPath = false
@@ -1234,12 +1242,11 @@ function findNearestEnemy_MapWide()
         end
     end
 
-    -- Pass 1: Direct Humanoid model check (Ensures enemies are found immediately on start)
+    -- Pass 1: Direct Humanoid model check
     for _, obj in ipairs(Workspace:GetDescendants()) do
         if obj:IsA("Model") and not seenModels[obj] then
             local humanoid = obj:FindFirstChildWhichIsA("Humanoid")
             if humanoid and humanoid.Health > 0 and not Players:GetPlayerFromCharacter(obj) then
-                -- Make sure it's not the player character or accessory
                 if obj ~= character and not obj:IsDescendantOf(character) then
                     evaluateEntity(obj, humanoid.Health, "HumanoidDirect")
                 end
@@ -1247,7 +1254,7 @@ function findNearestEnemy_MapWide()
         end
     end
 
-    -- Pass 2: BillboardGui Health Tag check (Fallback for special dungeon mobs)
+    -- Pass 2: BillboardGui Health Tag check
     for _, obj in ipairs(Workspace:GetDescendants()) do
         if obj:IsA("BillboardGui") then
             local containerModel = obj.Parent and obj.Parent:FindFirstAncestorOfClass("Model") or obj.Parent
