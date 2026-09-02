@@ -11,7 +11,7 @@ local NAV = S.NAV
 local HZ = S.HZ
 local LD = S.LD
 local MC = S.MC
-local CL = S.CL
+local DG = S.DG
 local ZN = S.ZN
 local K = S.UIKit
 local T = S.UIKit.Theme
@@ -178,7 +178,7 @@ local function destructScript()
     setTelegraphPickerEnabled(false)
     setPathEditEnabled(false)
     stopMacroSubsystem()
-    S.setCloneActive(false)
+    S.setDodgeActive(false)
     clearPrecastZones()
     -- Through setLowDetailEnabled, so the mode flag is cleared first and the
     -- effect restore is not immediately undone.
@@ -863,8 +863,8 @@ local function createControlUI()
     modeIsland = K.segmented(autofarm.body, {
         { value = "legacy", label = "Legacy",
           tip = "Finds enemies, walks to them, fights them, and dodges by searching for a safe point each time something lands near you." },
-        { value = "clone", label = "Clone",
-          tip = "The same bot, dodging differently: a visible ring of player-sized volumes around you, each green or red, and it steps into the best green one." },
+        { value = "clone", label = "Dodge",
+          tip = "The same bot, dodging differently: a box that is never in danger, and a character that follows it." },
         { value = "macro", label = "Macro",
           tip = "Replays runs you recorded yourself - where you walked, where you looked, what you pressed." },
     }, function() return MC.mode end, function(v)
@@ -1121,195 +1121,67 @@ local function createControlUI()
     -- ------------------------------------------------------------------
     -- Clone evasion
     -- ------------------------------------------------------------------
-    local cloneSection = K.section(autofarm.body, "Clone grid", nextOrder(),
-        "The field of positions Clone mode dodges across. Green means your whole body fits there untouched, red means something would hit you, and the blue trail is the way out it has found.")
+    local cloneSection = K.section(autofarm.body, "Dodge", nextOrder(),
+        "A box that is never in danger, and a character that follows it.")
     table.insert(cloneSections, cloneSection)
-    local recommendRow = K.buttonRow(cloneSection.content, 0.5)
-    track(K.dropdown(cloneSection.content, "Movement", {
-        { value = "velocity", label = "Velocity - instant, precise" },
-        { value = "walk", label = "Walk - Humanoid:MoveTo" },
-        { value = "steer", label = "Steer - Humanoid:Move" },
-        { value = "tween", label = "Tween - exact, ignores collision" },
-    }, function() return CFG.moveMode end, function(v) CFG.moveMode = v end, 0.2,
-        "How the character is actually driven, which turns out to be most of why dodging looks bad. MoveTo accelerates for a quarter of a second and arrives within about two studs - in a three-stud gap between beams that means late and off the mark, however good the decision was. Velocity changes direction the same frame and arrives exactly. Tween is exact to the stud and ignores collision entirely, which is why it is precise and why it is conspicuous."))
-    track(K.slider(cloneSection.content, "Arrive within", "Studs that count as there",
-        0.3, 4, true,
-        function() return CFG.moveArriveRadius end, function(v) CFG.moveArriveRadius = v end, 0.3,
-        "How close counts as arrived. MoveTo's own tolerance is nearer two studs, which is wider than some of the gaps you need to stand in."))
-
-    local recommendRow2 = K.buttonRow(cloneSection.content, 0.4)
-    recommendRow2.add("Simple mode", "accent", function()
-        S.applySimpleClone()
-        refreshAllWidgets()
-        setMovementState("clone set to simple mode")
-    end, "Exact geometry, exact timing, precise movement, and none of the heuristics that have been caught fighting each other. This is the configuration to judge the dodging by: when it fails there are few enough moving parts left to say why.")
-
-    recommendRow.add("Recommended settings", "accent", function()
-        S.applyRecommendedClone()
-        refreshAllWidgets()
-        setMovementState("clone settings reset to recommended")
-    end, "Set the whole of this section back to the values tuned across the dungeons so far: dense grid, honest probe, survival-first caution, sliced evaluation for the frame rate.")
-
     K.caption(cloneSection.content,
-        "Discs are the size of your hitbox and overlap, so a safe pocket a few studs wide between two attacks still shows up. The way out is searched cell by cell and never crosses red it could go around.", 1)
+        "A few dozen points around you are checked twenty times a second: what lands on the way there, and what lands once you stop, at the moments those things happen. The box goes on the best one and you go to the box. There is no path - deciding every frame and moving exactly, the straight line is the path.", 1)
+
+    local dodgeButtons = K.buttonRow(cloneSection.content, 2)
+    dodgeButtons.add("Recommended settings", "accent", function()
+        S.applyRecommendedDodge()
+        refreshAllWidgets()
+        setMovementState("dodge settings reset")
+    end, "Put every setting in this section back to the tuned values.")
+
     track(K.toggle(cloneSection.content, "Manual run (no autofarm)",
-        function() return CFG.cloneManual end, function(v) CFG.cloneManual = v end, 2,
-        "The grid dodges for you and nothing else runs: no target hunting, no pursuit, no waypoints. You drive, it pulls you out of attacks."))
-    track(K.slider(cloneSection.content, "Spacing", "Studs between discs",
-        1, 4, true,
-        function() return CFG.cloneGridSpacing end, function(v) CFG.cloneGridSpacing = v end, 3,
-        "Smaller finds smaller pockets and costs more tests. 1.5 suits boss fights."))
-    track(K.slider(cloneSection.content, "Radius", "How far the grid reaches",
-        6, 40, false,
-        function() return CFG.cloneRadius end, function(v) CFG.cloneRadius = v end, 4,
-        "Capped by the cell budget: at 1.5 spacing and 900 cells the grid reaches about 22 studs whatever you ask for."))
-    track(K.slider(cloneSection.content, "Cells per pass", "Re-tested each think",
-        64, 900, false,
-        function() return CFG.cloneEvalBudget end, function(v) CFG.cloneEvalBudget = v end, 5.5,
-        "How much of the grid is re-judged each pass. The rest keeps its previous answer, so a big radius refreshes in slices instead of hitching. Lower this first if the frame rate suffers - it costs a little freshness at the edges and nothing where you are standing."))
-    track(K.slider(cloneSection.content, "Cell budget", "Most discs at once",
-        100, 1600, false,
-        function() return CFG.cloneMaxCells end, function(v) CFG.cloneMaxCells = v end, 5,
-        "The cap is the promise, the radius is the request. Every disc is tested against every attack each evaluation."))
+        function() return CFG.dodgeManual end, function(v) CFG.dodgeManual = v end, 3,
+        "Dodge only. No target hunting, no pursuit, no waypoints: you drive, and it pulls you out of attacks."))
+    track(K.dropdown(cloneSection.content, "Movement", {
+        { value = "tween", label = "Tween - exact, walking pace, collision-checked" },
+        { value = "walk", label = "Walk - Humanoid:MoveTo" },
+        { value = "steer", label = "Steer - Humanoid:Move (takes controls)" },
+        { value = "velocity", label = "Velocity - direct (takes controls)" },
+    }, function() return CFG.moveMode end, function(v) CFG.moveMode = v end, 4,
+        "How the character is driven. Tween steps the position straight at the box, never faster than walking and never through anything, and it is the only one Roblox's own control script cannot overrule. MoveTo arrives within about two studs and accelerates for a quarter of a second, which in a narrow gap is late and off the mark."))
+    track(K.slider(cloneSection.content, "Reach", "Studs to the outer ring",
+        8, 30, false,
+        function() return CFG.dodgeReach end, function(v) CFG.dodgeReach = v end, 5,
+        "How far out it looks for somewhere to stand."))
+    track(K.slider(cloneSection.content, "Rings", "Circles of candidates",
+        1, 5, false,
+        function() return CFG.dodgeRings end, function(v) CFG.dodgeRings = v end, 6,
+        "More rings find nearer spots; each costs a ring of checks."))
+    track(K.slider(cloneSection.content, "Rays", "Directions per ring",
+        8, 32, false,
+        function() return CFG.dodgeRays end, function(v) CFG.dodgeRays = v end, 7,
+        "More directions find narrower gaps."))
+    track(K.slider(cloneSection.content, "Lead", "Seconds before impact a zone counts",
+        0.3, 3, true,
+        function() return CFG.dodgeLead end, function(v) CFG.dodgeLead = v end, 8,
+        "An announced attack is floor you may cross until this long before it lands. Higher is more cautious; too high and every marker is a wall."))
+    track(K.slider(cloneSection.content, "Stay clear for", "Seconds after arriving",
+        0, 3, true,
+        function() return CFG.dodgeDwell end, function(v) CFG.dodgeDwell = v end, 9,
+        "A spot only counts if nothing lands on it for this long after you get there. This is what stops it walking somewhere, stopping, and being hit by what it already knew about."))
+    track(K.slider(cloneSection.content, "Move at", "Danger here that triggers a move",
+        0.05, 0.6, true,
+        function() return CFG.dodgeMoveAt end, function(v) CFG.dodgeMoveAt = v end, 10,
+        "Danger runs 0 to 1. Low means it leaves at the first warmth; high means it tolerates the edge of things."))
+    track(K.slider(cloneSection.content, "Enemy space", "Studs kept off melee",
+        4, 25, false,
+        function() return CFG.dodgeEnemyRadius end, function(v) CFG.dodgeEnemyRadius = v end, 11,
+        "Melee never telegraphs; being next to one is the attack. Chasing stops at this distance too."))
     track(K.slider(cloneSection.content, "Probe size", "0 uses your root part",
-        0, 4, true,
-        function() return CFG.threatProbeRadius end, function(v) CFG.threatProbeRadius = v end, 6.2,
-        "How wide the grid believes you are when testing whether a spot is clear - separate from the disc drawn on screen. This sets the smallest gap it can find: a probe of radius r cannot see a pocket narrower than twice r. Probing with your whole body including limbs made it blind to exactly the small safe pockets that matter, so 0 uses your root part instead, which is what the game damages against."))
-    track(K.slider(cloneSection.content, "Safety margin", "Clearance beyond your hitbox",
-        0, 4, true,
-        function() return CFG.cloneSafetyMargin end, function(v) CFG.cloneSafetyMargin = v end, 6,
-        "The only padding there is. A disc is green when your body plus this would not touch the attack - 0 means it just fits. Raise it if you are being grazed, but every stud here is taken off the walkable space between two attacks."))
-    track(K.slider(cloneSection.content, "Enemy space", "Studs to keep off melee enemies",
-        0, 25, true,
-        function() return CFG.cloneEnemyRadius end, function(v) CFG.cloneEnemyRadius = v end, 6.5,
-        "Melee enemies do not telegraph anything - being next to one IS the attack, so the grid marks a circle around each of them unsafe. Raise it if you are being chewed up in melee."))
-    track(K.toggle(cloneSection.content, "Keep distance while chasing",
-        function() return CFG.cloneKeepDistance end, function(v) CFG.cloneKeepDistance = v end, 6.45,
-        "Chasing stops at the same circle the grid draws around enemies, instead of closing to melee. Without it the dodge keeps its distance and the pursuit immediately gives it back, which on a high tier is one tap."))
-    track(K.slider(cloneSection.content, "Enemy spacing", "Discouraged out to this",
-        0, 40, true,
-        function() return CFG.cloneEnemySoftRadius end, function(v) CFG.cloneEnemySoftRadius = v end, 6.6,
-        "Beyond the hard circle, out to here, standing near an enemy is allowed but expensive. The bot will pass through to get somewhere better; it will not choose to stop there."))
-    track(K.slider(cloneSection.content, "Must stay safe for", "Seconds after arriving",
-        0, 4, true,
-        function() return CFG.cloneSafeDwell end, function(v) CFG.cloneSafeDwell = v end, 6.7,
-        "A cell counts as a destination only if nothing lands on it for this long after you get there. At 0 it judges the instant of arrival only, which is how it used to walk somewhere, stop, and be killed by an attack that was already announced."))
-    track(K.slider(cloneSection.content, "Wall threat", "Heat for ground you cannot walk onto",
-        0, 100, false,
-        function() return CFG.threatWallWeight end, function(v) CFG.threatWallWeight = v end, 6.8,
-        "Anything you cannot simply step onto counts as danger. A ledge within jump range is reachable but costs this, scaled by how high it is - a jump mid-fight is a moment spent not dodging. Ground with something solid standing in it is out entirely, whatever this says."))
-    track(K.slider(cloneSection.content, "Step height", "Rise you can walk up for free",
-        0.5, 6, true,
-        function() return CFG.cloneStepHeight end, function(v) CFG.cloneStepHeight = v end, 6.85,
-        "How far up a Roblox humanoid steps without jumping. Anything above this is charged Wall threat."))
-    track(K.toggle(cloneSection.content, "Use cover",
-        function() return CFG.coverEnabled end, function(v) CFG.coverEnabled = v end, 6.86,
-        "Put something solid between you and where the attack is coming from. When a radial burst fills the arena there is no open safe ground at all, and a pillar is the answer - the grid used to see those only as obstacles to route around."))
-    track(K.slider(cloneSection.content, "Cover value", "How much of the danger it removes",
-        0, 1, true,
-        function() return CFG.coverRelief end, function(v) CFG.coverRelief = v end, 6.87,
-        "A discount, not a bonus: cover removes this share of the heat rather than inventing safety, so a covered spot standing in a pool of fire is still a bad idea."))
-    track(K.toggle(cloneSection.content, "Prefer open ground",
-        function() return CFG.threatWallSpread end, function(v) CFG.threatWallSpread = v end, 6.9,
-        "Cells inherit a share of the heat around them, so a green pocket ringed by red reads hot - it is a trap, somewhere you can stand right now with nowhere to go the moment it closes. Walls count as heat too, so corners are included. This is what makes the bot strafe into the open instead of backing into a corner."))
-    track(K.slider(cloneSection.content, "Enclosure", "How much surroundings count",
-        0, 1.5, true,
-        function() return CFG.threatEnclosureWeight end, function(v) CFG.threatEnclosureWeight = v end, 6.91,
-        "How strongly a cell takes on the heat around it. Higher makes it hug open ground and refuse pockets; 0 turns it off and it will happily reverse into a dead end that happens to be green."))
-    track(K.slider(cloneSection.content, "Escape range", "Studs out it checks for a way through",
-        2, 20, true,
-        function() return CFG.threatEnclosureRange end, function(v) CFG.threatEnclosureRange = v end, 6.92,
-        "How far out it looks when judging whether somewhere is enclosed. Small only notices the walls it is touching; large notices a pocket it could get sealed into."))
-    track(K.toggle(cloneSection.content, "Look past the grid",
-        function() return CFG.escapeScanEnabled end, function(v) CFG.escapeScanEnabled = v end, 6.95,
-        "When everything inside the grid is hot, sample directions well beyond it and head for the coolest. Without this the bot can only choose between cells it can see, and cornered that means picking the least bad corner and staying in it."))
-    track(K.slider(cloneSection.content, "Look distance", "Times the grid radius",
-        1.5, 6, true,
-        function() return CFG.escapeScanFar end, function(v) CFG.escapeScanFar = v end, 6.96,
-        "How far out the escape scan looks. Only the direction is taken from out here; the grid still does the local routing, because out there it has no idea what the floor does."))
-    track(K.slider(cloneSection.content, "Unstick after", "Seconds pinned before it acts",
-        0.2, 3, true,
-        function() return CFG.cloneStuckTime end, function(v) CFG.cloneStuckTime = v end, 6.97,
-        "The ordinary stuck detector is off while dodging, since holding position inside a telegraph is sometimes right. This is the one that watches for being wedged against a wall: it hops, drops the goal and routes around."))
-    track(K.slider(cloneSection.content, "Caution", "Studs of detour one point of heat is worth",
-        0.5, 8, true,
-        function() return CFG.threatWeight end, function(v) CFG.threatWeight = v end, 7,
-        "The survival-versus-speed dial, in one number. Higher takes longer routes to stay cool; lower cuts corners through danger. Survival-first defaults sit high."))
-    track(K.slider(cloneSection.content, "Lethal at", "Heat a cell is impassable above",
-        20, 100, false,
-        function() return CFG.threatLethal end, function(v) CFG.threatLethal = v end, 7.1,
-        "Heat runs 0 to 100, where 100 is standing in a live attack. Cells at or above this are walls to the search - unless every route crosses one, in which case it takes the coolest rather than standing still."))
-    track(K.slider(cloneSection.content, "Move at heat", "Relocate once this hot",
-        0, 40, false,
-        function() return CFG.threatMoveAt end, function(v) CFG.threatMoveAt = v end, 7.15,
-        "Any heat at or above this and it leaves. Low on purpose: standing somewhere warm waiting to find out whether it becomes lethal is not a plan. Raise it if the bot fidgets in mild heat instead of fighting."))
-    track(K.toggle(cloneSection.content, "Projectile paths",
-        function() return CFG.threatSweepEnabled end, function(v) CFG.threatSweepEnabled = v end, 7.16,
-        "A moving hazard heats the whole corridor it is about to sweep, not just the square it is in. Without this the ground in front of an incoming shot reads as perfectly cool and the bot walks into it."))
-    track(K.slider(cloneSection.content, "Projectile lead", "Seconds before a pass that count",
-        0.2, 3, true,
-        function() return CFG.threatProjectileLead end, function(v) CFG.threatProjectileLead = v end, 7.18,
-        "How long before a projectile reaches a spot that spot is already dangerous. Being early is how you get hit, so this is generous. Raise it if the bot still steps into things."))
-    track(K.slider(cloneSection.content, "Projectile wake", "Seconds after it passes",
-        0, 1.5, true,
-        function() return CFG.threatProjectileWake end, function(v) CFG.threatProjectileWake = v end, 7.19,
-        "How long the ground stays dangerous once a projectile has gone by. Short on purpose: behind a projectile is the safest place on the map, and treating it as lethal made the bot flee the one spot that could not hurt it."))
-    track(K.slider(cloneSection.content, "Path length", "Seconds of flight treated as dangerous",
-        0.5, 8, true,
-        function() return CFG.threatSweepTime end, function(v) CFG.threatSweepTime = v end, 7.17,
-        "How far ahead of a moving hazard the corridor runs. Longer sees shots coming from further off; too long and distant projectiles crowd the map."))
-    track(K.slider(cloneSection.content, "Look ahead", "Seconds an attack starts to matter",
-        1, 8, true,
-        function() return CFG.threatHorizon end, function(v) CFG.threatHorizon = v end, 7.2,
-        "How far in advance an announced attack begins heating its area. It ramps up as impact approaches, so a marker firing in four seconds is barely warm and one firing now is lethal."))
-    track(K.slider(cloneSection.content, "Ramp sharpness", "How late an attack turns red",
-        1, 6, true,
-        function() return CFG.threatCurve end, function(v) CFG.threatCurve = v end, 7.25,
-        "A delayed attack is harmless until nearly landing, so it should read green through most of its wind-up and then redden hard. Higher keeps it green longer. At 2 it went lethal a whole second early, which turned every marker into a wall - and with attacks overlapping, walls everywhere means no route at all."))
-    track(K.slider(cloneSection.content, "Trust the future", "Weight on heat when you arrive",
-        0, 1, true,
-        function() return CFG.threatFutureBias end, function(v) CFG.threatFutureBias = v end, 7.26,
-        "How much the heat where you WILL be outweighs the heat where you land. High means it avoids squares that are cool now and hot in a moment, which is how you die standing still."))
-    track(K.slider(cloneSection.content, "Edge shoulder", "Warm band outside a hazard",
-        0, 16, true,
-        function() return CFG.threatFalloff end, function(v) CFG.threatFalloff = v end, 7.3,
-        "Heat fades over this distance outside an attack's edge, so the middle of a gap is preferred to its lip."))
-    track(K.toggle(cloneSection.content, "Sidestep projectiles",
-        function() return CFG.dodgeProjectiles end, function(v) CFG.dodgeProjectiles = v end, 7.4,
-        "A per-frame sideways shove out of the path of anything already in the air. The grid replans a few times a second, which is right for ground attacks and far too slow for a shot in flight."))
-    track(K.toggle(cloneSection.content, "Heat gradient",
-        function() return CFG.showThreatGradient end, function(v) CFG.showThreatGradient = v end, 7.5,
-        "Colour the discs by how hot they are - dark green, green, yellow-green, light yellow, dark yellow, orange, red - instead of only safe or unsafe."))
-    track(K.slider(cloneSection.content, "Colour bands", "Steps in the heat ramp",
-        3, 16, false,
-        function() return CFG.threatColorBands end, function(v) CFG.threatColorBands = v end, 7.55,
-        "Discrete steps rather than a smooth blend. Across several hundred discs a continuous ramp turns to mush; banding makes the edge between cooler and hotter ground visible, which is what you actually need to read."))
-    track(K.colorRow(cloneSection.content, "Warm colour",
-        function() return CFG.colorThreatWarm end, function(c) CFG.colorThreatWarm = c end, 7.6,
-        "The middle of the gradient."))
-    track(K.slider(cloneSection.content, "Commit time", "Seconds before it reconsiders",
-        0.1, 1.5, true,
-        function() return CFG.cloneCommitTime end, function(v) CFG.cloneCommitTime = v end, 9,
-        "Holding a chosen goal briefly stops the character stuttering between two equally good regions. The path to it is re-planned constantly."))
-    track(K.slider(cloneSection.content, "Disc size", "Times your footprint",
-        0.5, 2, true,
-        function() return CFG.cloneDiscScale end, function(v) CFG.cloneDiscScale = v end, 15,
-        "1.0 is your body's real width, measured from your limbs and re-measured as you play. Accessories and held weapons are excluded, so a big cosmetic does not make the bot think it needs more room than it does."))
-    track(K.toggle(cloneSection.content, "Show the grid",
-        function() return CFG.showClones end, function(v) CFG.showClones = v end, 10,
-        "Draw the discs. Turning them off keeps the dodging - only the drawing stops."))
-    track(K.toggle(cloneSection.content, "Tall prisms",
-        function() return CFG.showClonePrisms end, function(v) CFG.showClonePrisms = v end, 11,
-        "A player-sized prism on every disc. Off by default: at boss density that is hundreds of parts."))
-    track(K.colorRow(cloneSection.content, "Safe colour",
-        function() return CFG.colorCloneSafe end, function(c) CFG.colorCloneSafe = c end, 12,
-        "Nothing would be hitting you there. Dimmer at the edge of a safe area."))
-    track(K.colorRow(cloneSection.content, "Danger colour",
-        function() return CFG.colorCloneDanger end, function(c) CFG.colorCloneDanger = c end, 13,
-        "Something would."))
-    track(K.colorRow(cloneSection.content, "Path colour",
-        function() return CFG.colorClonePath end, function(c) CFG.colorClonePath = c end, 14,
-        "The way out, and the cell it is heading for."))
+        0, 3, true,
+        function() return CFG.dodgeProbe end, function(v) CFG.dodgeProbe = v end, 12,
+        "How wide it believes you are when testing a spot. The root part is what the game damages against; probing with the whole body makes narrow gaps read as closed."))
+    track(K.toggle(cloneSection.content, "Show field",
+        function() return CFG.dodgeShowField end, function(v) CFG.dodgeShowField = v end, 13,
+        "Draw the candidate points, green through yellow to red by danger."))
+    track(K.toggle(cloneSection.content, "Show the box",
+        function() return CFG.dodgeShowTarget end, function(v) CFG.dodgeShowTarget = v end, 14,
+        "Draw the box the character is heading for."))
 
     -- The Attack Book lives in the Attacks panel (it is per map, and it
     -- belongs with the pickers that fill it). These are the widgets it uses.

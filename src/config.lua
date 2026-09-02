@@ -242,13 +242,27 @@ local function buildConfigTable()
             loopPath = CFG.loopPath,
             waypointClearRadius = CFG.waypointClearRadius,
             macroMode = MC.mode,
-            cloneCount = CFG.cloneCount,
-            cloneRings = CFG.cloneRings,
-            cloneRadius = CFG.cloneRadius,
-            cloneInnerRadius = CFG.cloneInnerRadius,
-            cloneAutoRings = CFG.cloneAutoRings,
-            cloneRingSpacing = CFG.cloneRingSpacing,
             pathfindingEnabled = CFG.pathfindingEnabled,
+            dodgeInterval = CFG.dodgeInterval,
+            dodgeReach = CFG.dodgeReach,
+            dodgeRings = CFG.dodgeRings,
+            dodgeRays = CFG.dodgeRays,
+            dodgeProbe = CFG.dodgeProbe,
+            dodgeMargin = CFG.dodgeMargin,
+            dodgeShoulder = CFG.dodgeShoulder,
+            dodgeLead = CFG.dodgeLead,
+            dodgeLinger = CFG.dodgeLinger,
+            dodgeDwell = CFG.dodgeDwell,
+            dodgeMoveAt = CFG.dodgeMoveAt,
+            dodgeHysteresis = CFG.dodgeHysteresis,
+            dodgeDistanceCost = CFG.dodgeDistanceCost,
+            dodgeEnemyRadius = CFG.dodgeEnemyRadius,
+            dodgeEnemySoft = CFG.dodgeEnemySoft,
+            dodgeMaxClimb = CFG.dodgeMaxClimb,
+            dodgeMaxDrop = CFG.dodgeMaxDrop,
+            dodgeManual = CFG.dodgeManual,
+            dodgeShowField = CFG.dodgeShowField,
+            dodgeShowTarget = CFG.dodgeShowTarget,
             attackMethod = CFG.attackMethod,
             autoClickEnabled = CFG.autoClickEnabled,
             clickAtCursor = CFG.clickAtCursor,
@@ -257,51 +271,9 @@ local function buildConfigTable()
             safeZoneEnabled = CFG.safeZoneEnabled,
             autoDetectMap = CFG.autoDetectMap,
             dodgeEnabled = CFG.dodgeEnabled,
-            cloneSafetyMargin = CFG.cloneSafetyMargin,
-            cloneCommitTime = CFG.cloneCommitTime,
-            cloneManual = CFG.cloneManual,
-            cloneEnemyRadius = CFG.cloneEnemyRadius,
-            cloneEnemySoftRadius = CFG.cloneEnemySoftRadius,
-            cloneSafeDwell = CFG.cloneSafeDwell,
-            cloneKeepDistance = CFG.cloneKeepDistance,
-            threatWeight = CFG.threatWeight,
-            threatMoveAt = CFG.threatMoveAt,
             moveMode = CFG.moveMode,
             moveTakeControls = CFG.moveTakeControls,
             moveArriveRadius = CFG.moveArriveRadius,
-            adaptiveLookahead = CFG.adaptiveLookahead,
-            threatWallWeight = CFG.threatWallWeight,
-            threatEnclosureWeight = CFG.threatEnclosureWeight,
-            coverEnabled = CFG.coverEnabled,
-            coverRelief = CFG.coverRelief,
-            threatEnclosureRange = CFG.threatEnclosureRange,
-            escapeScanEnabled = CFG.escapeScanEnabled,
-            escapeScanFar = CFG.escapeScanFar,
-            cloneStuckTime = CFG.cloneStuckTime,
-            threatWallSpread = CFG.threatWallSpread,
-            cloneStepHeight = CFG.cloneStepHeight,
-            threatProjectileLead = CFG.threatProjectileLead,
-            threatProjectileWake = CFG.threatProjectileWake,
-            threatProbeRadius = CFG.threatProbeRadius,
-            threatMargin = CFG.threatMargin,
-            cloneEvalBudget = CFG.cloneEvalBudget,
-            threatCurve = CFG.threatCurve,
-            threatColorBands = CFG.threatColorBands,
-            threatFutureBias = CFG.threatFutureBias,
-            threatSweepEnabled = CFG.threatSweepEnabled,
-            threatSweepTime = CFG.threatSweepTime,
-            threatLethal = CFG.threatLethal,
-            threatHorizon = CFG.threatHorizon,
-            threatFalloff = CFG.threatFalloff,
-            showThreatGradient = CFG.showThreatGradient,
-            dodgeProjectiles = CFG.dodgeProjectiles,
-            cloneGridSpacing = CFG.cloneGridSpacing,
-            cloneMaxCells = CFG.cloneMaxCells,
-            cloneDangerCost = CFG.cloneDangerCost,
-            cloneDepthBonus = CFG.cloneDepthBonus,
-            showClonePrisms = CFG.showClonePrisms,
-            cloneDiscScale = CFG.cloneDiscScale,
-            showClones = CFG.showClones,
             macroLoop = CFG.macroLoop,
             macroShowRoute = CFG.macroShowRoute,
             macroRecordBind = MC.recordBind.Name,
@@ -411,13 +383,16 @@ local function applyConfigData(data)
             or combat.macroMode == "clone" then
             MC.mode = combat.macroMode
         end
-        CFG.cloneCount = tonumber(combat.cloneCount) or CFG.cloneCount
-        CFG.cloneRings = tonumber(combat.cloneRings) or CFG.cloneRings
-        CFG.cloneRadius = tonumber(combat.cloneRadius) or CFG.cloneRadius
-        CFG.cloneInnerRadius = tonumber(combat.cloneInnerRadius) or CFG.cloneInnerRadius
-        CFG.cloneRingSpacing = tonumber(combat.cloneRingSpacing) or CFG.cloneRingSpacing
-        if combat.cloneAutoRings ~= nil then CFG.cloneAutoRings = combat.cloneAutoRings == true end
         if combat.pathfindingEnabled ~= nil then CFG.pathfindingEnabled = combat.pathfindingEnabled == true end
+        for _, key in ipairs({ "dodgeInterval", "dodgeReach", "dodgeRings", "dodgeRays", "dodgeProbe",
+            "dodgeMargin", "dodgeShoulder", "dodgeLead", "dodgeLinger", "dodgeDwell", "dodgeMoveAt",
+            "dodgeHysteresis", "dodgeDistanceCost", "dodgeEnemyRadius", "dodgeEnemySoft",
+            "dodgeMaxClimb", "dodgeMaxDrop" }) do
+            CFG[key] = tonumber(combat[key]) or CFG[key]
+        end
+        for _, key in ipairs({ "dodgeManual", "dodgeShowField", "dodgeShowTarget" }) do
+            if combat[key] ~= nil then CFG[key] = combat[key] == true end
+        end
         if combat.attackMethod == "auto" or combat.attackMethod == "tool" or combat.attackMethod == "click" then
             CFG.attackMethod = combat.attackMethod
         end
@@ -428,54 +403,12 @@ local function applyConfigData(data)
         if combat.safeZoneEnabled ~= nil then CFG.safeZoneEnabled = combat.safeZoneEnabled == true end
         if combat.autoDetectMap ~= nil then CFG.autoDetectMap = combat.autoDetectMap == true end
         if combat.dodgeEnabled ~= nil then CFG.dodgeEnabled = combat.dodgeEnabled == true end
-        CFG.cloneSafetyMargin = tonumber(combat.cloneSafetyMargin) or CFG.cloneSafetyMargin
-        CFG.cloneCommitTime = tonumber(combat.cloneCommitTime) or CFG.cloneCommitTime
-        if combat.showClones ~= nil then CFG.showClones = combat.showClones == true end
-        if combat.cloneManual ~= nil then CFG.cloneManual = combat.cloneManual == true end
-        CFG.cloneEnemyRadius = tonumber(combat.cloneEnemyRadius) or CFG.cloneEnemyRadius
-        CFG.cloneEnemySoftRadius = tonumber(combat.cloneEnemySoftRadius) or CFG.cloneEnemySoftRadius
-        CFG.cloneSafeDwell = tonumber(combat.cloneSafeDwell) or CFG.cloneSafeDwell
-        if combat.cloneKeepDistance ~= nil then CFG.cloneKeepDistance = combat.cloneKeepDistance == true end
-        CFG.threatWeight = tonumber(combat.threatWeight) or CFG.threatWeight
-        CFG.threatMoveAt = tonumber(combat.threatMoveAt) or CFG.threatMoveAt
         local mode = combat.moveMode
         if mode == "walk" or mode == "steer" or mode == "velocity" or mode == "tween" then
             CFG.moveMode = mode
         end
         CFG.moveArriveRadius = tonumber(combat.moveArriveRadius) or CFG.moveArriveRadius
         if combat.moveTakeControls ~= nil then CFG.moveTakeControls = combat.moveTakeControls == true end
-        if combat.adaptiveLookahead ~= nil then CFG.adaptiveLookahead = combat.adaptiveLookahead == true end
-        CFG.threatWallWeight = tonumber(combat.threatWallWeight) or CFG.threatWallWeight
-        CFG.threatEnclosureWeight = tonumber(combat.threatEnclosureWeight) or CFG.threatEnclosureWeight
-        CFG.coverRelief = tonumber(combat.coverRelief) or CFG.coverRelief
-        if combat.coverEnabled ~= nil then CFG.coverEnabled = combat.coverEnabled == true end
-        CFG.threatEnclosureRange = tonumber(combat.threatEnclosureRange) or CFG.threatEnclosureRange
-        CFG.escapeScanFar = tonumber(combat.escapeScanFar) or CFG.escapeScanFar
-        CFG.cloneStuckTime = tonumber(combat.cloneStuckTime) or CFG.cloneStuckTime
-        if combat.escapeScanEnabled ~= nil then CFG.escapeScanEnabled = combat.escapeScanEnabled == true end
-        CFG.cloneStepHeight = tonumber(combat.cloneStepHeight) or CFG.cloneStepHeight
-        if combat.threatWallSpread ~= nil then CFG.threatWallSpread = combat.threatWallSpread == true end
-        CFG.threatProjectileLead = tonumber(combat.threatProjectileLead) or CFG.threatProjectileLead
-        CFG.threatProjectileWake = tonumber(combat.threatProjectileWake) or CFG.threatProjectileWake
-        CFG.threatProbeRadius = tonumber(combat.threatProbeRadius) or CFG.threatProbeRadius
-        CFG.threatMargin = tonumber(combat.threatMargin) or CFG.threatMargin
-        CFG.cloneEvalBudget = tonumber(combat.cloneEvalBudget) or CFG.cloneEvalBudget
-        CFG.threatCurve = tonumber(combat.threatCurve) or CFG.threatCurve
-        CFG.threatColorBands = tonumber(combat.threatColorBands) or CFG.threatColorBands
-        CFG.threatFutureBias = tonumber(combat.threatFutureBias) or CFG.threatFutureBias
-        CFG.threatSweepTime = tonumber(combat.threatSweepTime) or CFG.threatSweepTime
-        if combat.threatSweepEnabled ~= nil then CFG.threatSweepEnabled = combat.threatSweepEnabled == true end
-        CFG.threatLethal = tonumber(combat.threatLethal) or CFG.threatLethal
-        CFG.threatHorizon = tonumber(combat.threatHorizon) or CFG.threatHorizon
-        CFG.threatFalloff = tonumber(combat.threatFalloff) or CFG.threatFalloff
-        if combat.showThreatGradient ~= nil then CFG.showThreatGradient = combat.showThreatGradient == true end
-        if combat.dodgeProjectiles ~= nil then CFG.dodgeProjectiles = combat.dodgeProjectiles == true end
-        CFG.cloneGridSpacing = tonumber(combat.cloneGridSpacing) or CFG.cloneGridSpacing
-        CFG.cloneMaxCells = tonumber(combat.cloneMaxCells) or CFG.cloneMaxCells
-        CFG.cloneDangerCost = tonumber(combat.cloneDangerCost) or CFG.cloneDangerCost
-        CFG.cloneDepthBonus = tonumber(combat.cloneDepthBonus) or CFG.cloneDepthBonus
-        if combat.showClonePrisms ~= nil then CFG.showClonePrisms = combat.showClonePrisms == true end
-        CFG.cloneDiscScale = tonumber(combat.cloneDiscScale) or CFG.cloneDiscScale
         if combat.macroLoop ~= nil then CFG.macroLoop = combat.macroLoop == true end
         if combat.macroShowRoute ~= nil then CFG.macroShowRoute = combat.macroShowRoute == true end
         if type(combat.macroRecordBind) == "string" then
@@ -828,98 +761,26 @@ local function watchDungeonName()
     return true
 end
 
--- One button's worth of tuning. These are the values arrived at across the
--- dungeons tested so far, kept here rather than in the UI so the defaults and
--- the reset cannot drift apart.
-local RECOMMENDED_CLONE = {
-    cloneGridSpacing = 1.5, cloneRadius = 22, cloneMaxCells = 900,
-    cloneEvalBudget = 320, cloneDiscScale = 1.0,
-    threatProbeRadius = 0, threatMargin = 0.4,
-    threatWeight = 2.6, threatLethal = 55, threatMoveAt = 6,
-    threatHorizon = 4.0, threatCurve = 3.0, threatFalloff = 7.0,
-    threatFutureBias = 0.65, threatColorBands = 9,
-    threatSweepTime = 3.0, threatProjectileLead = 1.1, threatProjectileWake = 0.3,
-    threatWallWeight = 60, cloneStepHeight = 2.5,
-    escapeScanFar = 2.8, escapeMargin = 12, cloneStuckTime = 0.7,
-    threatEnclosureWeight = 0.55, threatEnclosureRange = 6.0,
-    coverRelief = 0.75, threatSliceMid = 1.0, threatSliceLate = 2.6,
-    cloneEnemyRadius = 12.0, cloneEnemySoftRadius = 20.0,
-    cloneSafeDwell = 1.6, cloneCommitTime = 0.35, cloneDepthBonus = 1.5,
+-- One button's worth of tuning (4.0.0). Kept beside the loader so the defaults
+-- and the reset cannot drift apart.
+local RECOMMENDED_DODGE = {
+    dodgeInterval = 0.05, dodgeReach = 18, dodgeRings = 3, dodgeRays = 16,
+    dodgeProbe = 0, dodgeMargin = 0.5, dodgeShoulder = 3.0,
+    dodgeLead = 1.2, dodgeLinger = 0.35, dodgeDwell = 1.2,
+    dodgeMoveAt = 0.15, dodgeHysteresis = 0.12, dodgeDistanceCost = 0.008,
+    dodgeEnemyRadius = 12, dodgeEnemySoft = 20,
+    dodgeMaxClimb = 3.0, dodgeMaxDrop = 10.0, dodgeRayBudget = 12,
+    moveMode = "tween", moveArriveRadius = 1.2,
 }
 
--- SIMPLE
---
--- The clone system has sixty-eight settings. Each one was a fair response to a
--- specific failure, but together they interact in ways neither the code nor
--- anyone reading it can predict - enclosure fought cover, freshness fought
--- hysteresis, the wall pass fought the slicing. Every fix has had a decent
--- chance of breaking something else.
---
--- This is the small version: exact geometry, exact timing, a precise mover, and
--- almost nothing else. It is what a script that does this well in a few hundred
--- lines actually contains, and it is the configuration to judge the dodging by,
--- because when it fails there are few enough moving parts to say why.
-local function applySimpleClone()
-    -- Ground truth and precision: keep.
-    CFG.usePrecast = true
-    CFG.moveMode = "tween"
-    CFG.moveArriveRadius = 1.2
-    CFG.threatProbeRadius = 0
-    CFG.threatMargin = 0.4
-
-    -- The field: dense, honest, and read at the time we would arrive.
-    CFG.cloneGridSpacing = 1.5
-    CFG.cloneRadius = 24
-    CFG.cloneMaxCells = 900
-    CFG.cloneEvalBudget = 900          -- no slicing: one consistent snapshot
-    CFG.threatHorizon = 4.0
-    CFG.threatCurve = 3.0
-    CFG.threatLethal = 55
-    CFG.threatMoveAt = 6
-    CFG.threatWeight = 2.6
-    CFG.threatFalloff = 7.0
-    CFG.cloneSafeDwell = 1.6
-
-    -- Enemies and walls still matter; nothing else does.
-    CFG.cloneEnemyRadius = 12
-    CFG.cloneEnemySoftRadius = 20
-    CFG.cloneKeepDistance = true
-    CFG.threatWallWeight = 60
-    CFG.threatSweepEnabled = true
-    CFG.dodgeProjectiles = true
-
-    -- Off: every heuristic that has been caught fighting another one.
-    CFG.threatWallSpread = false       -- enclosure
-    CFG.coverEnabled = false
-    CFG.escapeScanEnabled = false
-    CFG.cloneDepthBonus = 0
-    CFG.threatEnclosureWeight = 0
-    CFG.cloneFreshnessBias = 0
-    CFG.cloneGoalHysteresis = 25
-    CFG.threatFutureBias = 0.65
-    CFG.adaptiveLookahead = true
-
-    heavyDebug("Clone", "Simple mode: exact geometry, exact timing, precise movement, "
-        .. "and none of the heuristics that have been caught fighting each other. "
-        .. "If dodging fails here, there are few enough parts left to say why.")
+local function applyRecommendedDodge()
+    for key, value in pairs(RECOMMENDED_DODGE) do CFG[key] = value end
+    CFG.dodgeShowField = true
+    CFG.dodgeShowTarget = true
+    heavyDebug("Dodge", "Dodge settings reset to the recommended tuning.")
 end
 
-local function applyRecommendedClone()
-    for key, value in pairs(RECOMMENDED_CLONE) do CFG[key] = value end
-    CFG.threatSweepEnabled = true
-    CFG.threatWallSpread = true
-    CFG.escapeScanEnabled = true
-    CFG.coverEnabled = true
-    CFG.dodgeProjectiles = true
-    CFG.showThreatGradient = true
-    CFG.cloneAutoRings = true
-    CFG.cloneKeepDistance = true
-    CFG.showClonePrisms = false
-    heavyDebug("Clone", "Clone settings reset to the recommended tuning.")
-end
-
-S.applyRecommendedClone = applyRecommendedClone
-S.applySimpleClone = applySimpleClone
+S.applyRecommendedDodge = applyRecommendedDodge
 S.setCurrentMap = setCurrentMap
 S.watchDungeonName = watchDungeonName
 S.applyDetectedMap = applyDetectedMap

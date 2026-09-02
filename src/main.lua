@@ -57,12 +57,12 @@ local recordStep = S.recordStep
 local runMacroPlayback = S.runMacroPlayback
 local startMacroInput = S.startMacroInput
 local startPrecastListener = S.startPrecastListener
-local CL = S.CL
+local DG = S.DG
 local ZN = S.ZN
 local LD = S.LD
-local cloneStep = S.cloneStep
-local runCloneEvasion = S.runCloneEvasion
-local buildClones = S.buildClones
+local dodgeStep = S.dodgeStep
+local runDodge = S.runDodge
+local buildDodgeVisuals = S.buildDodgeVisuals
 
 -- Trial runs (2.3.0): every drop in health is handed to the correlator while a
 -- trial run is on. The connection is per character and rebuilt on respawn.
@@ -212,8 +212,8 @@ local function attackEnemy(enemy)
     -- Reach has to cover the stand-off distance, otherwise the bot would walk
     -- back into melee purely so it could swing.
     local reach = CFG.attackRange
-    if CFG.cloneKeepDistance and CL.active then
-        reach = math.max(reach, CFG.cloneEnemyRadius + 2)
+    if DG.active then
+        reach = math.max(reach, CFG.dodgeEnemyRadius + 2)
     end
     if flatOffset.Magnitude <= reach and RT.farmEnabled and not RT.destroyed and RT.gameSpecificAttackMethod then
         RT.gameSpecificAttackMethod(enemy)
@@ -489,9 +489,8 @@ local function startAutofarm()
         root = newChar:WaitForChild("HumanoidRootPart")
         watchOwnAnimations(newChar)
         watchHealth(newChar)
-        -- The ring is sized from the character's own hitbox, so a respawn
-        -- means rebuilding it rather than leaving volumes around the old body.
-        if CL.active then buildClones() end
+        -- The box is sized from the character, so a respawn rebuilds it.
+        if DG.active then buildDodgeVisuals() end
     end)
 
     -- Index maintenance + throttled enemy scan. The index step runs even while
@@ -611,24 +610,22 @@ local function startAutofarm()
 
             useAutoAbilities()
 
-            -- The clone ring follows the character whether or not anything is
-            -- threatening, so its pads are already telling the truth by the
-            -- time one is needed.
-            if CL.active then cloneStep(root) end
+            -- The dodge decides every frame whether or not anything is
+            -- threatening, so the box is already in the right place when it
+            -- is needed.
+            if DG.active then dodgeStep(root, humanoid) end
 
-            -- Manual clone: the ring is the whole feature. It watches, it
-            -- colours, and it pulls you out of an attack - and nothing else
+            -- Manual: dodge only. It pulls you out of attacks and nothing else
             -- runs, so the character is yours between dodges.
-            if CL.active and CFG.cloneManual then
-                if (S.getThreatAt(root.Position, 0) or 0) >= CFG.threatMoveAt then
-                    heavyDebugOnChange("loop_branch", "clone_manual_dodge", "Loop",
-                        "BRANCH: CLONE MANUAL - dodging.")
-                    runCloneEvasion(humanoid, root)
+            if DG.active and CFG.dodgeManual then
+                if DG.target or DG.dangerHere >= CFG.dodgeMoveAt then
+                    heavyDebugOnChange("loop_branch", "dodge_manual_move", "Loop",
+                        "BRANCH: DODGE MANUAL - moving.")
+                    runDodge(humanoid, root)
                 else
-                    heavyDebugOnChange("loop_branch", "clone_manual", "Loop",
-                        "BRANCH: CLONE MANUAL - watching; you have the controls.")
-                    setMovementState(string.format("CLONE manual (%d/%d safe)",
-                        CL.safeCount, #CL.nodes))
+                    heavyDebugOnChange("loop_branch", "dodge_manual", "Loop",
+                        "BRANCH: DODGE MANUAL - watching; you have the controls.")
+                    setMovementState(string.format("DODGE manual (danger %.2f)", DG.dangerHere))
                     NAV.lastIssuedMove = nil
                 end
                 releaseFacing(humanoid)
@@ -639,15 +636,12 @@ local function startAutofarm()
             -- sets this; the recovery detector reads it after the branch.
             NAV.driving = false
 
-            -- In Clone mode the trigger is heat, not a yes/no. The binary test
-            -- called a heat-40 square "safe", so the bot skipped evasion
-            -- entirely and went off to pursue an enemy through it: the field
-            -- was being computed and then ignored for the one decision that
-            -- actually matters. Any warmth now means relocate.
+            -- In Dodge mode the trigger is the dodge's own verdict on here, and
+            -- an en-route box keeps it in charge until it arrives.
             local inHazard
-            if CL.active then
+            if DG.active then
                 inHazard = CFG.dodgeEnabled
-                    and (S.getThreatAt(root.Position, 0) or 0) >= CFG.threatMoveAt
+                    and (DG.target ~= nil or DG.dangerHere >= CFG.dodgeMoveAt)
             else
                 inHazard = CFG.dodgeEnabled and not isPositionSafeFromDamageBricks(root.Position, 0.5)
             end
@@ -682,7 +676,7 @@ local function startAutofarm()
 
                 -- Recompute when the route runs out, the destination stopped being
                 -- safe (a new telegraph landed on it), or the cache went stale.
-                if not CL.active and not NAV.computingEscape
+                if not DG.active and not NAV.computingEscape
                     and (routeSpent or not targetStillSafe
                         or (clock - NAV.lastEscapeTime) >= CFG.escapeRecomputeInterval) then
                     NAV.lastEscapeTime = clock
@@ -693,14 +687,12 @@ local function startAutofarm()
                     end)
                 end
 
-                if CL.active then
-                    -- Clone mode dodges by stepping into the best green volume
-                    -- rather than searching for an escape point each time.
-                    if not runCloneEvasion(humanoid, root) then
+                if DG.active then
+                    if not runDodge(humanoid, root) then
                         local repulsion = getActiveHazardRepulsionVector(root.Position)
                         local fallbackDir = repulsion.Magnitude > 0.1 and repulsion.Unit or Vector3.new(0, 0, 1)
                         humanoid:MoveTo(root.Position + (fallbackDir * 10))
-                        setMovementState("CLONE - repulsion fallback")
+                        setMovementState("DODGE - repulsion fallback")
                     end
                 elseif not followEscapeRoute(humanoid, root) then
                     local repulsion = getActiveHazardRepulsionVector(root.Position)

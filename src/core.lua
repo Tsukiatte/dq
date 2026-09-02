@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 3.6.2
+    VERSION : 4.0.0
     BUILD   : 2026-09-01
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "3.6.2"
+local SCRIPT_VERSION = "4.0.0"
 local SCRIPT_BUILD_DATE = "2026-09-01"
-local SCRIPT_CODENAME = "Actuator"
+local SCRIPT_CODENAME = "The box"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "4.0.0", date = "2026-09-02", notes = "The dodge is rebuilt from scratch around the thing that actually works in a few hundred lines: a box that is never in danger, and a character that follows it. clone.lua and threat.lua are gone - the 900-cell grid, the heat field, the space-time A*, the enclosure, cover, depth, freshness, hysteresis and slicing passes, and seventy-nine settings with them. What remains is 1009 lines across dodge, mover and precast. A few dozen points around the character are checked twenty times a second for what lands on the way there and what lands once you stop, at the moments those things happen, using exact geometry and timing for announced attacks, the footprint for physical ones, a swept segment for anything moving and a circle for every enemy. The box goes on the best point; the character goes to the box. There is no path: deciding every frame and moving exactly, the straight line is the path, and the on-the-way check is what keeps that line off anything that lands while you are on it. Ground truth detection, the precast listener and the collision-checked tween mover are kept unchanged." },
     { version = "3.6.2", date = "2026-09-02", notes = "Why steer and velocity both stood still: nothing was disabling Roblox's default control module. It calls Humanoid:Move every frame from input - with no keys held that is Move(zero) - on RenderStepped, BEFORE physics, while ours lands on Heartbeat after. Its stop is what physics sees. MoveTo survived only because it is a separate persistent mechanism. Tween is the default now, because writing the CFrame is the one path the control module cannot argue with, and it is what a script that tweens to a marker is doing. It is capped to the distance the character could actually have walked this frame, so the speed a server sees is ordinary walking speed, and each step is raycast so it never passes through anything - clipping through a wall is the one genuinely conspicuous thing about moving this way and it is now impossible. The Move-based modes take the player controls while they run and hand them straight back." },
     { version = "3.6.1", date = "2026-09-02", notes = "Fixes the regression 3.6.0 shipped. The new velocity mover wrote the horizontal velocity and then called Humanoid:Move(Vector3.zero) on the very next line - and Move(zero) is an instruction to BRAKE, which the Humanoid re-applies every physics step. The two fought and the Humanoid always wins, so the character stood still in the middle of attacks. Both must be told the same direction; then the Humanoid handles animation, footing and slopes while the direct write removes the acceleration ramp. The default is now steer, which is plain Humanoid:Move with a direction: it still fixes the arrival tolerance and the re-planning that made MoveTo miss, and it cannot stall because it is the Humanoid driving itself. And a watchdog - any mode that is asked to move and produces no movement for a second falls back to walk, so a mover bug can never again strand the character inside an attack." },
     { version = "3.6.0", date = "2026-09-02", notes = "Every dodge was issued as Humanoid:MoveTo, and that is most of why the dodging looked broken however good the decision was. MoveTo accelerates for about a quarter of a second, arrives only within roughly two studs, and re-plans on every call - so in a three-stud gap between two beams it arrives late and off the mark. Standing in the middle of attacks, stopping at the edge of one instead of going around, and scraping along walls are all descriptions of an actuator failing rather than a chooser failing. Movement is now selectable: walk is the old MoveTo, steer uses Humanoid:Move, velocity writes the horizontal assembly velocity directly for instant direction changes and exact arrival while physics still applies, and tween steps the root CFrame for stud-exact movement that ignores collision. Velocity is the default. Also added Simple mode: the clone system has sixty-eight settings and they have repeatedly been caught fighting each other, so Simple turns off every heuristic that has done so and leaves exact geometry, exact timing and precise movement." },
@@ -130,15 +131,14 @@ local HZ = {}
 local LD = {}
 -- MC = macro recording and playback.
 local MC = {}
--- CL = clone evasion: the ring of volumes and what each one currently thinks.
-local CL = {}
+-- DG = dodge: the box, the candidates around the character, and what was
+-- gathered for the last decision.
+local DG = {}
 -- ZN = hand-drawn hazard zones: the definitions, and the live volumes built
 -- from them.
 local ZN = {}
 -- PC = precast: the attacks the game has announced but not yet landed.
 local PC = {}
--- TH = threat field: the sources it is built from each pass.
-local TH = {}
 -- RT = loose runtime flags and handles (farmEnabled, debugLevel, connections...)
 -- that used to be bare locals. They live in a table so every module sees the
 -- same value; a bare local copied into another module would go stale.
@@ -453,6 +453,35 @@ CFG.autoDetectMap = true
 -- no amount of appearance scoring will make a decal into a hitbox. So you point
 -- at the decoration and draw the volume around it yourself, and from then on
 -- every copy of that decoration carries one.
+-- Dodge (4.0.0). Few on purpose: the previous system had sixty-eight and they
+-- were caught fighting each other three times in six versions.
+CFG.dodgeInterval = 0.05         -- seconds between decisions
+CFG.dodgeReach = 18              -- studs to the outer ring of candidates
+CFG.dodgeRings = 3
+CFG.dodgeRays = 16
+CFG.dodgeProbe = 0               -- studs; 0 uses the root part's radius
+CFG.dodgeMargin = 0.5            -- clearance on top of the probe
+CFG.dodgeShoulder = 3.0          -- studs of warm edge outside a hazard
+CFG.dodgeLead = 1.2              -- seconds before impact a zone counts as live
+CFG.dodgeLinger = 0.35           -- seconds after impact it still does
+CFG.dodgeDwell = 1.2             -- seconds a spot must stay clear after arrival
+CFG.dodgeMoveAt = 0.15           -- danger here at or above this: relocate
+CFG.dodgeHysteresis = 0.12       -- a new spot must beat the box by this
+CFG.dodgeDistanceCost = 0.008    -- danger-equivalent per stud of travel
+CFG.dodgeEnemyRadius = 12
+CFG.dodgeEnemySoft = 20
+CFG.dodgeMoverMinSpeed = 3       -- studs/sec before a hazard counts as moving
+CFG.dodgeMoverWindow = 0.15      -- half-width, seconds, of a mover's swept segment
+CFG.dodgeMaxClimb = 3.0
+CFG.dodgeMaxDrop = 10.0
+CFG.dodgeRayBudget = 12          -- candidates raycast per decision, cheapest first
+CFG.dodgeManual = false          -- dodge only; you drive the rest
+CFG.dodgeShowField = true
+CFG.dodgeShowTarget = true
+CFG.colorDodgeTarget = Color3.fromRGB(255, 255, 255)
+CFG.colorDodgeSafe = Color3.fromRGB(60, 220, 120)
+CFG.colorDodgeDanger = Color3.fromRGB(255, 70, 70)
+
 CFG.zoneDefaultRadius = 12.0
 CFG.zoneDefaultHeight = 14.0
 CFG.zoneMinRadius = 2.0
@@ -480,49 +509,6 @@ CFG.panelAttacks = true
 -- Saved configs. As many as you like, each a full snapshot of every setting.
 CFG.configFile = "DungeonAutofarm_configs.json"
 
--- Clone evasion (2.9.0). A ring of player-sized volumes around the character,
--- each continuously tested against the live hazards. When something is about to
--- hit you the bot steps into the best green one. It is the same job the Legacy
--- escape search does, except the candidates are visible and you can watch it
--- decide.
-CFG.cloneCount = 24              -- total volumes, spread over the rings below
-CFG.cloneRings = 2               -- inner ring at 55% of the radius, outer at 100%
-CFG.cloneRadius = 12.0
-CFG.cloneEvalInterval = 0.08     -- how often safety is re-tested (positions move every frame)
-CFG.cloneSafetyMargin = 0.75      -- extra clearance a clone must have to count as safe
-CFG.cloneMaxDrop = 12.0          -- a clone whose floor is further below this is off a ledge
-CFG.cloneMaxClimb = 6.0
--- Terrain as heat (3.2.2). "Has a floor" is not the same question as "can I get
--- there": a ledge you must jump onto and a wall in the way both have perfectly
--- good floors. A Roblox humanoid steps up about this much for free; anything
--- higher needs a jump, and a jump in the middle of a boss fight is a moment
--- spent not dodging.
-CFG.cloneStepHeight = 2.5
-CFG.threatWallWeight = 60        -- heat for ground you cannot simply walk onto
-CFG.threatWallSpread = true      -- warm the cells beside a wall as well
--- Enclosure. A green pocket ringed by red is a TRAP: you can stand in it right
--- now and have nowhere to go the moment it closes. Cells inherit a share of the
--- heat around them, so an enclosed pocket reads hotter than open ground of the
--- same local safety and the bot strafes out instead of backing into a corner.
--- Space-time slices (3.5.0). Each cell stores its heat at three moments, and
--- the search interpolates for the time it would actually arrive having gone
--- round whatever was in the way. Sampling a cell at its straight-line ETA is a
--- different question from what it will be when you really get there.
--- Cover (3.5.0). When a radial burst fills the arena there is no open safe
--- ground, and the answer is not to find the least bad patch of it - it is to
--- put something solid between you and the source. The arena pillars are exactly
--- that, and until now the grid treated them only as obstacles to route round.
-CFG.coverEnabled = true
-CFG.coverRelief = 0.75           -- share of a source's heat that cover removes
-CFG.coverBudget = 90             -- line-of-sight rays per pass
-CFG.coverRefresh = 0.4           -- seconds a cover verdict is trusted
-CFG.colorCover = Color3.fromRGB(90, 160, 255)
-
-CFG.threatSliceMid = 1.0         -- seconds; the middle sample
-CFG.threatSliceLate = 2.6        -- seconds; the late sample
-CFG.threatEnclosureWeight = 0.55
-CFG.threatEnclosureRange = 6.0   -- studs out to sample for a way through
-
 -- Looking past the edge of the grid (3.2.5). The window only reaches about
 -- twenty studs; cornered with attacks inside all of it, the genuinely clear
 -- ground is simply invisible and the bot settles for the least bad corner.
@@ -535,19 +521,6 @@ CFG.diagnoseAttacks = false
 CFG.diagnoseRadius = 90
 CFG.diagnoseMax = 900
 CFG.diagnoseFile = "DungeonAutofarm_attacklog.txt"
-
--- Adaptive lookahead. Borrowed from the standalone heatmap prototype, which
--- scales its prediction window inversely with the agent's speed: a slow agent
--- cannot dodge reactively, so it has to see danger coming much earlier. Every
--- horizon in this script was a fixed constant regardless of WalkSpeed, which
--- meant the same warning time whether you were sprinting or crawling.
-CFG.adaptiveLookahead = true
-CFG.lookaheadBaseSpeed = 16      -- the WalkSpeed the tuned horizons assume
-
-CFG.escapeScanEnabled = true
-CFG.escapeScanRays = 16          -- directions sampled beyond the grid
-CFG.escapeScanFar = 2.8          -- times the grid radius
-CFG.escapeMargin = 12            -- heat it must beat the local best by to bother
 
 -- Being pinned is its own failure, and the ordinary stuck detector is switched
 -- off while dodging.
@@ -569,113 +542,6 @@ CFG.moveMode = "tween"
 -- the moment it stops.
 CFG.moveTakeControls = true
 CFG.moveArriveRadius = 1.2       -- studs; MoveTo's own tolerance is nearer 2
-
-CFG.cloneGoalHysteresis = 45     -- a new goal must beat the held one by this
-CFG.clonePathInterval = 0.12     -- seconds between full re-plans
-CFG.cloneFreshnessBias = 18      -- score penalty for a cell measured long ago
-
-CFG.cloneStuckTime = 0.7         -- seconds of no progress before intervening
-CFG.cloneStuckDistance = 1.5     -- studs that counts as progress
-CFG.cloneCommitTime = 0.35       -- hold a chosen clone this long before reconsidering
--- Where the innermost ring sits. Not a fraction of the radius: a fraction
--- means the hole around the character grows every time you widen the ring,
--- which is the one place you most need somewhere to step.
-CFG.cloneInnerRadius = 4.0
--- Rings are added automatically so the gap between them stays about this, no
--- matter how wide the ring is. The Rings slider is the floor, not the answer.
-CFG.cloneAutoRings = true
-CFG.cloneRingSpacing = 6.0
-CFG.cloneMaxVolumes = 100        -- slider ceilings
-CFG.cloneMaxRings = 10
--- Manual mode: the ring dodges for you, but nothing else runs. No target
--- hunting, no pursuit, no waypoints - you drive, it pulls you out of attacks.
-CFG.cloneManual = false
-CFG.showClones = true
--- The grid (2.15.0). Dense by default: boss fights have safe pockets a few
--- studs wide, and a disc the size of your hitbox every 1.5 studs is what it
--- takes to find one. The cell budget caps the cost; the radius is a request.
-CFG.cloneGridSpacing = 1.5
-CFG.cloneMaxCells = 900
-CFG.cloneDangerCost = 25         -- a red cell costs this many green ones to cross
-CFG.cloneDepthBonus = 1.5        -- studs of extra travel one cell of depth is worth
-CFG.clonePenaltyWeight = 0.05
-CFG.cloneFloorRefresh = 3.0      -- seconds a cached floor height is trusted
-CFG.cloneFloorBudget = 150       -- floor raycasts per evaluation
--- Cells re-tested per pass. The whole grid no longer has to be judged in one
--- go: verdicts persist between passes, so a big grid refreshes in slices
--- instead of dropping a frame every time it thinks. This is the single knob
--- that decides whether a large radius is affordable on a weak machine.
-CFG.cloneEvalBudget = 320
-CFG.showClonePrisms = false      -- hundreds of prisms at boss density; off unless asked
-CFG.colorClonePath = Color3.fromRGB(80, 170, 255)
--- Disc diameter as a multiple of the character's real footprint (2.15.1).
-CFG.cloneDiscScale = 1.0
-CFG.cloneMaxFootprint = 3.0      -- studs; a cosmetic cannot inflate past this
--- Melee enemies do not telegraph. Standing next to one is simply fatal, so the
--- grid gives every live enemy a circle of its own.
-CFG.cloneEnemyRadius = 12.0
-CFG.cloneEnemySoftRadius = 20.0  -- beyond the hard circle, discouraged not forbidden
--- Chasing obeys the same circle the grid draws. Without this the dodge kept its
--- distance and the pursuit immediately walked back into melee, which on a high
--- tier is one tap.
-CFG.cloneKeepDistance = true
-
--- Threat field (3.1.0). Heat rather than a yes/no verdict: in a fan of beams
--- every square is unsafe, so a boolean leaves the search nothing to choose
--- between and the character stands still and dies.
-CFG.threatWeight = 2.6           -- studs of detour one point of heat is worth
-CFG.threatLethal = 55            -- at or above this a cell is impassable...
-CFG.threatDesperate = true       -- ...unless there is no path at all
-CFG.threatHorizon = 4.0          -- seconds ahead an announced attack starts to matter
--- Shape of the ramp from "announced" to "landing". Higher stays cool longer and
--- then reddens hard, which is what a delayed attack actually does: it is not
--- dangerous at all until it nearly lands. Squared went lethal a full second
--- early, which quietly turned every marker into a wall.
-CFG.threatCurve = 3.0
--- How much the heat where you WILL be outweighs the heat where you arrive. A
--- cell that is cool now and hot in a moment is a trap, not a destination.
-CFG.threatFutureBias = 0.65
-CFG.threatFalloff = 7.0          -- studs of warm shoulder outside a hazard edge
--- What safety actually probes with, in studs, INDEPENDENT of the disc drawn on
--- screen. This is what decides the smallest gap the grid can find: a probe of
--- radius r cannot see a safe pocket narrower than 2r, so probing with the whole
--- body including limbs made it blind to exactly the small pockets that matter.
--- The game damages against the root part, which is about a stud across, so that
--- is what the probe should be. 0 means "use the character's root radius".
-CFG.threatProbeRadius = 0
-CFG.threatMargin = 0.4           -- clearance added to the probe before anything counts
--- Any heat at or above this and the bot relocates. Deliberately low: standing
--- in something warm waiting for it to become lethal is not a plan.
-CFG.threatMoveAt = 6
--- A moving hazard heats the whole corridor it is about to sweep, not just the
--- square it currently occupies.
-CFG.threatSweepEnabled = true
-CFG.threatSweepTime = 3.0        -- seconds of flight path treated as dangerous
--- A projectile is dangerous in a WINDOW around the moment it passes, not on a
--- ramp. Before it arrives you can cross and be gone; once it has passed, the
--- ground behind it is the safest on the map. The ground-attack ramp got both
--- of those backwards.
-CFG.threatProjectileLead = 1.1   -- seconds before the pass that still count
-CFG.threatProjectileWake = 0.3   -- seconds after it, before the ground is clear
-CFG.showThreatGradient = true    -- colour discs by heat rather than safe/unsafe
--- Discrete bands rather than a continuous blend. Across several hundred discs a
--- smooth ramp turns to mush; banding makes "this patch is cooler than that one"
--- readable at a glance, which is the whole point of drawing it.
-CFG.threatColorBands = 9
-
--- Projectile steering: the reflex under the grid, for things already in the air.
-CFG.dodgeProjectiles = true
-CFG.dodgeLookahead = 1.4         -- seconds of flight time considered
-CFG.dodgeMinProjectileSpeed = 12 -- studs/sec before the sidestep reflex engages
-CFG.threatSweepMinSpeed = 3      -- studs/sec before a hazard heats its own path
-CFG.dodgeStrength = 14           -- studs the sideways shove aims for
-CFG.colorThreatWarm = Color3.fromRGB(255, 170, 40)
--- A cell has to STAY safe this long after arrival, not merely be safe at the
--- instant of arrival. Standing still is a decision too.
-CFG.cloneSafeDwell = 1.6
-CFG.cloneFootprintRefresh = 0.5  -- seconds between re-measuring the character
-CFG.colorCloneSafe = Color3.fromRGB(60, 220, 120)
-CFG.colorCloneDanger = Color3.fromRGB(255, 70, 70)
 
 -- Account panel (2.8.0). Rank is a plain string for now; there is no account
 -- system behind it yet.
@@ -892,7 +758,6 @@ HZ.damageEvents = 0
 RT.lastHealth = nil
 RT.healthConnection = nil
 
-
 -- Low detail. keepNames is what the user picked (lowercased part names, saved
 -- per map); hidden remembers what each part looked like so it can be restored.
 LD.enabled = false
@@ -964,54 +829,29 @@ MC.playProgressDistance = nil
 MC.playSkips = 0
 MC.routeFolder = nil             -- drawn route of the selected macro
 
--- Clone evasion. `nodes` is the pool: each entry is { prism, pad, offset,
--- position, safe, penalty }. Built once when the mode is entered and reused.
-CL.active = false
-CL.folder = nil
-CL.nodes = {}
-CL.lastEvalTime = -math.huge
-CL.chosen = nil                  -- the node currently being run to
-CL.chosenAt = 0
-CL.safeCount = 0
--- The grid (2.15.0): cells in window order, the floor cache by world key, the
--- current path as cell indices, and the committed goal.
-CL.cells = {}
-CL.floorCache = {}
-CL.path = {}
-CL.goal = nil
-CL.goalAt = 0
-CL.centerI = nil
-CL.centerJ = nil
-CL.reach = 1
-CL.side = 3
-CL.signature = ""
-CL.footprintRadius = 1.5
-CL.footprintCheckedAt = -math.huge
-CL.evalCursor = 1
-CL.progressPos = nil
-CL.progressAt = 0
-CL.escapeDir = nil
-CL.escapeAt = 0
-CL.coverCache = {}
-CL.coverCursor = 1
-CL.coverOrigin = nil
-CL.goalScore = math.huge
-CL.pathAt = 0
-CL.pathCenterI = nil
-CL.pathCenterJ = nil
--- Indices of the cells inside the circle. The array stays square because the
--- indexing is arithmetic; the corners are simply never active.
-CL.activeCells = {}
-CL.searchGen = 0
--- Last verdict per world cell, so a window shift can carry the answer over
--- instead of blanking it. See the flicker note in clone.lua.
-CL.verdictCache = {}
--- The committed goal, as a WORLD key rather than a window index: the window
--- slides as you walk, so an index means somewhere different a moment later.
--- The committed goal, as WORLD cell coordinates: the window slides as you
--- walk, so an index into it means somewhere different a moment later.
-CL.goalI = nil
-CL.goalJ = nil
+-- Dodge (4.0.0). See dodge.lua.
+DG.active = false
+DG.folder = nil
+DG.box = nil
+DG.discs = {}
+DG.offsets = {}                  -- fixed candidate offsets around the character
+DG.offsetsKey = ""
+DG.cands = {}                    -- scratch: one record per offset
+DG.order = {}                    -- scratch: candidate indices sorted by cost
+DG.pathFractions = { 0.34, 0.67, 1.0 }
+DG.enemies = {}
+DG.movers = {}
+DG.moverSet = {}
+DG.floorCache = {}
+DG.floorCacheSize = 0
+DG.rayParams = nil
+DG.reach = 1.5
+DG.halfHeight = 5
+DG.now = 0
+DG.dangerHere = 0
+DG.target = nil                  -- where the box is; nil when here is fine
+DG.targetReason = ""
+DG.lastDecision = -math.huge
 
 -- Hand-drawn zones. `defs` is what gets saved (a signature plus a shape);
 -- `live` is [decoration part] = the volume currently following it.
@@ -1036,10 +876,6 @@ PC.bridge = nil
 PC.failed = false
 PC.total = 0
 
-TH.enemyPositions = {}
-TH.origin = nil
-TH.projectiles = {}
-TH.LETHAL = 100
 PC.received = 0                  -- payloads seen on the bridge, parsed or not
 PC.lastShown = -1
 PC.lastTotal = -1
@@ -1197,10 +1033,9 @@ S.sliderConnections = sliderConnections
 S.getVisualRoot = getVisualRoot
 S.LD = LD
 S.MC = MC
-S.CL = CL
+S.DG = DG
 S.ZN = ZN
 S.PC = PC
-S.TH = TH
 S.MAP_CODES = MAP_CODES
 S.MAP_LABELS = MAP_LABELS
 end
