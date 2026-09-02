@@ -11,6 +11,77 @@ file and that table in sync on every edit.
 
 ---
 
+## 2.4.0 - 2026-09-01 - "Cartography"
+Four requests: hold attacks still long enough to pick them, trial runs with the
+loop off, a low-detail world, and per-map storage.
+
+### Freeze Parts
+- **A telegraph exists for well under a second**, which is not long enough to
+  point a mouse at - so "Pick Telegraph" was nearly unusable for exactly the
+  attacks it exists for. **Freeze** (third button on the picker row) holds a
+  **copy** of every attack the moment it is detected: an anchored, query-able,
+  childless clone in our visual folder that stays after the real part is gone.
+  Copies are inert (no collision, no touch, no scripts) and live under the
+  visual root, so the classifiers and our own raycasts ignore them.
+- The copy records the original's **name and parent** as attributes, so picking
+  a copy produces an Attack Book entry about the real attack, not about the
+  copy. Same for the own-effect picker.
+- Capped at `CFG.freezeCap` (400) with a throttled log line; turning Freeze off
+  clears them all, as does Destruct.
+
+### Pick Telegraph now writes to the Attack Book
+- A hand pick used to only add a name to the learned-names set, which had no UI
+  at all - the only way to undo one was to find the part and click it again. It
+  now **also creates an Attack Book entry** (`source = "picked"`, enabled, 0
+  hits), so hand picks and trial-run discoveries land in the same list with the
+  same rename / disable / delete controls. Clicking a marked part again removes
+  both the learned name and the entry.
+
+### Trial runs work with the loop off
+- The hazard scan lived in the main combat loop, which returns immediately when
+  the loop is off - so with farming paused there was no hazard list, no
+  highlights, no name tags, nothing to freeze, and the damage correlator had an
+  empty suspect list. The scan now runs from the scanner loop **whenever Trial
+  Run, Freeze or a picker is armed**, farming or not. Standing still and letting
+  an attack hit you is the natural way to study it, and that no longer requires
+  the bot to be driving your character at the same time.
+- Motion tracking and the pruning of aged-out parts moved into the world index
+  step, where they belong: they are index maintenance, and previously
+  `HZ.recentParts` was only pruned from inside the combat loop, so with the loop
+  off it grew without bound.
+
+### Low Detail
+- **Hides every part in the world whose name you did not pick.** Enemies
+  (anything under a model with a Humanoid), anything currently classified as an
+  attack, and our own markers are always kept - hiding those would defeat the
+  point of running the bot.
+- **Hiding is `Transparency = 1` + no shadow, never destruction.** Collision is
+  untouched: a hidden floor is still solid and still walkable. Originals are
+  snapshotted per part and restored on toggle-off and on Destruct.
+- **Particles, trails, beams, smoke, fire and sparkles** are indexed separately
+  and switched off with the mode (`CFG.lowDetailKillEffects`); in Roblox they
+  are usually the other half of the frame cost.
+- Parts are swept from the world index pool a bounded slice per frame
+  (`CFG.lowDetailBudget`), so turning it on across a whole dungeon costs a
+  little work for a couple of seconds rather than one long freeze.
+- **Pick parts to keep** is a third picker mode: click a part to keep or drop
+  its name. The keep list is shown in the panel with an X per entry.
+
+### Per-map storage
+- Waypoint paths and low-detail keep lists are properties of a dungeon, not of
+  the session, so they are now stored **per map** across all fourteen: DT, WO,
+  PI, KC, TU, SP, TC, GH, SS, OO, VC, AT, EF, NL. `RT.mapData` holds every map
+  the config knows about; the live `NAV.waypath` / `LD.keepNames` are the
+  selected map's entry checked out for editing.
+- **Map & Detail panel** (button next to Hitbox): `<` / `>` to pick the map,
+  Save all maps, Reload config, and the low-detail controls. Switching maps
+  checks the current one back in first, so nothing is lost, and **saving one map
+  never drops the others**.
+- The selected map is stored in the config and **loaded on execution**, so a
+  session comes up on the dungeon you left it on.
+- A pre-2.4 config with a single top-level `waypath` has it adopted into
+  whichever map the config names, so an existing route is not lost by upgrading.
+
 ## 2.3.0 - 2026-09-01 - "Fieldnotes"
 Three requests: learn from damage on "trial runs", predict projectiles, and
 always show enemy attacks with their names.

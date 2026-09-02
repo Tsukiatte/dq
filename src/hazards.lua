@@ -6,6 +6,8 @@ return function(S)
 local RT = S.RT
 local LocalPlayer = S.LocalPlayer
 local HZ = S.HZ
+local LD = S.LD
+local heavyDebugThrottled = S.heavyDebugThrottled
 local CFG = S.CFG
 local NAV = S.NAV
 local Players = S.Players
@@ -1301,6 +1303,15 @@ local function indexAdded(inst, now, initial)
             end
         end
         poolAdd(inst)
+        if LD.enabled and not initial then LD.sweeping = true end
+    elseif inst:IsA("ParticleEmitter") or inst:IsA("Trail") or inst:IsA("Beam")
+        or inst:IsA("Smoke") or inst:IsA("Fire") or inst:IsA("Sparkles") then
+        -- Indexed for low detail: these are the other half of the frame cost.
+        LD.effects[inst] = true
+        if LD.enabled and CFG.lowDetailKillEffects and inst.Enabled then
+            LD.disabledEffects[inst] = true
+            pcall(function() inst.Enabled = false end)
+        end
     elseif inst:IsA("Humanoid") then
         local model = inst.Parent
         if model and model:IsA("Model") then
@@ -1326,6 +1337,11 @@ local function indexRemoving(inst)
         HZ.spawnTimes[inst] = nil
         HZ.recentParts[inst] = nil
         HZ.motion[inst] = nil
+        LD.hidden[inst] = nil
+    elseif inst:IsA("ParticleEmitter") or inst:IsA("Trail") or inst:IsA("Beam")
+        or inst:IsA("Smoke") or inst:IsA("Fire") or inst:IsA("Sparkles") then
+        LD.effects[inst] = nil
+        LD.disabledEffects[inst] = nil
     elseif inst:IsA("Humanoid") then
         local model = inst.Parent
         if model then HZ.enemyModels[model] = nil end
@@ -1353,6 +1369,10 @@ local function startWorldIndex()
     table.clear(HZ.freshParts)
     table.clear(HZ.candidateSet)
     table.clear(HZ.invisWallSet)
+    table.clear(LD.effects)
+    table.clear(LD.disabledEffects)
+    table.clear(LD.hidden)
+    LD.cursor = 1
     HZ.poolCursor = 1
     HZ.catalogDirty = true
     HZ.indexReady = false
@@ -1371,6 +1391,271 @@ end
 
 -- Runs every frame from the scanner loop. Bounded work: a slice of the initial
 -- ingest, then every freshly added part, then a slice of the pool.
+-- Per frame: motion for every young part (projectile discovery) and every
+-- current candidate, and pruning of parts that have aged out.
+local function trackRecentParts(now)
+    for part, addedAt in pairs(HZ.recentParts) do
+        if not part.Parent or now - addedAt > CFG.projectileTrackWindow then
+            HZ.recentParts[part] = nil
+            if not HZ.candidateSet[part] then HZ.motion[part] = nil end
+        else
+            updateMotion(part, now)
+            local motion = HZ.motion[part]
+            if motion and motion.moving and not HZ.candidateSet[part] and HZ.partPoolIndex[part] then
+                -- It started moving: it may be a projectile now.
+                classifyPoolPart(part, now)
+            end
+        end
+    end
+end
+
+-- =========================================================================
+-- FREEZE (2.4.0)
+--
+-- A telegraph is on screen for well under a second. That is not long enough to
+-- point a mouse at it, which made "Pick Telegraph" nearly unusable for exactly
+-- the attacks it exists for. Freeze holds a COPY of every detected attack: an
+-- anchored, query-able clone in our visual folder that stays after the real
+-- part is gone. Picking a copy learns the original's name and parent (kept as
+-- attributes), so the Attack Book entry is about the real attack, not the copy.
+--
+-- The copies are inert - no children, no collision, no touch - and they live
+-- under the visual root, so the classifiers and our own raycasts ignore them.
+-- =========================================================================
+
+local FROZEN_ORIG_NAME = "DQOriginalName"
+local FROZEN_ORIG_PARENT = "DQOriginalParent"
+
+local function clearFrozenParts()
+    if HZ.frozenFolder then HZ.frozenFolder:Destroy() end
+    HZ.frozenFolder = nil
+    HZ.frozenCount = 0
+    HZ.frozenOf = setmetatable({}, { __mode = "k" })
+end
+
+local function freezeCopy(part)
+    if HZ.frozenOf[part] then return end
+    if HZ.frozenCount >= CFG.freezeCap then
+        heavyDebugThrottled("freeze_full", 5.0, "Freeze", string.format(
+            "Holding %d copies (the cap); clear them to keep going.", HZ.frozenCount))
+        return
+    end
+
+    if not HZ.frozenFolder or not HZ.frozenFolder.Parent then
+        HZ.frozenFolder = Instance.new("Folder")
+        HZ.frozenFolder.Name = "FrozenAttacks"
+        HZ.frozenFolder.Parent = getVisualRoot()
+    end
+
+    local ok, copy = pcall(function() return part:Clone() end)
+    if not ok or not copy then return end
+    -- A bare part: whatever the original carried (scripts, emitters, welds) is
+    -- not wanted in a held copy.
+    for _, child in ipairs(copy:GetChildren()) do child:Destroy() end
+    copy:SetAttribute(FROZEN_ORIG_NAME, part.Name)
+    copy:SetAttribute(FROZEN_ORIG_PARENT, part.Parent and part.Parent.Name or "")
+    copy.Name = "Frozen_" .. part.Name
+    copy.Anchored = true
+    copy.CanCollide = false
+    copy.CanTouch = false
+    copy.CanQuery = true          -- the whole point: the mouse must be able to hit it
+    copy.CastShadow = false
+    copy.Transparency = math.min(part.Transparency, 0.55)
+    copy.Parent = HZ.frozenFolder
+
+    HZ.frozenOf[part] = copy
+    HZ.frozenCount = HZ.frozenCount + 1
+end
+
+-- Called each frame from scanDamageBricks with the current hazard list.
+local function updateFrozenSnapshots()
+    if not HZ.freezeEnabled then return end
+    for _, part in ipairs(HZ.detected) do
+        if part.Parent then freezeCopy(part) end
+    end
+end
+
+local function setFreezeEnabled(enabled)
+    HZ.freezeEnabled = enabled
+    if enabled then
+        heavyDebug("Freeze", "Freeze ON: every attack that appears is copied and held. "
+            .. "Point at a copy with Pick Telegraph to add it to the Attack Book.")
+    else
+        clearFrozenParts()
+        heavyDebug("Freeze", "Freeze off; held copies cleared.")
+    end
+end
+
+-- The real name and parent behind a picked part: a frozen copy answers for the
+-- original it was made from.
+local function resolvePickedIdentity(part)
+    local originalName = part:GetAttribute(FROZEN_ORIG_NAME)
+    if type(originalName) == "string" then
+        local originalParent = part:GetAttribute(FROZEN_ORIG_PARENT)
+        return originalName, type(originalParent) == "string" and originalParent or "", true
+    end
+    return part.Name, part.Parent and part.Parent ~= Workspace and part.Parent.Name or "", false
+end
+
+-- =========================================================================
+-- LOW DETAIL (2.4.0)
+--
+-- Hides everything in the world except the part names the user picked. Hiding
+-- is Transparency 1 + no shadow, never destruction: collision is untouched, so
+-- a hidden floor is still solid and the character still walks on it. Enemies,
+-- anything currently classified as an attack, and our own markers are always
+-- kept - hiding those would defeat the point of running the bot at all.
+--
+-- Parts are swept from the world index pool a bounded slice per frame, so
+-- turning it on across a whole dungeon costs a little work for a couple of
+-- seconds rather than one long freeze.
+-- =========================================================================
+
+local function shouldKeepVisible(part)
+    if LD.keepNames[string.lower(part.Name)] then return true end
+    if HZ.candidateSet[part] then return true end      -- an attack: always visible
+    if part.Name == "Terrain" or part.Name == "Baseplate" then return true end
+    local model = part:FindFirstAncestorWhichIsA("Model")
+    if model and model:FindFirstChildWhichIsA("Humanoid") then return true end
+    return false
+end
+
+local function restorePart(part)
+    local snapshot = LD.hidden[part]
+    if not snapshot then return end
+    LD.hidden[part] = nil
+    if not part.Parent then return end
+    pcall(function()
+        part.Transparency = snapshot.transparency
+        part.CastShadow = snapshot.castShadow
+    end)
+end
+
+local function hidePart(part)
+    if LD.hidden[part] then return end
+    local ok = pcall(function()
+        LD.hidden[part] = { transparency = part.Transparency, castShadow = part.CastShadow }
+        part.Transparency = 1
+        part.CastShadow = false
+    end)
+    if not ok then LD.hidden[part] = nil end
+end
+
+-- Particles, trails and beams are the other half of the frame cost, and they
+-- are indexed separately because they are not BaseParts.
+local function applyEffectState()
+    if LD.enabled and CFG.lowDetailKillEffects then
+        for effect in pairs(LD.effects) do
+            if effect.Parent then
+                if effect.Enabled and not LD.disabledEffects[effect] then
+                    LD.disabledEffects[effect] = true
+                    pcall(function() effect.Enabled = false end)
+                end
+            else
+                LD.effects[effect] = nil
+                LD.disabledEffects[effect] = nil
+            end
+        end
+    else
+        for effect in pairs(LD.disabledEffects) do
+            LD.disabledEffects[effect] = nil
+            if effect.Parent then pcall(function() effect.Enabled = true end) end
+        end
+    end
+end
+
+local function restoreAllDetail()
+    for part in pairs(LD.hidden) do restorePart(part) end
+    table.clear(LD.hidden)
+    applyEffectState()
+end
+
+local function setLowDetailEnabled(enabled)
+    LD.enabled = enabled
+    LD.cursor = 1
+    if enabled then
+        LD.sweeping = true
+        local count = 0
+        for _ in pairs(LD.keepNames) do count = count + 1 end
+        heavyDebug("LowDetail", string.format(
+            "Low detail ON: hiding everything except %d picked name(s), enemies and attacks. Collision is unchanged.",
+            count))
+    else
+        LD.sweeping = false
+        restoreAllDetail()
+        heavyDebug("LowDetail", "Low detail off; the world is visible again.")
+    end
+    applyEffectState()
+end
+
+-- The keep list changed: re-sweep so newly kept parts come back and newly
+-- dropped ones disappear, without a full restore in between.
+local function refreshLowDetail()
+    if not LD.enabled then return end
+    LD.cursor = 1
+    LD.sweeping = true
+end
+
+local function toggleKeepPart(part)
+    if not part or not part:IsA("BasePart") then return end
+    local name = select(1, resolvePickedIdentity(part))
+    local key = string.lower(name)
+    if LD.keepNames[key] then
+        LD.keepNames[key] = nil
+        heavyDebug("LowDetail", string.format("'%s' removed from the keep list.", name))
+    else
+        LD.keepNames[key] = true
+        heavyDebug("LowDetail", string.format("'%s' kept visible in low detail.", name))
+    end
+    refreshLowDetail()
+    if S.refreshMapPanel then S.refreshMapPanel() end
+end
+
+local function clearKeepList()
+    table.clear(LD.keepNames)
+    heavyDebug("LowDetail", "Keep list cleared.")
+    refreshLowDetail()
+    if S.refreshMapPanel then S.refreshMapPanel() end
+end
+
+-- One bounded slice of the hide/restore sweep, run every frame from the index.
+local function lowDetailStep()
+    if not LD.enabled then
+        -- Anything still hidden after the mode went off is restored by
+        -- setLowDetailEnabled; nothing to do here.
+        return
+    end
+    local pool = HZ.partPool
+    local n = #pool
+    if n == 0 then return end
+
+    local cursor = LD.cursor
+    if cursor > n then cursor = 1 end
+    local budget = math.min(CFG.lowDetailBudget, n)
+    for _ = 1, budget do
+        local part = pool[cursor]
+        if not part then break end
+        if part.Parent then
+            if shouldKeepVisible(part) then
+                restorePart(part)
+            else
+                hidePart(part)
+            end
+        else
+            LD.hidden[part] = nil
+        end
+        cursor = cursor + 1
+        if cursor > #pool then
+            cursor = 1
+            if LD.sweeping then
+                LD.sweeping = false      -- a full pass has completed
+            end
+            if #pool == 0 then break end
+        end
+    end
+    LD.cursor = cursor
+end
+
 local function worldIndexStep()
     local now = os.clock()
 
@@ -1423,6 +1708,12 @@ local function worldIndexStep()
         end
         HZ.poolCursor = cursor
     end
+
+    -- Motion tracking and the pruning of aged-out parts are index maintenance,
+    -- not combat work: they run here rather than in scanDamageBricks so they
+    -- keep happening (and HZ.recentParts keeps being pruned) with the loop off.
+    trackRecentParts(now)
+    lowDetailStep()
 end
 
 -- =========================================================================
@@ -1548,31 +1839,12 @@ local function setTrialEnabled(enabled)
         or "Trial run off. The Attack Book keeps being used for detection.")
 end
 
--- Per frame: motion for every young part (projectile discovery) and every
--- current candidate, and pruning of parts that have aged out.
-local function trackRecentParts(now)
-    for part, addedAt in pairs(HZ.recentParts) do
-        if not part.Parent or now - addedAt > CFG.projectileTrackWindow then
-            HZ.recentParts[part] = nil
-            if not HZ.candidateSet[part] then HZ.motion[part] = nil end
-        else
-            updateMotion(part, now)
-            local motion = HZ.motion[part]
-            if motion and motion.moving and not HZ.candidateSet[part] and HZ.partPoolIndex[part] then
-                -- It started moving: it may be a projectile now.
-                classifyPoolPart(part, now)
-            end
-        end
-    end
-end
-
 -- The catalog (which parts are telegraphs / invisible walls) is maintained by
 -- the world index above, not here. This function only does the cheap per-frame
 -- work: filter the catalogued telegraphs down to the ones actually in range
 -- and still active.
 local function scanDamageBricks(rootPosition)
     local now = os.clock()
-    trackRecentParts(now)
     rebuildCatalogArrays()
 
     local found = {}
@@ -1595,6 +1867,7 @@ local function scanDamageBricks(rootPosition)
         end
     end
     HZ.detected = found
+    updateFrozenSnapshots()
 
     if UI.damageBrickCountLabel then
         UI.damageBrickCountLabel.Text = "Telegraphs Active: " .. tostring(#found)
@@ -1616,35 +1889,75 @@ local function scanDamageBricks(rootPosition)
 end
 
 -- Telegraph picker. Click a part to mark it as a hazard the heuristics missed.
--- Marking also learns the part's name, so future spawns of the same attack are
--- caught without another click. Clicking a marked part unmarks it and unlearns.
+-- Marking learns the part's name AND writes an Attack Book entry (2.4.0), so a
+-- hand pick and a trial-run discovery end up in the same place, with the same
+-- rename / disable / delete controls. Clicking a marked part undoes both.
+--
+-- The part clicked may be a frozen copy, which is the normal case for a
+-- telegraph that only exists for half a second: the identity used is the
+-- original's, recorded on the copy when it was made.
 local function togglePickedTelegraph(part)
     if not part or not part:IsA("BasePart") then return end
 
-    local partName = string.lower(part.Name)
+    local originalName, originalParent, isCopy = resolvePickedIdentity(part)
+    local partName = string.lower(originalName)
     local now = os.clock()
 
-    if HZ.manualParts[part] or HZ.learnedNames[partName] then
+    local existing = findAttackRecord(part)
+    if HZ.learnedNames[partName] or (existing and existing.source == "picked") then
         HZ.manualParts[part] = nil
         HZ.learnedNames[partName] = nil
-        heavyDebug("Picker", string.format("UNMARKED '%s' (parent '%s'). Name unlearned.",
-            part.Name, part.Parent and part.Parent.Name or "Workspace"))
+        for i = #HZ.attackBook, 1, -1 do
+            local record = HZ.attackBook[i]
+            if record.source == "picked" and record.partName == partName then
+                table.remove(HZ.attackBook, i)
+            end
+        end
+        invalidateAttackBook()
+        heavyDebug("Picker", string.format(
+            "UNMARKED '%s' (parent '%s'). Name unlearned and its Attack Book entry removed.",
+            originalName, originalParent ~= "" and originalParent or "Workspace"))
     else
-        HZ.manualParts[part] = true
         HZ.learnedNames[partName] = true
         -- A hand pick is the user overruling the own-attack learner.
-        HZ.ownParts[part] = nil
         HZ.ownNames[partName] = nil
-        HZ.spawnTimes[part] = now
-        heavyDebug("Picker", string.format(
-            "MARKED '%s' (parent '%s', class %s, transparency %.2f, canCollide %s). Name learned.",
-            part.Name, part.Parent and part.Parent.Name or "Workspace",
-            part.ClassName, part.Transparency, tostring(part.CanCollide)))
+        if not isCopy then
+            HZ.manualParts[part] = true
+            HZ.ownParts[part] = nil
+            HZ.spawnTimes[part] = now
+        end
+
+        if not existing then
+            local record = partSignature(part)
+            record.partName = partName
+            record.parentName = string.lower(originalParent)
+            record.name = isGenericName(partName)
+                and (isGenericName(record.parentName) and string.format("Attack %d", #HZ.attackBook + 1) or originalParent)
+                or originalName
+            record.hits = 0
+            record.damage = 0
+            record.melee = false
+            record.enabled = true
+            record.moving = false
+            record.source = "picked"
+            record.learnedAt = os.time()
+            table.insert(HZ.attackBook, record)
+            invalidateAttackBook()
+            heavyDebug("Picker", string.format(
+                "MARKED '%s' (parent '%s', %s%s). Added to the Attack Book - rename it there, then Save.",
+                originalName, originalParent ~= "" and originalParent or "Workspace",
+                describeRecord(record), isCopy and ", from a frozen copy" or ""))
+        else
+            heavyDebug("Picker", string.format(
+                "MARKED '%s'; it already has the Attack Book entry '%s'.", originalName, existing.name))
+        end
     end
 
     -- Re-classify right away rather than waiting for the round-robin.
-    poolAdd(part)
-    classifyPoolPart(part, now)
+    if not isCopy then
+        poolAdd(part)
+        classifyPoolPart(part, now)
+    end
     NAV.forceRescan = true
 end
 
@@ -1654,8 +1967,26 @@ end
 local function togglePickedOwn(part)
     if not part or not part:IsA("BasePart") then return end
 
-    local partName = string.lower(part.Name)
+    local originalName, _, isCopy = resolvePickedIdentity(part)
+    local partName = string.lower(originalName)
     local now = os.clock()
+
+    if isCopy then
+        -- A frozen copy is of something the script CLASSIFIED as an enemy
+        -- attack; marking it as ours only needs the name.
+        if HZ.ownNames[partName] then
+            HZ.ownNames[partName] = nil
+            heavyDebug("Picker", string.format("UNMARKED '%s' as our own effect.", originalName))
+        else
+            HZ.ownNames[partName] = true
+            HZ.learnedNames[partName] = nil
+            heavyDebug("Picker", string.format(
+                "MARKED '%s' as our OWN effect (from a frozen copy). Saved with the config.", originalName))
+        end
+        invalidateAttackBook()
+        NAV.forceRescan = true
+        return
+    end
 
     if HZ.ownNames[partName] or HZ.ownParts[part] then
         HZ.ownNames[partName] = nil
@@ -1676,10 +2007,12 @@ local function togglePickedOwn(part)
     NAV.forceRescan = true
 end
 
--- mode: "telegraph" (default) or "own". One picker at a time.
+-- mode: "telegraph" (default), "own", or "keep" (low-detail keep list).
+-- One picker at a time.
 local function setTelegraphPickerEnabled(enabled, mode)
     HZ.pickerEnabled = enabled
     HZ.ownPickerEnabled = enabled and mode == "own" or false
+    LD.pickerEnabled = enabled and mode == "keep" or false
 
     for _, connection in ipairs(HZ.pickerConnections) do
         connection:Disconnect()
@@ -1700,16 +2033,21 @@ local function setTelegraphPickerEnabled(enabled, mode)
 
     table.insert(HZ.pickerConnections, HZ.pickerMouse.Button1Down:Connect(function()
         if not HZ.pickerEnabled then return end
-        if HZ.ownPickerEnabled then
-            togglePickedOwn(HZ.pickerMouse.Target)
+        local target = HZ.pickerMouse.Target
+        if LD.pickerEnabled then
+            toggleKeepPart(target)
+        elseif HZ.ownPickerEnabled then
+            togglePickedOwn(target)
         else
-            togglePickedTelegraph(HZ.pickerMouse.Target)
+            togglePickedTelegraph(target)
         end
     end))
 
-    heavyDebug("Picker", HZ.ownPickerEnabled
-        and "Picker armed (OWN ATTACKS). Click one of your own effects to mark or unmark it."
-        or "Picker armed. Click a part to mark or unmark it as a telegraph.")
+    heavyDebug("Picker", LD.pickerEnabled
+        and "Picker armed (KEEP VISIBLE). Click a part to keep or drop its name in low detail."
+        or (HZ.ownPickerEnabled
+            and "Picker armed (OWN ATTACKS). Click one of your own effects to mark or unmark it."
+            or "Picker armed (TELEGRAPH). Click an attack - or a frozen copy of one - to add it to the Attack Book."))
 end
 
 S.clearHazardHighlights = clearHazardHighlights
@@ -1737,6 +2075,12 @@ S.recordDamageEvent = recordDamageEvent
 S.removeAttackRecord = removeAttackRecord
 S.clearAttackBook = clearAttackBook
 S.setTrialEnabled = setTrialEnabled
+S.setFreezeEnabled = setFreezeEnabled
+S.clearFrozenParts = clearFrozenParts
+S.setLowDetailEnabled = setLowDetailEnabled
+S.refreshLowDetail = refreshLowDetail
+S.restoreAllDetail = restoreAllDetail
+S.clearKeepList = clearKeepList
 S.rebuildCatalogArrays = rebuildCatalogArrays
 S.resetWallCatalog = resetWallCatalog
 S.startWorldIndex = startWorldIndex

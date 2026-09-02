@@ -28,6 +28,10 @@ local SCRIPT_VERSION = S.SCRIPT_VERSION
     treated as an error.
 =========================================================================== ]]
 
+local LD = S.LD
+local MAP_LABELS = S.MAP_LABELS
+local refreshLowDetail = S.refreshLowDetail
+
 local CONFIG_FILE = "DungeonAutofarm_config.json"
 
 local function hasFileAccess()
@@ -50,6 +54,70 @@ local function resolveInstancePath(path)
     return node ~= game and node or nil
 end
 
+-- =========================================================================
+-- PER-MAP STORAGE (2.4.0)
+--
+-- The waypoint path and the low-detail keep list are properties of a dungeon,
+-- not of the session, so they are stored per map code. RT.mapData holds every
+-- map the config knows about; the live NAV.waypath / LD.keepNames are just the
+-- selected map's entry checked out for editing. Switching map checks the
+-- current one back in and the new one out.
+-- =========================================================================
+
+local function syncCurrentMapToStore()
+    local waypath = {}
+    for _, pos in ipairs(NAV.waypath) do
+        table.insert(waypath, { x = pos.X, y = pos.Y, z = pos.Z })
+    end
+    local keep = {}
+    for name in pairs(LD.keepNames) do
+        table.insert(keep, name)
+    end
+    RT.mapData[RT.currentMap] = { waypath = waypath, keep = keep }
+end
+
+-- Checks a map's stored data out into the live tables. Does NOT save.
+local function applyMapFromStore(code)
+    local entry = RT.mapData[code] or {}
+
+    table.clear(NAV.waypath)
+    if type(entry.waypath) == "table" then
+        for _, p in ipairs(entry.waypath) do
+            if type(p) == "table" and tonumber(p.x) and tonumber(p.y) and tonumber(p.z) then
+                table.insert(NAV.waypath, Vector3.new(p.x, p.y, p.z))
+            end
+        end
+    end
+    NAV.pathIndex = 1
+    renderPathMarkers()
+    if S.refreshPathPanel then S.refreshPathPanel() end
+
+    table.clear(LD.keepNames)
+    if type(entry.keep) == "table" then
+        for _, name in ipairs(entry.keep) do
+            if type(name) == "string" then LD.keepNames[name] = true end
+        end
+    end
+    refreshLowDetail()
+    if S.refreshMapPanel then S.refreshMapPanel() end
+
+    local keepCount = 0
+    for _ in pairs(LD.keepNames) do keepCount = keepCount + 1 end
+    heavyDebug("Map", string.format("%s (%s): %d waypoint(s), %d kept part name(s).",
+        code, MAP_LABELS[code] or code, #NAV.waypath, keepCount))
+end
+
+-- The map picker. Checks the current map in, then the requested one out.
+local function setCurrentMap(code)
+    if not MAP_LABELS[code] or code == RT.currentMap then
+        if code == RT.currentMap then applyMapFromStore(code) end
+        return
+    end
+    syncCurrentMapToStore()
+    RT.currentMap = code
+    applyMapFromStore(code)
+end
+
 local function buildConfigTable()
     local binds = {}
     for obj, field in pairs(SM.manualBinds) do
@@ -70,11 +138,13 @@ local function buildConfigTable()
         table.insert(ownNames, name)
     end
 
-    -- Path waypoints are stored as raw coordinates, so they survive between
-    -- sessions regardless of how the game restructures its instances.
-    local waypath = {}
-    for _, pos in ipairs(NAV.waypath) do
-        table.insert(waypath, { x = pos.X, y = pos.Y, z = pos.Z })
+    -- Per-map storage (2.4.0). The live waypath and keep list belong to whichever
+    -- map is selected; everything already loaded for the other maps is carried
+    -- through untouched, so saving one dungeon never drops the rest.
+    syncCurrentMapToStore()
+    local maps = {}
+    for code, entry in pairs(RT.mapData) do
+        maps[code] = entry
     end
 
     return {
@@ -117,7 +187,8 @@ local function buildConfigTable()
         -- Plain data by construction (partSignature + name/hits/flags), so it
         -- round-trips through JSON as-is.
         attackBook = HZ.attackBook,
-        waypath = waypath,
+        currentMap = RT.currentMap,
+        maps = maps,
     }
 end
 
@@ -279,19 +350,35 @@ local function loadConfig()
         end
     end
 
-    if type(data.waypath) == "table" then
-        table.clear(NAV.waypath)
-        for _, p in ipairs(data.waypath) do
-            if type(p) == "table" and tonumber(p.x) and tonumber(p.y) and tonumber(p.z) then
-                table.insert(NAV.waypath, Vector3.new(p.x, p.y, p.z))
+    -- Per-map data (2.4.0), and the pre-2.4 single top-level waypath, which is
+    -- adopted into whichever map the config names so an existing setup is not
+    -- lost by upgrading.
+    table.clear(RT.mapData)
+    if type(data.maps) == "table" then
+        for code, entry in pairs(data.maps) do
+            if MAP_LABELS[code] and type(entry) == "table" then
+                RT.mapData[code] = {
+                    waypath = type(entry.waypath) == "table" and entry.waypath or {},
+                    keep = type(entry.keep) == "table" and entry.keep or {},
+                }
             end
         end
-        NAV.pathIndex = 1
-        renderPathMarkers()
-        if #NAV.waypath > 0 then
-            heavyDebug("Config", string.format("Restored %d path waypoints.", #NAV.waypath))
-        end
     end
+
+    if type(data.currentMap) == "string" and MAP_LABELS[data.currentMap] then
+        RT.currentMap = data.currentMap
+    end
+
+    if type(data.waypath) == "table" and not RT.mapData[RT.currentMap] then
+        RT.mapData[RT.currentMap] = { waypath = data.waypath, keep = {} }
+        heavyDebug("Config", string.format(
+            "Adopted the pre-2.4 waypoint path into map %s.", RT.currentMap))
+    end
+
+    applyMapFromStore(RT.currentMap)
+    local mapCount = 0
+    for _ in pairs(RT.mapData) do mapCount = mapCount + 1 end
+    heavyDebug("Config", string.format("Loaded map %s of %d stored.", RT.currentMap, mapCount))
 
     heavyDebug("Config", "Loaded from " .. CONFIG_FILE)
     return true, streamer and streamer.enabled == true
@@ -305,5 +392,7 @@ end
 
 S.loadConfig = loadConfig
 S.saveConfig = saveConfig
+S.setCurrentMap = setCurrentMap
+S.syncCurrentMapToStore = syncCurrentMapToStore
 S.syncStreamerToggleWidget = syncStreamerToggleWidget
 end
