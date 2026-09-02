@@ -11,6 +11,51 @@ file and that table in sync on every edit.
 
 ---
 
+## 3.4.0 - 2026-09-02 - "Ground truth first"
+
+### The capture found it
+From a live Steampunk Sewers fight: **895 of 900 parts missed**, and among them:
+
+```
+- | hitBox  | Part | 8 studs | size 22 22 22  | tr 1.00 | anc hammerBotHit(Model)
+- | precast | Part | 8 studs | size 1.3 22 22 | tr 0.80 | anc hammerBotHit(Model)
+```
+
+`hammerbothit` **is** in the name table. It was never reached, because
+`isDamageBrick` had this above every name check:
+
+```lua
+if part.Transparency >= CFG.telegraphTransparencyCutoff then return false end  -- 0.99
+```
+
+**In this game the `hitBox` — the part that actually damages you — is created at
+Transparency 1.** Fully invisible, by design. `GAME_NOTES.md` records exactly
+that about `PrecastHitbox`, and I wrote it down and then left a rule that threw
+those parts away first. Appearance scoring was overruling ground truth.
+
+The five things it *did* detect were enemy hands 88 studs away.
+
+### Detection is structural now, and runs first
+A part is an attack if **its name or an ancestor model's name is a known
+attack**, or if it is a **`hitBox`/`precast` inside any model without a
+Humanoid** — whatever it looks like. Transparency and the CanCollide gate now
+apply only to the appearance-scoring fallback underneath.
+
+The second rule is the important one: every attack in this game is built the
+same way — a Model containing a PrimaryPart, an invisible `hitBox` and a visible
+`precast` — so it catches bosses nobody has dumped, without needing a name.
+
+Ownership is still checked inside that block, since your own abilities are built
+the same way. Verified against the capture: all three Chromatic Rain models are
+in `OWN_EFFECTS` and stay ours.
+
+### Own-attack learning could poison the whole game
+`markOwnIfRecent` learns the *name* of anything appearing near you just after
+you cast. A boss `precast` landing at your feet a moment after your ability
+would teach the script that **"precast" is yours** — and every attack in the
+game uses that name. Shared grammar names (`precast`, `hitBox`, `part`, `beam`,
+`ball`, …) can no longer be learned as ours; the specific instance still can.
+
 ## 3.3.0 - 2026-09-02 - "Open ground"
 
 ### Attack capture — so misses stop being guesswork

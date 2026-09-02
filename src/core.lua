@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 3.3.0
+    VERSION : 3.4.0
     BUILD   : 2026-09-01
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "3.3.0"
+local SCRIPT_VERSION = "3.4.0"
 local SCRIPT_BUILD_DATE = "2026-09-01"
-local SCRIPT_CODENAME = "Open ground"
+local SCRIPT_CODENAME = "Ground truth first"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "3.4.0", date = "2026-09-02", notes = "The capture found it. In this game the hitBox - the part that actually damages you - is created at Transparency 1, fully invisible, exactly as GAME_NOTES records for PrecastHitbox. And isDamageBrick rejected anything at 0.99 or above BEFORE checking a single name, so hammerBotHit.hitBox and spinBotSpin.hitBox were thrown away with their names sitting in the table, never reached: 895 of 900 parts missed. Appearance scoring was overruling ground truth. Detection is now structural and runs first: a part whose name or ancestor model is a known attack, or a hitBox/precast inside any non-character model, is an attack whatever it looks like - which also generalises to bosses nobody has dumped, since every attack in the game is built that way. Transparency and the CanCollide gate now apply only to the guesswork underneath. Own-attack learning can no longer claim shared grammar names like precast or hitBox, which would have poisoned every attack in the game at once." },
     { version = "3.3.0", date = "2026-09-02", notes = "Attack capture: Record what spawns logs every part that appears near you along with the verdict, then Save capture writes it to a file. A place file says what exists in ReplicatedStorage; it does not say what a part is named, parented or shaped when it actually spawns in a fight, and both dumps had an empty Workspace.enemies - so misses have been diagnosed by inference twice and got it wrong twice. The misses are the point: a part judged harmless appears in no other log. Enclosure: cells inherit a share of the heat around them, so a green pocket ringed by red reads hot because it is a trap, and walls count as heat so corners do too. Open ground now beats an enclosed pocket of equal local safety, which is what stops the bot backing into a corner instead of strafing out. And adaptive lookahead, taken from the standalone heatmap prototype: horizons stretch when WalkSpeed is low, because a slow character cannot dodge reactively and has to see danger earlier." },
     { version = "3.2.6", date = "2026-09-02", notes = "The pathfinding window is a circle rather than a square. The corners of a square are its furthest cells - 1.4 times the radius - so they were the least useful ground in the grid and the most expensive to path to, and they were a quarter of the total work. Dropping them costs nothing and buys about three more studs of sight for the same cell budget: 24 studs instead of 21 at the default. The cell array stays square because the indexing is arithmetic; the corners are simply never active, never measured, never drawn and never routed through - and because they are never measured they cannot be mistaken for walls by the edge pass." },
     { version = "3.2.5", date = "2026-09-02", notes = "Every boss attack in the game was missing from the name table. Bosses keep their attacks in a subfolder of their own - enemyProjectiles.Steampunk.bossCannonBeam and so on - and the table was built from top-level children only, then dropped Folders to avoid picking up gear, which threw away 111 attack models. Rebuilt recursively from both dumps: 519 names, up from 238. Every one of those models is built the same way, a PrimaryPart plus a hitBox and a precast, so those two names now catch attacks from bosses nobody has dumped. Two fixes for being cornered. The grid only sees about twenty studs, so boxed in with attacks filling all of it the clear ground was invisible and the bot settled for the least bad corner; when the whole window is hot it now samples bearings well beyond the grid and heads for the coolest. And the ordinary stuck detector is switched off while dodging, so nothing at all was watching for the character being wedged between a wall and an enemy - it now hops, drops the goal and marks the obstruction impassable." },
