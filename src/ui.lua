@@ -164,7 +164,7 @@ local function destructScript()
     setTelegraphPickerEnabled(false)
     setPathEditEnabled(false)
     S.setDodgeActive(false)
-    if S.stopNorthernListener then S.stopNorthernListener() end
+    if S.stopBossEventListeners then S.stopBossEventListeners() end
     clearPrecastZones()
     -- Through setLowDetailEnabled, so the mode flag is cleared first and the
     -- effect restore is not immediately undone.

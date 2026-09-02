@@ -325,6 +325,24 @@ S.SAFE_MARKERS = SAFE_MARKERS
 S.matchesGameName = matchesGameName
 S.isAttackStructure = isAttackStructure
 S.ATTACK_PARTS = ATTACK_PARTS
+
+-- Arming delays measured or read from the client script, by attack Model
+-- name (lowercased). Seeded into RT.armDelays only where nothing has been
+-- learned yet, so the FIRST cast of these is time-aware too. 0 = live from
+-- the moment it appears. Anything learned in play overrides these.
+--   beam                  Steampunk second boss pulse wave: six beams per
+--                         cast, fired 4.8s after the strips appear (video,
+--                         2026-09-02). 4.5 keeps the margin on the safe side.
+--   secondbossrandompulse the ball: the client brightens its precast 0.2s
+--                         after it appears; it is live from the start.
+local DEFAULT_ARM_DELAYS = {
+    beam = 4.5,
+    secondbossrandompulse = 0,
+}
+S.DEFAULT_ARM_DELAYS = DEFAULT_ARM_DELAYS
+for name, delay in pairs(DEFAULT_ARM_DELAYS) do
+    if S.RT.armDelays[name] == nil then S.RT.armDelays[name] = delay end
+end
 S.isKnownEnemyAttack = isKnownEnemyAttack
 S.isKnownOwnEffect = isKnownOwnEffect
 S.isSafeZoneMarker = isSafeZoneMarker

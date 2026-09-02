@@ -1,4 +1,4 @@
--- northern.lua - Northern Lands: the bosses announce themselves, exactly.
+-- bossevents.lua - The bosses announce themselves, exactly: one listener per map remote.
 -- Module contract: receives the shared table S. Everything this module needs from
 -- earlier modules is pulled into locals below; everything later modules need is
 -- assigned onto S at the bottom. Load order is fixed by main.lua / build.py.
@@ -17,14 +17,14 @@ local addPrecastZone = S.addPrecastZone
 local max, min, abs = math.max, math.min, math.abs
 
 -- =========================================================================
--- NORTHERN LANDS (4.6.0)
+-- BOSS EVENTS (4.6.0 Northern Lands, 4.7.0 every map)
 --
--- Read from the game's own client script (mapSpecificLocals, the handler for
--- ReplicatedStorage.remotes.northernBossSpecficEvents) and the models in
--- ReplicatedStorage.enemyProjectiles, live in Studio. Every timed attack of
--- the three bosses and the bonus boss is sent to the client BEFORE it happens
--- with the numbers the client uses to animate it - and those numbers are the
--- attack:
+-- Read from the game's own client script (mapSpecificLocals) and the models in
+-- ReplicatedStorage.enemyProjectiles, live in Studio. Each map's bosses talk to
+-- the client over their own RemoteEvent in ReplicatedStorage.remotes -
+-- northernBossSpecficEvents, steampunkBossSpecficEvents, and so on - plus a
+-- shared mapSpecificEvent. Every timed attack is sent BEFORE it happens with
+-- the numbers the client animates it with, and those numbers are the attack:
 --
 --   projectiles   { distance, duration, startTime, endTime, startCFrame }
 --                 position(t) = start + look * clamp((t - startTime) / duration) * distance
@@ -32,21 +32,24 @@ local max, min, abs = math.max, math.min, math.abs
 --   orb beams     cframe; a pillar that lives six seconds
 --   tall swirly   { colour, fireTime }; the arena explodes, the matching
 --                 colour safe spot is the only place to be
+--   drop cogs     a container of cog models, each tweened down 100 studs in 0.75s
+--   back flames   a model of flameParts, lit 0.5s after the event for 1s
 --
 -- Times are on the game's timeSync clock (ReplicatedStorage.timeSync, a
 -- MasterClock/SlaveClock pair synced to the server's tick()). We require the
 -- same module, so we read the same clock.
 --
 -- Scripted projectiles go into PC.paths: the dodge asks where each one WILL
--- be at the moment it would be somewhere, which beats extrapolating a mesh
--- from two frames of motion. Timed ground attacks become precast zones with
--- exact impact times, and pillars are zones held open for their lifetime.
--- The bonus boss's colour spots become timed safe windows - outside them is
--- the danger, but only around the explosion.
+-- be at the moment it would be somewhere. Timed ground attacks become precast
+-- zones with exact impact times, pillars are zones held open for their
+-- lifetime, and colour spots become timed safe windows. Attacks the server
+-- spawns as Models (precast + hitBox) need none of this: the arming pass in
+-- hazards.lua reads their precast. A few of those get their arming delay
+-- seeded here from measurement so even the first cast is time-aware.
 -- =========================================================================
 
 local NL = {
-    connection = nil,
+    connections = {},       -- [remote name] = RBXScriptConnection
     timeSync = nil,
     total = 0,
     flameTracks = {},       -- { player, endsAt (game clock) }
@@ -139,7 +142,7 @@ end
 
 local function log(text)
     NL.total = NL.total + 1
-    heavyDebugThrottled("nl_event", 0.5, "Northern", text)
+    heavyDebugThrottled("boss_event", 0.5, "Bosses", text)
 end
 
 local function isArgs(args, n)
@@ -147,7 +150,10 @@ local function isArgs(args, n)
 end
 
 -- ------------------------------------------------------------ handlers
+-- [remote name] = { [event name] = function(args) }
+local REMOTES = {}
 local HANDLERS = {}
+REMOTES["northernBossSpecficEvents"] = HANDLERS
 
 -- First boss: rolling projectiles down a line.
 HANDLERS["First Boss Criss Cross Projectile"] = function(a)
@@ -215,7 +221,7 @@ HANDLERS["Bonus Boss Tall Swirly"] = function(a)
         circleZone("tall swirly", middle.Position, 130, fireAt, 0.8)
     end
     local spots = safeSpotsFor(colour)
-    addSafeWindow(spots, fireAt - CFG.northernSafeLead, fireAt + 0.8, "swirly " .. tostring(colour))
+    addSafeWindow(spots, fireAt - CFG.bossSafeLead, fireAt + 0.8, "swirly " .. tostring(colour))
     log(string.format("Tall swirly (%s) in %.1fs; %d safe spot(s)", tostring(colour), fireAt - gameClock(), #spots))
 end
 HANDLERS["Bonus Boss Flame Pre Target"] = function(a)
@@ -231,9 +237,75 @@ HANDLERS["Bonus Boss Freezing Orb Beam"] = function(a)
     log("Freezing orb beam pillar, 6s")
 end
 
+
+-- ------------------------------------------------------------ Steampunk Sewers
+-- The Evil Scientist's kit is mostly server-spawned Models - the six-beam
+-- pulse wave (the lattice), the concentric outward blasts, the punch circle,
+-- the zig-zag, the orb shot, the cannon and horizontal beams - and the arming
+-- pass reads those. The remote adds the cogs and the flames, which have no
+-- precast of their own, and the pulse ball.
+local SP = {}
+REMOTES["steampunkBossSpecficEvents"] = SP
+
+SP["Drop Cogs"] = function(container)
+    if typeof(container) ~= "Instance" then return end
+    -- Every part of every cog is tweened 100 studs straight down over 0.75s.
+    -- Where it will be is where it is now, minus a hundred.
+    local count = 0
+    local fire = gameClock() + 0.75
+    for _, cog in ipairs(container:GetChildren()) do
+        if cog:IsA("Model") then
+            for _, part in ipairs(cog:GetChildren()) do
+                if part:IsA("BasePart") then
+                    local landing = part.CFrame - Vector3.new(0, 100, 0)
+                    local size = part.Size
+                    cubeZone("cog", landing, Vector3.new(size.X + 3, size.Y, size.Z + 3), fire, 0.6)
+                    count = count + 1
+                end
+            end
+        end
+    end
+    log(string.format("Cogs dropping: %d part(s) land in 0.75s", count))
+end
+
+SP["Second Boss Random Pulse"] = function(model)
+    -- The ball. Its precast is brightened 0.2s after it appears, which the
+    -- arming pass already reads as live; this just names it in the log.
+    if typeof(model) == "Instance" then log("Pulse ball at " .. tostring(model:GetPivot().Position)) end
+end
+
+SP["Second Boss Pulse Wave"] = function()
+    -- The client draws an expanding disc; the damage is the six beam Models
+    -- the server spawns alongside, which arm through their precasts.
+    log("Pulse wave (six beams follow)")
+end
+
+SP["Second Boss Aura"] = function()
+    log("Aura for 4.8s")
+end
+
+-- Shared by every map.
+local SHARED = {}
+REMOTES["mapSpecificEvent"] = SHARED
+
+SHARED["Steampunk Back Flames"] = function(model)
+    if typeof(model) ~= "Instance" then return end
+    -- flamePart children are lit 0.5s after the event and burn for 1s.
+    local fire = gameClock() + 0.5
+    local count = 0
+    for _, part in ipairs(model:GetChildren()) do
+        if part.Name == "flamePart" and part:IsA("BasePart") then
+            local size = part.Size
+            cubeZone("back flame", part.CFrame, Vector3.new(size.X + 4, size.Y, size.Z + 4), fire, 1.1)
+            count = count + 1
+        end
+    end
+    log(string.format("Back flames: %d jet(s) light in 0.5s", count))
+end
+
 -- ------------------------------------------------------------ per-frame
 local function step()
-    if not NL.connection then return end
+    if next(NL.connections) == nil then return end
     local nowS = Workspace:GetServerTimeNow()
     for i = #PC.paths, 1, -1 do
         if nowS > PC.paths[i].t1 + 0.5 then table.remove(PC.paths, i) end
@@ -250,7 +322,7 @@ local function step()
                 local character = track.player and track.player.Character
                 local root = character and character:FindFirstChild("HumanoidRootPart")
                 if root then
-                    circleZone("bonus flame", root.Position, 17.5, nowG + CFG.northernFlameDelay, 1.0)
+                    circleZone("bonus flame", root.Position, 17.5, nowG + CFG.bossFlameDelay, 1.0)
                 end
                 table.remove(NL.flameTracks, i)
             end
@@ -265,40 +337,51 @@ local function step()
 end
 
 -- ------------------------------------------------------------ hook
-local function startNorthernListener()
-    if NL.connection or not CFG.useNorthern then return NL.connection ~= nil end
+local function startBossEventListeners()
+    if next(NL.connections) ~= nil or not CFG.useBossEvents then return next(NL.connections) ~= nil end
     local ok, err = pcall(function()
         local ts = ReplicatedStorage:FindFirstChild("timeSync")
         if ts then NL.timeSync = require(ts) end
         local remotes = ReplicatedStorage:WaitForChild("remotes", 5)
-        local remote = remotes and remotes:FindFirstChild("northernBossSpecficEvents")
-        if not remote then error("northernBossSpecficEvents not found") end
-        NL.connection = remote.OnClientEvent:Connect(function(name, args)
-            local handler = HANDLERS[name]
-            if not handler then return end
-            local hok, herr = pcall(handler, args)
-            if not hok then
-                heavyDebugThrottled("nl_handler", 2.0, "Northern", "Handler for '" .. tostring(name) .. "' threw: " .. tostring(herr))
+        if not remotes then error("ReplicatedStorage.remotes not found") end
+        for remoteName, handlers in pairs(REMOTES) do
+            local remote = remotes:FindFirstChild(remoteName)
+            if remote and remote:IsA("RemoteEvent") then
+                NL.connections[remoteName] = remote.OnClientEvent:Connect(function(name, args)
+                    local handler = handlers[name]
+                    if not handler then return end
+                    local hok, herr = pcall(handler, args)
+                    if not hok then
+                        heavyDebugThrottled("boss_handler", 2.0, "Bosses", "Handler for '" .. tostring(name) .. "' threw: " .. tostring(herr))
+                    end
+                end)
             end
-        end)
+        end
     end)
-    if ok then
-        heavyDebug("Northern", "Listening to the Northern Lands bosses" .. (NL.timeSync and " on the game's clock." or " (no timeSync; using local time)."))
+    local hooked = {}
+    for name in pairs(NL.connections) do hooked[#hooked + 1] = name end
+    table.sort(hooked)
+    if ok and #hooked > 0 then
+        heavyDebug("Bosses", "Listening to " .. table.concat(hooked, ", ")
+            .. (NL.timeSync and " on the game's clock." or " (no timeSync; using local time)."))
         return true
     end
-    heavyDebug("Northern", "Could not hook the boss events: " .. tostring(err))
+    heavyDebug("Bosses", "Could not hook the boss events: " .. tostring(err or "no known remotes present"))
     return false
 end
 
-local function stopNorthernListener()
-    if NL.connection then NL.connection:Disconnect() NL.connection = nil end
+local function stopBossEventListeners()
+    for name, connection in pairs(NL.connections) do
+        connection:Disconnect()
+        NL.connections[name] = nil
+    end
     table.clear(PC.paths)
     table.clear(PC.safeWindows)
     table.clear(NL.flameTracks)
 end
 
-S.NL = NL
-S.startNorthernListener = startNorthernListener
-S.stopNorthernListener = stopNorthernListener
-S.northernStep = step
+S.BE = NL
+S.startBossEventListeners = startBossEventListeners
+S.stopBossEventListeners = stopBossEventListeners
+S.bossEventsStep = step
 end

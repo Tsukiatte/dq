@@ -11,6 +11,33 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.7.0 - 2026-09-02 - "Steampunk knows too"
+
+`src/northern.lua` is now `src/bossevents.lua`: one listener per map remote,
+hooking every one present (`northernBossSpecficEvents`,
+`steampunkBossSpecficEvents`, the shared `mapSpecificEvent`), with a handler
+table per map. Read from the Steampunk Sewers client handler and the Evil
+Scientist's models live in Studio.
+
+| event | what we do |
+|---|---|
+| Drop Cogs | every cog part is tweened 100 studs straight down over 0.75 s: each landing footprint is a cube zone with the exact time |
+| Steampunk Back Flames (`mapSpecificEvent`) | flame jets light 0.5 s after the event for 1 s: each jet is a zone with that window |
+| Second Boss Random Pulse (the ball) | live from spawn; named in the log |
+| Second Boss Pulse Wave / Aura | visuals; the damage is the six beam Models, which arm through their precasts |
+
+Server-spawned Models (the six-beam pulse wave lattice, `outwardBlastSize1-5`,
+`secondBossPunchCircle`, `secondBossZigZag`, `secondBossOrbShot`,
+`bossCannonBeam`, `bossHorizontalBeam`) arm through their precasts as
+before. Two arming delays are **seeded** (`DEFAULT_ARM_DELAYS` in
+gamedata.lua) so the first cast is time-aware without being learned: the
+pulse-wave `beam` at 4.5 s (measured 4.8 s in the 15:19 video), and the ball
+(`secondbossrandompulse`) at 0 = live from the start. Anything learned in
+play overrides a seed.
+
+Settings renamed: `useNorthern` → `useBossEvents`, `northernSafeLead` →
+`bossSafeLead`, `northernFlameDelay` → `bossFlameDelay`.
+
 ## 4.6.0 - 2026-09-02 - "Northern Lands knows"
 
 Read from the game's client handler for `northernBossSpecficEvents` and from
