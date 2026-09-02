@@ -860,7 +860,7 @@ local RECOMMENDED_CLONE = {
 local function applySimpleClone()
     -- Ground truth and precision: keep.
     CFG.usePrecast = true
-    CFG.moveMode = "velocity"
+    CFG.moveMode = "steer"
     CFG.moveArriveRadius = 1.2
     CFG.threatProbeRadius = 0
     CFG.threatMargin = 0.4
