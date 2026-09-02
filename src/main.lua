@@ -674,7 +674,15 @@ local function startAutofarm()
             -- bot backs out of the telegraph while still pointed at the enemy,
             -- which keeps it in position to attack the moment it is clear. Not
             -- during recovery - there the character should look where it walks.
-            if CFG.faceTarget and NAV.cachedEnemy and not NAV.recovery and not MC.playing then
+            if MC.playing then
+                -- Macro playback owns facing and has already applied the
+                -- recorded direction this tick. This branch used to fall
+                -- through to releaseFacing, which switched the alignment rig
+                -- off again every single frame - so the recorded rotation was
+                -- captured and stored correctly and then thrown away a
+                -- microsecond after it was applied, which read as "rotation is
+                -- not being recorded".
+            elseif CFG.faceTarget and NAV.cachedEnemy and not NAV.recovery then
                 local targetRoot = NAV.cachedEnemy:FindFirstChild("HumanoidRootPart")
                     or NAV.cachedEnemy.PrimaryPart
                     or NAV.cachedEnemy:FindFirstChildWhichIsA("BasePart")

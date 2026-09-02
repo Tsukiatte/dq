@@ -54,6 +54,56 @@ local function macroCount(macro)
     return macro and macro.samples and #macro.samples or 0
 end
 
+-- One recorded moment: where the torso was, and which way it and the camera
+-- were pointing.
+--
+-- The facing is stored as a LOOK VECTOR rather than an angle. Roblox's look
+-- direction for yaw t is (-sin t, 0, -cos t) - the minus signs matter, and
+-- 2.7.0 got them wrong, which pointed the replay a clean 180 degrees away from
+-- where you had been standing. A unit vector has no sign convention to get
+-- wrong on the way back out.
+--
+-- Both are recorded because they are different things. A humanoid keeps its
+-- torso upright, so torso pitch is ~0 whatever you do with the mouse; the pitch
+-- you actually aimed with lives on the camera.
+local function sampleAt(root, t)
+    local look = root.CFrame.LookVector
+    local sample = {
+        t = t,
+        -- One decimal is well under the arrive radius and keeps the saved JSON
+        -- to a sane size; a long macro is thousands of samples.
+        x = math.floor(root.Position.X * 10 + 0.5) / 10,
+        y = math.floor(root.Position.Y * 10 + 0.5) / 10,
+        z = math.floor(root.Position.Z * 10 + 0.5) / 10,
+        lx = math.floor(look.X * 1000 + 0.5) / 1000,
+        ly = math.floor(look.Y * 1000 + 0.5) / 1000,
+        lz = math.floor(look.Z * 1000 + 0.5) / 1000,
+    }
+    local camera = Workspace.CurrentCamera
+    if camera then
+        local cameraLook = camera.CFrame.LookVector
+        sample.cx = math.floor(cameraLook.X * 1000 + 0.5) / 1000
+        sample.cy = math.floor(cameraLook.Y * 1000 + 0.5) / 1000
+        sample.cz = math.floor(cameraLook.Z * 1000 + 0.5) / 1000
+    end
+    return sample
+end
+
+-- The torso facing of a sample, or nil. Handles the 2.7.0 format, which stored
+-- a bare yaw angle in `r`.
+local function sampleLook(sample)
+    if not sample then return nil end
+    if sample.lx then
+        local look = Vector3.new(sample.lx, sample.ly, sample.lz)
+        if look.Magnitude > 0.01 then return look end
+        return nil
+    end
+    if sample.r then
+        return Vector3.new(-math.sin(sample.r), 0, -math.cos(sample.r))
+    end
+    return nil
+end
+
 local function samplePosition(macro, index)
     local sample = macro.samples[index]
     if not sample then return nil end
@@ -201,9 +251,7 @@ local function startRecording()
 
     MC.recording = true
     MC.recordStart = os.clock()
-    local _, startYaw = root.CFrame:ToOrientation()
-    MC.samples = { { t = 0, x = root.Position.X, y = root.Position.Y, z = root.Position.Z,
-        r = math.floor(startYaw * 1000 + 0.5) / 1000 } }
+    MC.samples = { sampleAt(root, 0) }
     MC.actions = {}
     MC.lastActions = MC.actions
     MC.lastSampleTime = MC.recordStart
@@ -254,18 +302,7 @@ local function recordStep()
 
     MC.lastSampleTime = now
     MC.lastSamplePosition = position
-    -- Which way you were FACING, not just where you stood (2.7.0). Yaw only:
-    -- pitch and roll are not yours to set on a humanoid anyway.
-    local _, yaw = root.CFrame:ToOrientation()
-    table.insert(MC.samples, {
-        t = now - MC.recordStart,
-        -- One decimal is well under the arrive radius and keeps the saved JSON
-        -- to a sane size; a long macro is thousands of samples.
-        x = math.floor(position.X * 10 + 0.5) / 10,
-        y = math.floor(position.Y * 10 + 0.5) / 10,
-        z = math.floor(position.Z * 10 + 0.5) / 10,
-        r = math.floor(yaw * 1000 + 0.5) / 1000,
-    })
+    table.insert(MC.samples, sampleAt(root, now - MC.recordStart))
 
     if #MC.samples >= CFG.macroMaxSamples then
         heavyDebug("Macro", "Sample limit reached; stopping the recording here.")
@@ -468,14 +505,14 @@ local function runMacroPlayback(humanoid, root)
     -- walked it.
     local target = samplePosition(macro, MC.playCursor)
 
-    -- Facing. With a recorded yaw we reproduce where you were LOOKING, which
-    -- matters because the attacks fire in the direction the camera points -
-    -- a click replayed while facing the wrong way hits nothing. Falls back to
-    -- looking where it walks for macros recorded before 2.7.0.
-    local sample = macro.samples[MC.playCursor]
-    if CFG.macroFaceRecorded and sample and sample.r then
-        faceTowards(root, humanoid,
-            rootPos + Vector3.new(math.sin(sample.r), 0, math.cos(sample.r)) * 12)
+    -- Facing: point the body the way it pointed when you recorded. faceTowards
+    -- flattens to yaw, which is all a humanoid can do - it keeps its torso
+    -- upright no matter where you look. The recorded pitch is kept in the file
+    -- (see sampleAt) but is not applied to the body, because a body cannot
+    -- express it.
+    local look = CFG.macroFaceRecorded and sampleLook(macro.samples[MC.playCursor]) or nil
+    if look then
+        faceTowards(root, humanoid, rootPos + look * 12)
     else
         releaseFacing(humanoid)
     end

@@ -11,6 +11,27 @@ file and that table in sync on every edit.
 
 ---
 
+## 2.7.4 - 2026-09-02
+Macro rotation. It *was* being recorded - it just never survived to the screen.
+
+- **The main loop threw the facing away every frame.** During playback the
+  facing block fell through to `releaseFacing(humanoid)`, which switches the
+  AlignOrientation rig off and hands rotation back to the Humanoid. So
+  `runMacroPlayback` applied the recorded direction and the same tick undid it a
+  microsecond later. That is why it looked like rotation was not being recorded
+  at all. Playback now owns facing outright.
+- **The direction was reconstructed with the wrong sign.** Roblox's look vector
+  for yaw *t* is `(-sin t, 0, -cos t)`; 2.7.0 used `(sin t, 0, cos t)`, which
+  points a clean 180 degrees the other way. Facing is now stored as a **look
+  vector** rather than an angle, so there is no sign convention left to get
+  wrong on the way back out.
+- **Pitch is recorded**, as asked - both the torso's and the camera's. Only yaw
+  is applied to the body: a humanoid keeps its torso upright, so torso pitch is
+  ~0 no matter where you point the mouse, and the pitch you actually aim with
+  lives on the camera. Both are in the file for anything that wants them.
+- Macros recorded by 2.7.0-2.7.3 still play: the old bare-yaw `r` field is read
+  through the same path, now with the signs the right way round.
+
 ## 2.7.3 - 2026-09-01
 The actual fix for the blank labels, and a HUD that stays in one piece.
 
