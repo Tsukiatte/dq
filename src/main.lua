@@ -584,7 +584,7 @@ local function startAutofarm()
             -- colours, and it pulls you out of an attack - and nothing else
             -- runs, so the character is yours between dodges.
             if CL.active and CFG.cloneManual then
-                if not isPositionSafeFromDamageBricks(root.Position, 0.5) then
+                if (S.getThreatAt(root.Position, 0) or 0) > 0 then
                     heavyDebugOnChange("loop_branch", "clone_manual_dodge", "Loop",
                         "BRANCH: CLONE MANUAL - dodging.")
                     runCloneEvasion(humanoid, root)

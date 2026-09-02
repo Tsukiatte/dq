@@ -261,6 +261,12 @@ local function buildConfigTable()
             cloneEnemySoftRadius = CFG.cloneEnemySoftRadius,
             cloneSafeDwell = CFG.cloneSafeDwell,
             cloneKeepDistance = CFG.cloneKeepDistance,
+            threatWeight = CFG.threatWeight,
+            threatLethal = CFG.threatLethal,
+            threatHorizon = CFG.threatHorizon,
+            threatFalloff = CFG.threatFalloff,
+            showThreatGradient = CFG.showThreatGradient,
+            dodgeProjectiles = CFG.dodgeProjectiles,
             cloneGridSpacing = CFG.cloneGridSpacing,
             cloneMaxCells = CFG.cloneMaxCells,
             cloneDangerCost = CFG.cloneDangerCost,
@@ -397,6 +403,12 @@ local function applyConfigData(data)
         CFG.cloneEnemySoftRadius = tonumber(combat.cloneEnemySoftRadius) or CFG.cloneEnemySoftRadius
         CFG.cloneSafeDwell = tonumber(combat.cloneSafeDwell) or CFG.cloneSafeDwell
         if combat.cloneKeepDistance ~= nil then CFG.cloneKeepDistance = combat.cloneKeepDistance == true end
+        CFG.threatWeight = tonumber(combat.threatWeight) or CFG.threatWeight
+        CFG.threatLethal = tonumber(combat.threatLethal) or CFG.threatLethal
+        CFG.threatHorizon = tonumber(combat.threatHorizon) or CFG.threatHorizon
+        CFG.threatFalloff = tonumber(combat.threatFalloff) or CFG.threatFalloff
+        if combat.showThreatGradient ~= nil then CFG.showThreatGradient = combat.showThreatGradient == true end
+        if combat.dodgeProjectiles ~= nil then CFG.dodgeProjectiles = combat.dodgeProjectiles == true end
         CFG.cloneGridSpacing = tonumber(combat.cloneGridSpacing) or CFG.cloneGridSpacing
         CFG.cloneMaxCells = tonumber(combat.cloneMaxCells) or CFG.cloneMaxCells
         CFG.cloneDangerCost = tonumber(combat.cloneDangerCost) or CFG.cloneDangerCost

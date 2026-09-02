@@ -11,6 +11,62 @@ file and that table in sync on every edit.
 
 ---
 
+## 3.1.0 - 2026-09-02 - "Heat"
+
+Safety stops being a yes or no. It is now **heat**: a number from 0 to 100, at
+a point *and at a moment*.
+
+The screenshot that prompted this is the argument for it — a fan of radial
+beams where every square is unsafe. A boolean leaves the search nothing to
+choose between, so the character stands still and dies. A scalar field always
+has a least-bad answer, and the thin cool wedges between the beams fall out of
+it for free.
+
+### ThreatManager (`src/threat.lua`)
+`getThreatAt(position, atTime)` combines every source into one number, additive
+where they overlap:
+
+- **Announced ground attacks** — exact circle or oriented-box geometry from the
+  game's own broadcast, scaled by an **urgency curve**. Squared, so a marker
+  firing in four seconds is barely warm and one firing now is lethal. That ramp
+  is what produces the gradient rather than a wall.
+- **Live hazards** — full weight; there is nothing to wait for.
+- **Enemies** — constant in time, because melee never telegraphs and never
+  expires.
+- **Safe-spot markers** — inverted: outside the circle is the danger.
+- A **warm shoulder** outside every edge, so the middle of a gap beats its lip.
+
+The box test rotates the *world point* into the box's frame, which turns an
+oriented-box problem back into two 1-D comparisons — exact and cheaper than
+rotating the box.
+
+### A\* across the field
+```
+F = G + H + (threat * threatWeight)
+```
+G is distance travelled, H is octile distance remaining, and the threat term is
+what buys a longer cool route over a short hot one. **Caution** is literally
+"how many studs of detour is one point of heat worth" — the survival-versus-
+speed dial in one number, defaulted high since you chose survival first.
+
+Cells at or above **Lethal at** are impassable. If that leaves no route at all,
+the search re-runs with them merely expensive: being cornered is not a reason
+to stand still and take it.
+
+Scratch buffers are reused across searches and the open set is a linear scan —
+a heap of tables would allocate more per push than the scan costs on a window
+of a few hundred cells.
+
+### Projectile steering
+A per-frame reflex under the grid, for what is already in the air. Closest
+approach is solved analytically, then the dodge is the component of the offset
+**perpendicular** to the line of travel — the shortest way out of the path,
+where backing off along it would just be outrun.
+
+### Seeing it
+Discs are drawn green through amber to red by heat, with two gradient stops so
+the middle reads as amber rather than a muddy blend.
+
 ## 3.0.5 - 2026-09-02
 
 ### Attacks made of hundreds of meshes no longer melt the frame
