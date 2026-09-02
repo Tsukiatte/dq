@@ -16,6 +16,10 @@ local heavyDebug = S.heavyDebug
 local Workspace = S.Workspace
 local getVisualRoot = S.getVisualRoot
 local ZN = S.ZN
+local PC = S.PC
+local isKnownEnemyAttack = S.isKnownEnemyAttack
+local isKnownOwnEffect = S.isKnownOwnEffect
+local isSafeZoneMarker = S.isSafeZoneMarker
 
 -- Realistic Player Hitbox
 local function getPlayerHitboxMetrics()
@@ -356,7 +360,7 @@ end
 --
 -- The attack book is evidence-based detection: a record is only written when
 -- we actually took damage with that kind of part next to us (see
--- recordDamageEvent further down). Each record is a plain-data signature of
+-- the picker and the drawn zones). Each record is a plain-data signature of
 -- the part - name, parent name, class, material, shape, colour, size - plus a
 -- display name, hit count and an enabled flag, so it can be saved as JSON and
 -- shown in a panel. A part matches a record by name when the name is specific,
@@ -515,15 +519,24 @@ local function isDamageBrick(part)
     if HZ.ownParts[part] then return false end
     local partName = string.lower(part.Name)
     if HZ.ownNames[partName] then return false end
-    -- Told "no" in the recommendations list: not an attack, whatever it looks like.
-    if HZ.rejectedNames[partName] then return false end
+
+    -- The game's own answer, ahead of every heuristic below (3.0.0). It keeps
+    -- its attack visuals in ReplicatedStorage.enemyProjectiles and ours in
+    -- .projectiles / .abilities, so "is this mine or theirs" is a lookup, not
+    -- a guess. See game/GAME_NOTES.md.
+    if isKnownOwnEffect(part) then return false end
+    -- A safe-spot marker is the opposite of a hazard: it is where you must
+    -- stand. Treating it as damage would drive the bot out of the one survivable
+    -- circle on the floor.
+    if isSafeZoneMarker(part) then return false end
+    if isKnownEnemyAttack(part) then return true end
 
     if isOwnedByPlayerOrTeammate(part) then return false end
 
     -- The attack book (2.3.0): evidence that this kind of part hurt us. It
     -- outranks the creature-part veto below because a record learned from a
     -- part inside a creature is exactly a swing hitbox - but those records are
-    -- OFF by default, see learnAttackPart.
+    -- OFF by default when picked from inside a creature model.
     local record = findAttackRecord(part)
     if record then
         return record.enabled ~= false
@@ -652,10 +665,22 @@ local function hazardClosestPoint(part, position)
     return closest + sweep * t
 end
 
-local function isPositionSafeFromDamageBricks(position, extraClearance)
+-- `atTime` (3.0.0) asks the question in the future: "would this spot be safe
+-- when I actually get there?" Physical hazards are judged as they are now;
+-- announced ground attacks are judged against their real impact time, which
+-- the game tells us. That is what lets the bot cross a marker that fires in a
+-- second and a half to reach real safety, instead of treating every marker as
+-- a wall and getting cornered by the third one.
+local function isPositionSafeFromDamageBricks(position, extraClearance, atTime)
     local _, playerRadius, totalHeight = getPlayerHitboxMetrics()
     local clearance = CFG.damageBrickClearance + playerRadius + (extraClearance or 0)
     local halfHeight = (totalHeight * 0.5) + 2.0
+
+    if CFG.usePrecast and #PC.zones > 0 then
+        if not S.isPositionSafeFromPrecast(position, clearance, atTime) then
+            return false
+        end
+    end
 
     for _, part in ipairs(HZ.detected) do
         if part.Parent then
@@ -669,6 +694,36 @@ local function isPositionSafeFromDamageBricks(position, extraClearance)
         end
     end
     return true
+end
+
+-- Live safe-spot markers, refreshed with the catalog. Several bosses spawn a
+-- circle you must stand IN; for those the whole polarity of the dodge flips,
+-- and a grid that only avoids red would calmly walk you out of the one place
+-- that survives.
+local function collectSafeZones()
+    table.clear(HZ.safeZones)
+    if not CFG.safeZoneEnabled then return end
+    for _, part in ipairs(HZ.partPool) do
+        if part.Parent and isSafeZoneMarker(part) then
+            HZ.safeZones[#HZ.safeZones + 1] = part
+        end
+    end
+end
+
+-- 0 when there is no safe zone on the floor, or when `pos` is inside one;
+-- CFG.safeZonePull when a zone exists and this spot is outside every one.
+local function safeZonePenalty(pos)
+    local zones = HZ.safeZones
+    if #zones == 0 then return 0 end
+    for _, part in ipairs(zones) do
+        if part.Parent then
+            local size = part.Size
+            local reach = math.max(size.X, size.Z) * 0.5
+            local d = Vector3.new(pos.X - part.Position.X, 0, pos.Z - part.Position.Z).Magnitude
+            if d < reach then return 0 end
+        end
+    end
+    return CFG.safeZonePull
 end
 
 local function evaluateHazardPenaltyAtPoint(pos)
@@ -695,7 +750,7 @@ local function evaluateHazardPenaltyAtPoint(pos)
         end
     end
 
-    return totalPenalty
+    return totalPenalty + safeZonePenalty(pos)
 end
 
 local function getActiveHazardRepulsionVector(pos)
@@ -1153,7 +1208,7 @@ end
 -- one every 4s, from the moment the script starts, on any map size.
 --
 -- The index below is built once - in slices, so even the first walk never lands
--- as a single freeze - and then kept current by DescendantAdded / Removing,
+-- as a single pass - and then kept current by DescendantAdded / Removing,
 -- which are O(1) per instance. Each frame re-classifies a bounded slice of the
 -- part pool round-robin, so a pooled effect part that is turned INTO a telegraph
 -- by changing its properties is still caught within a second, and a part that
@@ -1654,79 +1709,11 @@ end
 --
 -- A telegraph is on screen for well under a second. That is not long enough to
 -- point a mouse at it, which made "Pick Telegraph" nearly unusable for exactly
--- the attacks it exists for. Freeze holds a COPY of every detected attack: an
--- anchored, query-able clone in our visual folder that stays after the real
--- part is gone. Picking a copy learns the original's name and parent (kept as
--- attributes), so the Attack Book entry is about the real attack, not the copy.
---
--- The copies are inert - no children, no collision, no touch - and they live
--- under the visual root, so the classifiers and our own raycasts ignore them.
--- =========================================================================
 
 local FROZEN_ORIG_NAME = "DQOriginalName"
 local FROZEN_ORIG_PARENT = "DQOriginalParent"
 
-local function clearFrozenParts()
-    if HZ.frozenFolder then HZ.frozenFolder:Destroy() end
-    HZ.frozenFolder = nil
-    HZ.frozenCount = 0
-    HZ.frozenOf = setmetatable({}, { __mode = "k" })
-end
-
-local function freezeCopy(part)
-    if HZ.frozenOf[part] then return end
-    if HZ.frozenCount >= CFG.freezeCap then
-        heavyDebugThrottled("freeze_full", 5.0, "Freeze", string.format(
-            "Holding %d copies (the cap); clear them to keep going.", HZ.frozenCount))
-        return
-    end
-
-    if not HZ.frozenFolder or not HZ.frozenFolder.Parent then
-        HZ.frozenFolder = Instance.new("Folder")
-        HZ.frozenFolder.Name = "FrozenAttacks"
-        HZ.frozenFolder.Parent = getVisualRoot()
-    end
-
-    local ok, copy = pcall(function() return part:Clone() end)
-    if not ok or not copy then return end
-    -- A bare part: whatever the original carried (scripts, emitters, welds) is
-    -- not wanted in a held copy.
-    for _, child in ipairs(copy:GetChildren()) do child:Destroy() end
-    copy:SetAttribute(FROZEN_ORIG_NAME, part.Name)
-    copy:SetAttribute(FROZEN_ORIG_PARENT, part.Parent and part.Parent.Name or "")
-    copy.Name = "Frozen_" .. part.Name
-    copy.Anchored = true
-    copy.CanCollide = false
-    copy.CanTouch = false
-    copy.CanQuery = true          -- the whole point: the mouse must be able to hit it
-    copy.CastShadow = false
-    copy.Transparency = math.min(part.Transparency, 0.55)
-    copy.Parent = HZ.frozenFolder
-
-    HZ.frozenOf[part] = copy
-    HZ.frozenCount = HZ.frozenCount + 1
-end
-
--- Called each frame from scanDamageBricks with the current hazard list.
-local function updateFrozenSnapshots()
-    if not HZ.freezeEnabled then return end
-    for _, part in ipairs(HZ.detected) do
-        if part.Parent then freezeCopy(part) end
-    end
-end
-
-local function setFreezeEnabled(enabled)
-    HZ.freezeEnabled = enabled
-    if enabled then
-        heavyDebug("Freeze", "Freeze ON: every attack that appears is copied and held. "
-            .. "Point at a copy with Pick Telegraph to add it to the Attack Book.")
-    else
-        clearFrozenParts()
-        heavyDebug("Freeze", "Freeze off; held copies cleared.")
-    end
-end
-
--- The real name and parent behind a picked part: a frozen copy answers for the
+-- The real name and parent behind a picked part: a copy answers for the
 -- original it was made from.
 local function resolvePickedIdentity(part)
     local originalName = part:GetAttribute(FROZEN_ORIG_NAME)
@@ -1748,7 +1735,6 @@ end
 --
 -- Parts are swept from the world index pool a bounded slice per frame, so
 -- turning it on across a whole dungeon costs a little work for a couple of
--- seconds rather than one long freeze.
 -- =========================================================================
 
 local function shouldKeepVisible(part)
@@ -1896,8 +1882,6 @@ local function lowDetailStep()
     LD.cursor = cursor
 end
 
-local recommendStep
-
 local function worldIndexStep()
     local now = os.clock()
 
@@ -1956,334 +1940,9 @@ local function worldIndexStep()
     -- keep happening (and HZ.recentParts keeps being pruned) with the loop off.
     trackRecentParts(now)
     updateZones()
-    if recommendStep then recommendStep(now) end
+    collectSafeZones()
+    S.precastStep()
     lowDetailStep()
-end
-
--- =========================================================================
--- TRIAL RUNS (2.3.0): learning from damage.
---
--- With Trial Run on, every drop in our health is a lesson. The suspects are
--- the hazards already detected in range (strongest evidence: we were standing
--- in one) and every part that appeared within CFG.damageCorrelationWindow
--- before the hit and within CFG.damageCorrelationRadius of us. The closest
--- few are written into the attack book, or confirm an existing record. A hit
--- with no candidate at all (a melee swing with no spawned part, a DoT tick) is
--- logged and learns nothing, which is what keeps the book from filling with
--- scenery.
--- =========================================================================
-
-local function autoAttackName(part)
-    local name = part.Name
-    if not isGenericName(string.lower(name)) then return name end
-    local parent = part.Parent
-    if parent and parent ~= Workspace and not isGenericName(string.lower(parent.Name)) then
-        return parent.Name
-    end
-    return string.format("Attack %d", #HZ.attackBook + 1)
-end
-
-local function learnAttackPart(part, damage, now)
-    local record = findAttackRecord(part)
-    if record then
-        record.hits = (record.hits or 0) + 1
-        record.damage = math.max(record.damage or 0, damage)
-        heavyDebug("Trial", string.format("'%s' confirmed (hit #%d, %.0f damage).",
-            record.name, record.hits, damage))
-    else
-        record = partSignature(part)
-        local ancestorModel = part:FindFirstAncestorOfClass("Model")
-        local melee = ancestorModel ~= nil and ancestorModel:FindFirstChildOfClass("Humanoid") ~= nil
-        record.name = autoAttackName(part)
-        record.hits = 1
-        record.damage = damage
-        record.melee = melee
-        -- A part inside a creature model is its swing hitbox. Dodging those
-        -- keeps the bot out of its own attack range, so it starts OFF and the
-        -- user turns it on in the Attack Book if that is really wanted.
-        record.enabled = not melee
-        record.moving = getHazardMotion(part) ~= nil
-        record.learnedAt = os.time()
-        table.insert(HZ.attackBook, record)
-        heavyDebug("Trial", string.format(
-            "NEW attack learned: '%s' (%s%s, %.0f damage)%s",
-            record.name, describeRecord(record), record.moving and ", moving" or "", damage,
-            melee and " - inside a creature model, so OFF by default. Enable it in the Attack Book if wanted."
-                or ". Saved with the config."))
-    end
-    invalidateAttackBook()
-    -- Track it right away rather than waiting for the round-robin.
-    if HZ.partPoolIndex[part] then classifyPoolPart(part, now) end
-end
-
-local function recordDamageEvent(damage, now)
-    local character = LocalPlayer.Character
-    local root = character and character:FindFirstChild("HumanoidRootPart")
-    if not root then return end
-    local rootPos = root.Position
-    HZ.damageEvents = HZ.damageEvents + 1
-
-    local suspects = {}
-    local seen = {}
-    for _, part in ipairs(HZ.detected) do
-        if part.Parent and not seen[part] then
-            seen[part] = true
-            local closest = hazardClosestPoint(part, rootPos)
-            suspects[#suspects + 1] = {
-                part = part, detected = true,
-                distance = Vector2.new(rootPos.X - closest.X, rootPos.Z - closest.Z).Magnitude,
-            }
-        end
-    end
-    for part, addedAt in pairs(HZ.recentParts) do
-        if not seen[part] and part.Parent and now - addedAt <= CFG.damageCorrelationWindow
-            and not HZ.ownParts[part] and not HZ.ownNames[string.lower(part.Name)] then
-            local position = part.Position
-            local distance = Vector2.new(rootPos.X - position.X, rootPos.Z - position.Z).Magnitude
-            if distance <= CFG.damageCorrelationRadius and not isOwnedByPlayerOrTeammate(part) then
-                seen[part] = true
-                suspects[#suspects + 1] = { part = part, detected = false, distance = distance }
-            end
-        end
-    end
-
-    if #suspects == 0 then
-        heavyDebug("Trial", string.format(
-            "Took %.0f damage with nothing that appeared nearby in the last %.1fs - melee or DoT; nothing learned.",
-            damage, CFG.damageCorrelationWindow))
-        return
-    end
-
-    table.sort(suspects, function(a, b)
-        if a.detected ~= b.detected then return a.detected end
-        return a.distance < b.distance
-    end)
-    for i = 1, math.min(#suspects, CFG.damageSuspectLimit) do
-        learnAttackPart(suspects[i].part, damage, now)
-    end
-end
-
--- =========================================================================
--- RECOMMENDATIONS (2.14.0)
---
--- The scorer already has an opinion about every part on screen. Freeze-and-
--- pick made you find the right one with the mouse in a field of held copies;
--- this puts the opinion forward instead, one part at a time, each held in the
--- world in its own colour with a number on it, and you answer from a list.
---
--- Yes writes a book entry from the signature captured when it was put forward,
--- so it works after the part is long gone. No is remembered per map and vetoes
--- the name in isDamageBrick, so the bot stops dodging it too. The entry
--- outlives the part on purpose: an attack is on screen for a fraction of a
--- second, and that was the whole reason freeze existed.
--- =========================================================================
-
-local RECOMMEND_PALETTE = {
-    Color3.fromRGB(80, 220, 255),   -- cyan
-    Color3.fromRGB(255, 90, 220),   -- magenta
-    Color3.fromRGB(255, 150, 40),   -- orange
-    Color3.fromRGB(150, 255, 80),   -- lime
-    Color3.fromRGB(170, 110, 255),  -- violet
-    Color3.fromRGB(255, 200, 60),   -- gold
-    Color3.fromRGB(60, 230, 190),   -- teal
-    Color3.fromRGB(255, 120, 120),  -- salmon
-}
-
-local function recommendFolder()
-    if HZ.recommendFolder and HZ.recommendFolder.Parent then return HZ.recommendFolder end
-    local folder = Instance.new("Folder")
-    folder.Name = "Recommended"
-    folder.Parent = getVisualRoot()
-    HZ.recommendFolder = folder
-    return folder
-end
-
-local function dropRecommendation(index)
-    local entry = table.remove(HZ.recommendations, index)
-    if not entry then return end
-    HZ.recommendedNames[entry.partName] = nil
-    if entry.copy then entry.copy:Destroy() end
-end
-
-local function clearRecommendations()
-    for i = #HZ.recommendations, 1, -1 do dropRecommendation(i) end
-    if HZ.recommendFolder then HZ.recommendFolder:Destroy() end
-    HZ.recommendFolder = nil
-    if S.refreshRecommendPanel then S.refreshRecommendPanel() end
-end
-
--- A held copy of the part in its list colour, numbered, so what the list is
--- talking about is unmistakable in the world.
-local function makeRecommendCopy(part, entry)
-    local ok, copy = pcall(function() return part:Clone() end)
-    if not ok or not copy then return nil end
-    for _, child in ipairs(copy:GetChildren()) do child:Destroy() end
-    copy.Name = "Recommended_" .. entry.index
-    copy.Anchored = true
-    copy.CanCollide = false
-    copy.CanTouch = false
-    copy.CanQuery = false
-    copy.CastShadow = false
-    copy.Material = Enum.Material.Neon
-    copy.Color = entry.color
-    copy.Transparency = 0.35
-    copy.Parent = recommendFolder()
-
-    local hl = Instance.new("Highlight")
-    hl.FillColor = entry.color
-    hl.OutlineColor = entry.color
-    hl.FillTransparency = 0.6
-    hl.OutlineTransparency = 0
-    hl.Adornee = copy
-    hl.Parent = copy
-
-    local tag = Instance.new("BillboardGui")
-    tag.Size = UDim2.fromOffset(200, 30)
-    tag.StudsOffsetWorldSpace = Vector3.new(0, copy.Size.Y * 0.5 + 2, 0)
-    tag.AlwaysOnTop = true
-    tag.MaxDistance = 300
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.fromScale(1, 1)
-    label.BackgroundTransparency = 1
-    label.Font = Enum.Font.GothamBold
-    label.TextColor3 = entry.color
-    label.TextStrokeTransparency = 0.1
-    label.TextSize = 15
-    label.Text = string.format("#%d  %s", entry.index, entry.name)
-    label.Parent = tag
-    tag.Parent = copy
-    return copy
-end
-
-local function playerPosition()
-    local char = LocalPlayer.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    return root and root.Position or nil
-end
-
--- Whether a candidate is worth putting forward at all.
-local function recommendable(part)
-    if not part.Parent then return false end
-    if part:GetAttribute("DQZone") then return false end
-    if RT.visualRoot and part:IsDescendantOf(RT.visualRoot) then return false end
-    local lname = string.lower(part.Name)
-    if HZ.recommendedNames[lname] or HZ.rejectedNames[lname] or HZ.ownNames[lname] then return false end
-    if findAttackRecord(part) then return false end
-    return true
-end
-
-recommendStep = function(now)
-    -- Expire entries whose part has been gone long enough, whatever the rate.
-    local changed = false
-    for i = #HZ.recommendations, 1, -1 do
-        local entry = HZ.recommendations[i]
-        if not entry.gone and not entry.part.Parent then
-            entry.gone = now
-            changed = true
-        end
-        if entry.gone and now - entry.gone > CFG.recommendTTL then
-            dropRecommendation(i)
-            changed = true
-        end
-    end
-
-    if CFG.recommendEnabled and #HZ.recommendations < CFG.recommendMax
-        and now - HZ.lastRecommendTime >= 1 / math.max(CFG.recommendRate, 0.05) then
-        -- Nearest first: the one that matters is the one about to hit you.
-        local origin = playerPosition()
-        local best, bestDist = nil, math.huge
-        for _, part in ipairs(HZ.candidates) do
-            if recommendable(part) then
-                local d = origin and (part.Position - origin).Magnitude or 0
-                if d < bestDist then best, bestDist = part, d end
-            end
-        end
-        if best then
-            HZ.lastRecommendTime = now
-            HZ.recommendSerial = HZ.recommendSerial + 1
-            local model = best:FindFirstAncestorOfClass("Model")
-            local entry = {
-                part = best,
-                sig = partSignature(best),
-                name = autoAttackName(best),
-                partName = string.lower(best.Name),
-                parentName = (best.Parent and best.Parent ~= Workspace) and best.Parent.Name or "",
-                index = HZ.recommendSerial,
-                color = RECOMMEND_PALETTE[(HZ.recommendSerial - 1) % #RECOMMEND_PALETTE + 1],
-                since = now,
-                gone = nil,
-                distance = bestDist,
-                melee = model ~= nil and model:FindFirstChildOfClass("Humanoid") ~= nil,
-                moving = getHazardMotion(best) ~= nil,
-            }
-            entry.copy = makeRecommendCopy(best, entry)
-            HZ.recommendedNames[entry.partName] = true
-            table.insert(HZ.recommendations, entry)
-            changed = true
-            heavyDebug("Recommend", string.format("#%d '%s' put forward (%s, %.0f studs away).",
-                entry.index, entry.name, describeRecord(entry.sig), bestDist))
-        end
-    end
-
-    if changed and S.refreshRecommendPanel then S.refreshRecommendPanel() end
-end
-
--- Yes: it is an attack. A book record from the signature captured when it was
--- put forward, so this works after the part has gone.
-local function acceptRecommendation(index)
-    local entry = HZ.recommendations[index]
-    if not entry then return false end
-    local record = entry.sig
-    record.name = entry.name
-    record.hits = 0
-    record.damage = 0
-    record.melee = entry.melee
-    record.enabled = not entry.melee
-    record.moving = entry.moving
-    record.learnedAt = os.time()
-    table.insert(HZ.attackBook, record)
-    invalidateAttackBook()
-    heavyDebug("Recommend", string.format("#%d '%s' confirmed and added to this map's Attack Book%s.",
-        entry.index, entry.name, entry.melee and " (inside a creature model, so OFF by default)" or ""))
-    dropRecommendation(index)
-    if S.refreshRecommendPanel then S.refreshRecommendPanel() end
-    if S.refreshAttackBookPanel then S.refreshAttackBookPanel() end
-    return true
-end
-
--- No: it only looks like one. Remembered per map, and vetoed as a hazard from
--- now on, so the bot stops dodging it as well as stops asking.
-local function rejectRecommendation(index)
-    local entry = HZ.recommendations[index]
-    if not entry then return false end
-    HZ.rejectedNames[entry.partName] = true
-    heavyDebug("Recommend", string.format(
-        "#%d '%s' rejected: not an attack on this map. It will not be dodged or asked about again.",
-        entry.index, entry.name))
-    for i = #HZ.recommendations, 1, -1 do
-        if HZ.recommendations[i].partName == entry.partName then dropRecommendation(i) end
-    end
-    HZ.catalogDirty = true
-    if S.refreshRecommendPanel then S.refreshRecommendPanel() end
-    return true
-end
-
-local function serializeRejected()
-    local out = {}
-    for name in pairs(HZ.rejectedNames) do table.insert(out, name) end
-    table.sort(out)
-    return out
-end
-
-local function loadRejected(list)
-    table.clear(HZ.rejectedNames)
-    if type(list) == "table" then
-        for _, name in ipairs(list) do
-            if type(name) == "string" then HZ.rejectedNames[string.lower(name)] = true end
-        end
-    end
-    HZ.catalogDirty = true
-    return #serializeRejected()
 end
 
 local function removeAttackRecord(index)
@@ -2295,15 +1954,8 @@ end
 
 local function clearAttackBook()
     table.clear(HZ.attackBook)
-    heavyDebug("Trial", "Attack book cleared.")
+    heavyDebug("Book", "Attack book cleared.")
     invalidateAttackBook()
-end
-
-local function setTrialEnabled(enabled)
-    HZ.trialEnabled = enabled
-    heavyDebug("Trial", enabled
-        and "TRIAL RUN ON: every hit taken is matched to what appeared around you and written into the Attack Book."
-        or "Trial run off. The Attack Book keeps being used for detection.")
 end
 
 -- The catalog (which parts are telegraphs / invisible walls) is maintained by
@@ -2334,7 +1986,6 @@ local function scanDamageBricks(rootPosition)
         end
     end
     HZ.detected = found
-    updateFrozenSnapshots()
 
     if UI.damageBrickCountLabel then
         UI.damageBrickCountLabel.Text = "Telegraphs Active: " .. tostring(#found)
@@ -2360,7 +2011,7 @@ end
 -- hand pick and a trial-run discovery end up in the same place, with the same
 -- rename / disable / delete controls. Clicking a marked part undoes both.
 --
--- The part clicked may be a frozen copy, which is the normal case for a
+-- The part clicked is resolved to its underlying identity, which is what a
 -- telegraph that only exists for half a second: the identity used is the
 -- original's, recorded on the copy when it was made.
 local function togglePickedTelegraph(part)
@@ -2413,7 +2064,7 @@ local function togglePickedTelegraph(part)
             heavyDebug("Picker", string.format(
                 "MARKED '%s' (parent '%s', %s%s). Added to the Attack Book - rename it there, then Save.",
                 originalName, originalParent ~= "" and originalParent or "Workspace",
-                describeRecord(record), isCopy and ", from a frozen copy" or ""))
+                describeRecord(record), ""))
         else
             heavyDebug("Picker", string.format(
                 "MARKED '%s'; it already has the Attack Book entry '%s'.", originalName, existing.name))
@@ -2439,7 +2090,7 @@ local function togglePickedOwn(part)
     local now = os.clock()
 
     if isCopy then
-        -- A frozen copy is of something the script CLASSIFIED as an enemy
+        -- The picked part is something the script CLASSIFIED as an enemy
         -- attack; marking it as ours only needs the name.
         if HZ.ownNames[partName] then
             HZ.ownNames[partName] = nil
@@ -2448,7 +2099,7 @@ local function togglePickedOwn(part)
             HZ.ownNames[partName] = true
             HZ.learnedNames[partName] = nil
             heavyDebug("Picker", string.format(
-                "MARKED '%s' as our OWN effect (from a frozen copy). Saved with the config.", originalName))
+                "MARKED '%s' as our OWN effect. Saved with the config.", originalName))
         end
         invalidateAttackBook()
         NAV.forceRescan = true
@@ -2553,7 +2204,7 @@ local function setTelegraphPickerEnabled(enabled, mode)
         and "Picker armed (KEEP VISIBLE). Click a part to keep or drop its name in low detail."
         or (HZ.ownPickerEnabled
             and "Picker armed (OWN ATTACKS). Click one of your own effects to mark or unmark it."
-            or "Picker armed (TELEGRAPH). Click an attack - or a frozen copy of one - to add it to the Attack Book.")))
+            or "Picker armed (TELEGRAPH). Click an attack to add it to the Attack Book.")))
 end
 
 S.clearHazardHighlights = clearHazardHighlights
@@ -2577,12 +2228,8 @@ S.getHazardMotion = getHazardMotion
 S.findAttackRecord = findAttackRecord
 S.invalidateAttackBook = invalidateAttackBook
 S.describeRecord = describeRecord
-S.recordDamageEvent = recordDamageEvent
 S.removeAttackRecord = removeAttackRecord
 S.clearAttackBook = clearAttackBook
-S.setTrialEnabled = setTrialEnabled
-S.setFreezeEnabled = setFreezeEnabled
-S.clearFrozenParts = clearFrozenParts
 S.setLowDetailEnabled = setLowDetailEnabled
 S.refreshLowDetail = refreshLowDetail
 S.restoreAllDetail = restoreAllDetail
@@ -2598,10 +2245,33 @@ S.serializeZones = serializeZones
 S.loadZones = loadZones
 S.rebuildZones = rebuildZones
 S.clearZones = clearZones
-S.acceptRecommendation = acceptRecommendation
-S.rejectRecommendation = rejectRecommendation
-S.clearRecommendations = clearRecommendations
-S.serializeRejected = serializeRejected
-S.loadRejected = loadRejected
 S.clearZonePreview = clearZonePreview
+-- The game fires abilityCast / abilityUsed when WE use an ability (3.0.0).
+-- That is a far better signal than watching our animations: it is exact, it
+-- fires before the effect spawns, and it cannot be confused by an enemy
+-- playing a similar animation.
+local function watchOwnAbilityRemotes()
+    local remotes = S.ReplicatedStorage:FindFirstChild("remotes")
+    if not remotes then return false end
+    local hooked = 0
+    for _, name in ipairs({ "abilityCast", "abilityUsed" }) do
+        local remote = remotes:FindFirstChild(name)
+        if remote and remote:IsA("RemoteEvent") then
+            table.insert(RT.connections, remote.OnClientEvent:Connect(function()
+                RT.lastOwnActionTime = os.clock()
+            end))
+            hooked = hooked + 1
+        end
+    end
+    if hooked > 0 then
+        heavyDebug("Own", string.format(
+            "Watching %d of the game's own ability remotes; our casts are now known exactly, not guessed from animations.",
+            hooked))
+    end
+    return hooked > 0
+end
+
+S.watchOwnAbilityRemotes = watchOwnAbilityRemotes
+S.collectSafeZones = collectSafeZones
+S.safeZonePenalty = safeZonePenalty
 end

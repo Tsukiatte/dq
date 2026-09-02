@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 2.15.1
+    VERSION : 3.0.0
     BUILD   : 2026-09-01
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "2.15.1"
+local SCRIPT_VERSION = "3.0.0"
 local SCRIPT_BUILD_DATE = "2026-09-01"
-local SCRIPT_CODENAME = "Grid"
+local SCRIPT_CODENAME = "Ground truth"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "3.0.0", date = "2026-09-02", notes = "The script stops guessing what an attack is and listens to the game tell it. ReplicatedStorage.modules.PrecastHitbox broadcasts every ground attack on a BridgeNet2 bridge with its exact shape, position, and delayUntilAttack, so time to impact is arithmetic and each clone-grid cell is now judged at the moment you would arrive there rather than right now. 238 enemy attack names and 293 of our own are read from the game as tables, which is the mine-or-theirs question the appearance scorer used to guess. Safe-spot bosses are handled: the markers that mean STAND HERE are attractors, where before the dodge walked you out of the only survivable circle. The map follows Workspace.dungeonName, enemies are scanned from Workspace.enemies, and our own casts come from the abilityCast remote rather than animation watching. Removed: freeze, trial-run damage learning, and the recommendation queue - all three existed to work around not knowing what an attack was." },
     { version = "2.15.1", date = "2026-09-02", notes = "Clone discs are sized from the character's real bounding footprint instead of the 2-stud root part, with a Disc size scale to match by eye. The safety test is given the same radius, so a green disc still means the whole footprint fits." },
     { version = "2.15.0", date = "2026-09-02", notes = "Clone mode moved from a ring to a dense grid anchored to the world, and the dodge became a search across it. Discs the size of your hitbox every 1.5 studs, overlapping, so a safe pocket a few studs wide between two boss attacks still shows up; green means your whole body fits there. The way out is found cell by cell: red cells cost twenty-five green ones to cross so they are crossed only when there is no way around, pits and walls are never crossed, and a depth pass lets it prefer the interior of a safe area over a single green cell about to close. The old ring checked the straight line for walls only and would run through a red strip to a green node behind it. Floor heights are cached per cell; walls are learned by trying. Also: the menu key is rebindable at the top of Modules, and a pinned window no longer stops the key from reopening the interface." },
     { version = "2.14.0", date = "2026-09-02", notes = "Recommendations replace freeze-and-pick as the way to fill the Attack Book. The scorer puts forward what it currently believes is an attack, nearest first, one at a time at a rate you set, each held in the world in its own colour with a number on it and listed in the Attacks panel. Tick writes a book entry from the signature captured when it was put forward, so it works after the part is gone; cross is remembered per map and vetoes the name as a hazard, so the bot stops dodging it as well as stops asking. Entries outlive their part on purpose - that was the whole reason freeze existed. Freeze and the pickers remain underneath as the manual route." },
@@ -86,6 +87,7 @@ local UserInputService = game:GetService("UserInputService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 if _G.DungeonAutofarmDestruct then
     pcall(_G.DungeonAutofarmDestruct)
@@ -110,6 +112,8 @@ local CL = {}
 -- ZN = hand-drawn hazard zones: the definitions, and the live volumes built
 -- from them.
 local ZN = {}
+-- PC = precast: the attacks the game has announced but not yet landed.
+local PC = {}
 -- RT = loose runtime flags and handles (farmEnabled, debugLevel, connections...)
 -- that used to be bare locals. They live in a table so every module sees the
 -- same value; a bare local copied into another module would go stale.
@@ -326,9 +330,6 @@ CFG.hookRemotes = true           -- watch this client's FireServer calls for cas
 -- winners go into the attack book: a named record of what the attack (or its
 -- warning telegraph) looks like. The book drives detection from then on and is
 -- saved with the config.
-CFG.damageCorrelationWindow = 1.5   -- a part that appeared this long before the hit is a suspect
-CFG.damageCorrelationRadius = 25.0  -- ...if it is within this of us (planar)
-CFG.damageSuspectLimit = 2          -- at most this many parts learned per hit
 CFG.attackColorTolerance = 0.18     -- RGB distance that still counts as "same colour"
 CFG.attackSizeTolerance = 0.45      -- +/- fraction per axis that still counts as "same size"
 
@@ -341,11 +342,9 @@ CFG.projectileTrackWindow = 6.0     -- newly added parts are motion-tracked this
 CFG.projectileMaxSize = 14.0        -- longer than this on its longest axis is not a projectile
 CFG.hazardTagEnabled = true         -- billboard name tag on every highlighted attack
 
--- Freeze (2.4.0). A telegraph is on screen for well under a second, which is not
 -- long enough to point at it. While Freeze is on, every detected attack is
 -- copied into a held snapshot that stays put after the real one is gone, so it
 -- can be pointed at and added to the Attack Book at leisure.
-CFG.freezeCap = 400                 -- held copies before it stops adding
 
 -- Low detail (2.4.0). Everything in the world is hidden except the parts whose
 -- names you picked, plus enemies, attacks and our own markers. Collision is
@@ -387,15 +386,22 @@ CFG.targetHpRange = 150.0
 CFG.pathfindingEnabled = true
 CFG.dodgeEnabled = true
 
--- Recommendations (2.14.0). Instead of freezing everything and hunting for
--- the right part with the mouse, the scorer puts forward what it currently
--- believes is an attack, one at a time, each held in the world in its own
--- colour with a number on it, and you say yes or no from a list. Yes writes a
--- book entry; no is remembered per map and vetoes the name outright.
-CFG.recommendEnabled = true
-CFG.recommendRate = 1.0          -- recommendations per second
-CFG.recommendMax = 8             -- entries kept in the list
-CFG.recommendTTL = 25.0          -- seconds an entry lingers after its part is gone
+-- The game's own attack broadcast (3.0.0). See game/GAME_NOTES.md.
+CFG.usePrecast = true            -- listen to the precastHitbox bridge
+CFG.showPrecast = true           -- draw the announced zones ourselves
+CFG.precastHorizon = 6.0         -- seconds ahead we care about
+CFG.precastLingerTime = 0.45     -- seconds a zone stays dangerous after impact
+CFG.precastMaxZones = 160
+CFG.colorPrecastEarly = Color3.fromRGB(255, 190, 60)
+CFG.colorPrecastImminent = Color3.fromRGB(255, 60, 60)
+
+-- Safe-spot bosses: markers that mean STAND HERE, not run away.
+CFG.safeZoneEnabled = true
+CFG.safeZonePull = 900           -- penalty for being outside a live safe zone
+CFG.colorSafeZone = Color3.fromRGB(90, 255, 190)
+
+-- Follow Workspace.dungeonName instead of making you pick the map.
+CFG.autoDetectMap = true
 
 -- Hand-drawn hazard zones (2.11.0). Some attacks are announced by a
 -- decoration that is not itself the damage - a rune on the floor, a glow - and
@@ -570,6 +576,8 @@ HZ.spawnTimes = {}
 HZ.seenAt = {}
 -- Parts the user marked by hand with the picker.
 HZ.manualParts = {}
+-- Live safe-spot markers: the places a boss says you MUST stand.
+HZ.safeZones = {}
 -- Lowercased part names learned from picks, so later spawns of the same attack
 -- are caught automatically instead of needing a click each time.
 HZ.learnedNames = {}
@@ -670,7 +678,6 @@ NAV.lastRecoveryIndex = nil
 NAV.pathMarkers = {}             -- [waypoint index] = { orb, link, sphere } drawn in the world
 
 -- Trial runs, attack book, projectiles (2.3.0).
-HZ.trialEnabled = false          -- damage taken is being correlated and learned
 HZ.attackBook = {}               -- array of learned attack records (plain data, saved)
 HZ.recentParts = {}              -- [part] = os.clock() it was added; motion-tracked while young
 HZ.motion = {}                   -- [part] = { position, time, velocity, moving }
@@ -679,23 +686,6 @@ HZ.damageEvents = 0
 RT.lastHealth = nil
 RT.healthConnection = nil
 
--- Freeze: held copies of attacks, so a telegraph can be pointed at after the
--- real one has gone. Keyed on the original (weak, so a destroyed original does
--- not pin the entry) - the copy itself is held in the array.
--- Recommendations: { part, copy, sig, name, partName, parentName, color,
--- index, since, gone }. `recommendedNames` stops the same attack being put
--- forward twice while one entry for it is still in the list; `rejectedNames`
--- is the per-map memory of every "no".
-HZ.recommendations = {}
-HZ.recommendedNames = {}
-HZ.rejectedNames = {}
-HZ.recommendFolder = nil
-HZ.lastRecommendTime = -math.huge
-HZ.recommendSerial = 0
-HZ.freezeEnabled = false
-HZ.frozenFolder = nil
-HZ.frozenOf = setmetatable({}, { __mode = "k" })
-HZ.frozenCount = 0
 
 -- Low detail. keepNames is what the user picked (lowercased part names, saved
 -- per map); hidden remembers what each part looked like so it can be restored.
@@ -729,7 +719,7 @@ RT.menuBindCapture = false
 -- dungeon, so they are keyed by map like the waypoints and the macros.
 RT.attackData = {}
 RT.zoneData = {}
-RT.rejectData = {}
+RT.rejectData = nil
 
 -- Clone evasion state (2.9.0).
 -- Macros (2.5.0). "legacy" = the hand-placed waypoint path; "macro" = recorded
@@ -795,6 +785,16 @@ ZN.dragging = false
 ZN.draftRadius = 0
 ZN.draftShape = "circle"         -- circle | square
 ZN.preview = nil
+
+-- Announced attacks, newest last: { shape, cframe|position, size|radius,
+-- startTime, delay, impactAt, part }. Filled by the precastHitbox listener.
+PC.zones = {}
+PC.parts = {}
+PC.folder = nil
+PC.connection = nil
+PC.bridge = nil
+PC.failed = false
+PC.total = 0
 
 -- Smallest deviation first, so steering hugs the intended heading.
 local STEER_FAN_ANGLES = { 0, 20, -20, 40, -40, 65, -65, 90, -90, 120, -120 }
@@ -915,6 +915,7 @@ for key, value in pairs(CFG) do RT.cfgDefaults[key] = value end
 S.CFG = CFG
 S.CollectionService = CollectionService
 S.Lighting = Lighting
+S.ReplicatedStorage = ReplicatedStorage
 S.DEBUG_NORMAL = DEBUG_NORMAL
 S.DEBUG_OFF = DEBUG_OFF
 S.DEBUG_VERBOSE = DEBUG_VERBOSE
@@ -950,6 +951,7 @@ S.LD = LD
 S.MC = MC
 S.CL = CL
 S.ZN = ZN
+S.PC = PC
 S.MAP_CODES = MAP_CODES
 S.MAP_LABELS = MAP_LABELS
 end

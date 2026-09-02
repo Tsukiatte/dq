@@ -4,6 +4,7 @@
 -- assigned onto S at the bottom. Load order is fixed by main.lua / build.py.
 return function(S)
 local RT = S.RT
+local Workspace = S.Workspace
 local heavyDebugOnChange = S.heavyDebugOnChange
 local LocalPlayer = S.LocalPlayer
 local updatePursuitMovement = S.updatePursuitMovement
@@ -50,12 +51,14 @@ local noteOwnAction = S.noteOwnAction
 local runRecovery = S.runRecovery
 local enterRecovery = S.enterRecovery
 local updateStuckDetector = S.updateStuckDetector
-local recordDamageEvent = S.recordDamageEvent
 local MC = S.MC
 local recordStep = S.recordStep
 local runMacroPlayback = S.runMacroPlayback
 local startMacroInput = S.startMacroInput
+local startPrecastListener = S.startPrecastListener
 local CL = S.CL
+local ZN = S.ZN
+local LD = S.LD
 local cloneStep = S.cloneStep
 local runCloneEvasion = S.runCloneEvasion
 local buildClones = S.buildClones
@@ -74,15 +77,9 @@ local function watchHealth(character)
         local last = RT.lastHealth
         RT.lastHealth = health
         if not last or health >= last then return end
-        local damage = last - health
-        if HZ.trialEnabled and damage > 0 then
-            local ok, err = xpcall(function()
-                recordDamageEvent(damage, os.clock())
-            end, debug.traceback)
-            if not ok then
-                heavyDebugThrottled("trial_error", 1.0, "FATAL", "Damage correlator threw:\n" .. tostring(err))
-            end
-        end
+        -- Health is tracked for the low-health branch. It used to also drive
+        -- the damage correlator that taught the Attack Book; the game now
+        -- announces its own attacks, so there is nothing to infer from a hit.
     end)
 end
 
@@ -274,6 +271,10 @@ local function findNearestEnemy()
     local now = os.clock()
     local rootPos = playerRoot.Position
 
+    -- Workspace.enemies is where the game puts them (game/GAME_NOTES.md), so
+    -- the sweep starts there instead of walking the whole world.
+    local enemiesFolder = Workspace:FindFirstChild("enemies")
+
     local function evaluateEntity(model, healthValue, sourceTag)
         if not model or model == character or seenModels[model] then
             return
@@ -432,6 +433,12 @@ local function startAutofarm()
     local root = character:WaitForChild("HumanoidRootPart")
 
     startWorldIndex()
+
+    -- The game's own attack broadcast, and its own idea of which dungeon this
+    -- is. Both are cheap and both beat anything we can infer.
+    if CFG.usePrecast then startPrecastListener() end
+    if S.watchDungeonName then S.watchDungeonName() end
+    if S.watchOwnAbilityRemotes then S.watchOwnAbilityRemotes() end
     detectGameAndInitialize()
     watchOwnAnimations(character)
     watchHealth(character)
@@ -479,10 +486,10 @@ local function startAutofarm()
         -- are about watching and learning, not fighting, and the natural way to
         -- study an attack is to stand there and let it hit you. The hazard scan
         -- (which also feeds the highlights, the name tags, the frozen copies and
-        -- the damage correlator's suspect list) therefore runs whenever any of
+        -- the pickers need a live world index) therefore runs whenever any of
         -- those is armed, even while farming is paused.
         if not RT.farmEnabled then
-            if HZ.trialEnabled or HZ.freezeEnabled or HZ.pickerEnabled then
+            if HZ.pickerEnabled or ZN.pickerEnabled or LD.pickerEnabled then
                 local character = LocalPlayer.Character
                 local liveRoot = character and character:FindFirstChild("HumanoidRootPart")
                 if liveRoot then

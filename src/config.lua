@@ -4,6 +4,7 @@
 -- assigned onto S at the bottom. Load order is fixed by main.lua / build.py.
 return function(S)
 local RT = S.RT
+local Workspace = S.Workspace
 local SM = S.SM
 local describeInstancePath = S.describeInstancePath
 local HZ = S.HZ
@@ -35,8 +36,6 @@ local refreshLowDetail = S.refreshLowDetail
 local serializeMacros = S.serializeMacros
 local serializeZones = S.serializeZones
 local loadZones = S.loadZones
-local serializeRejected = S.serializeRejected
-local loadRejected = S.loadRejected
 local loadMacros = S.loadMacros
 
 local CONFIG_FILE = "DungeonAutofarm_config.json"
@@ -88,7 +87,6 @@ local function syncCurrentMapToStore()
     for _, record in ipairs(HZ.attackBook) do table.insert(book, record) end
     RT.attackData[RT.currentMap] = book
     RT.zoneData[RT.currentMap] = serializeZones()
-    RT.rejectData[RT.currentMap] = serializeRejected()
 
     RT.mapData[RT.currentMap] = { waypath = waypath, keep = keep }
     -- Macros are bulky and live in their own file; the map store only carries
@@ -180,8 +178,7 @@ local function applyMapFromStore(code)
     end
     S.invalidateAttackBook()
     local zoneCount = loadZones(RT.zoneData[code])
-    loadRejected(RT.rejectData[code])
-    S.clearRecommendations()
+    S.clearPrecastZones()
 
     local keepCount = 0
     for _ in pairs(LD.keepNames) do keepCount = keepCount + 1 end
@@ -252,10 +249,10 @@ local function buildConfigTable()
             cloneAutoRings = CFG.cloneAutoRings,
             cloneRingSpacing = CFG.cloneRingSpacing,
             pathfindingEnabled = CFG.pathfindingEnabled,
-            recommendEnabled = CFG.recommendEnabled,
-            recommendRate = CFG.recommendRate,
-            recommendMax = CFG.recommendMax,
-            recommendTTL = CFG.recommendTTL,
+            usePrecast = CFG.usePrecast,
+            showPrecast = CFG.showPrecast,
+            safeZoneEnabled = CFG.safeZoneEnabled,
+            autoDetectMap = CFG.autoDetectMap,
             dodgeEnabled = CFG.dodgeEnabled,
             cloneSafetyMargin = CFG.cloneSafetyMargin,
             cloneCommitTime = CFG.cloneCommitTime,
@@ -314,7 +311,6 @@ local function buildConfigTable()
         maps = maps,
         attacksByMap = RT.attackData,
         zonesByMap = RT.zoneData,
-        rejectedByMap = RT.rejectData,
     }
 end
 
@@ -384,10 +380,10 @@ local function applyConfigData(data)
         CFG.cloneRingSpacing = tonumber(combat.cloneRingSpacing) or CFG.cloneRingSpacing
         if combat.cloneAutoRings ~= nil then CFG.cloneAutoRings = combat.cloneAutoRings == true end
         if combat.pathfindingEnabled ~= nil then CFG.pathfindingEnabled = combat.pathfindingEnabled == true end
-        if combat.recommendEnabled ~= nil then CFG.recommendEnabled = combat.recommendEnabled == true end
-        CFG.recommendRate = tonumber(combat.recommendRate) or CFG.recommendRate
-        CFG.recommendMax = tonumber(combat.recommendMax) or CFG.recommendMax
-        CFG.recommendTTL = tonumber(combat.recommendTTL) or CFG.recommendTTL
+        if combat.usePrecast ~= nil then CFG.usePrecast = combat.usePrecast == true end
+        if combat.showPrecast ~= nil then CFG.showPrecast = combat.showPrecast == true end
+        if combat.safeZoneEnabled ~= nil then CFG.safeZoneEnabled = combat.safeZoneEnabled == true end
+        if combat.autoDetectMap ~= nil then CFG.autoDetectMap = combat.autoDetectMap == true end
         if combat.dodgeEnabled ~= nil then CFG.dodgeEnabled = combat.dodgeEnabled == true end
         CFG.cloneSafetyMargin = tonumber(combat.cloneSafetyMargin) or CFG.cloneSafetyMargin
         CFG.cloneCommitTime = tonumber(combat.cloneCommitTime) or CFG.cloneCommitTime
@@ -490,12 +486,6 @@ local function applyConfigData(data)
     if type(data.attacksByMap) == "table" then
         for code, list in pairs(data.attacksByMap) do
             if MAP_LABELS[code] and type(list) == "table" then RT.attackData[code] = list end
-        end
-    end
-    table.clear(RT.rejectData)
-    if type(data.rejectedByMap) == "table" then
-        for code, list in pairs(data.rejectedByMap) do
-            if MAP_LABELS[code] and type(list) == "table" then RT.rejectData[code] = list end
         end
     end
     table.clear(RT.zoneData)
@@ -722,7 +712,44 @@ end
 
 S.loadConfig = loadConfig
 S.saveConfig = saveConfig
+-- The game publishes the dungeon it has loaded. Following it means the
+-- waypoints, macros, attack book and drawn zones for that dungeon are already
+-- in place by the time you can move, instead of waiting to be picked.
+local MAP_BY_GAME_NAME = {
+    ["desert temple"] = "DT", ["winter outpost"] = "WO", ["pirate island"] = "PI",
+    ["king's castle"] = "KC", ["the underworld"] = "TU", ["samurai palace"] = "SP",
+    ["the canals"] = "TC", ["ghastly harbor"] = "GH", ["steampunk sewers"] = "SS",
+    ["orbital outpost"] = "OO", ["volcanic chambers"] = "VC", ["aquatic temple"] = "AT",
+    ["enchanted forest"] = "EF", ["northern lands"] = "NL",
+}
+
+local function applyDetectedMap(raw)
+    if not CFG.autoDetectMap then return end
+    local code = MAP_BY_GAME_NAME[string.lower(tostring(raw or ""))]
+    if not code or code == RT.currentMap then return end
+    setCurrentMap(code)
+    heavyDebug("Map", string.format(
+        "The game says we are in %s; switched to %s and loaded its data.", raw, code))
+    if S.refreshAllWidgets then S.refreshAllWidgets() end
+    if S.refreshPathPanel then S.refreshPathPanel() end
+    if S.refreshMacroPanel then S.refreshMacroPanel() end
+    if S.refreshMapPanel then S.refreshMapPanel() end
+    if S.refreshAttackBookPanel then S.refreshAttackBookPanel() end
+    if S.refreshZonePanel then S.refreshZonePanel() end
+end
+
+local function watchDungeonName()
+    local value = Workspace:FindFirstChild("dungeonName")
+    if not value or not value:IsA("StringValue") then return false end
+    applyDetectedMap(value.Value)
+    table.insert(RT.connections, value.Changed:Connect(applyDetectedMap))
+    heavyDebug("Map", "Following Workspace.dungeonName; the map picker now switches itself.")
+    return true
+end
+
 S.setCurrentMap = setCurrentMap
+S.watchDungeonName = watchDungeonName
+S.applyDetectedMap = applyDetectedMap
 S.saveNamedConfig = saveNamedConfig
 S.loadNamedConfig = loadNamedConfig
 S.deleteNamedConfig = deleteNamedConfig

@@ -159,7 +159,7 @@ local function buildClones()
 
         CL.cells[k] = {
             i = 0, j = 0, key = "", x = 0, z = 0, y = nil,
-            standable = false, safe = false, penalty = math.huge, depth = 0,
+            standable = false, safe = false, penalty = math.huge, depth = 0, eta = 0,
             onPath = false, isGoal = false,
             pad = pad, prism = prism, halfHeight = totalHeight * 0.5,
         }
@@ -285,6 +285,14 @@ local function evaluateCells(root)
     -- measuring the disc, and the disc's promise holds.
     local footprint, rootRadius = footprintRadius()
     local extraClearance = math.max(footprint - rootRadius, 0)
+    -- How long it would take to walk to a cell, so each one is judged at the
+    -- moment we would actually be standing in it rather than right now. The
+    -- announced attacks carry real impact times, so this is the difference
+    -- between crossing a marker that fires in a second and being cornered by
+    -- treating it as a wall.
+    local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+    local speed = math.max((humanoid and humanoid.WalkSpeed) or 16, 4)
+    local rootPos = root.Position
 
     for _, cell in ipairs(CL.cells) do
         local y
@@ -297,7 +305,10 @@ local function evaluateCells(root)
             local pos = Vector3.new(cell.x, y, cell.z)
             -- The test takes the hitbox radius plus the margin: green means the
             -- whole body fits, not just the centre point.
-            cell.safe = isPositionSafeFromDamageBricks(pos, CFG.cloneSafetyMargin + extraClearance) and true or false
+            local travel = Vector3.new(cell.x - rootPos.X, 0, cell.z - rootPos.Z).Magnitude / speed
+            cell.eta = travel
+            cell.safe = isPositionSafeFromDamageBricks(
+                pos, CFG.cloneSafetyMargin + extraClearance, travel) and true or false
             cell.penalty = cell.safe and evaluateHazardPenaltyAtPoint(pos) or math.huge
             if cell.safe then safeCount = safeCount + 1 end
         else
