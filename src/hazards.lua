@@ -531,6 +531,14 @@ local function insideCreature(part)
     return false
 end
 
+-- Names the appearance scorer must never flag. Ground truth runs before the
+-- scorer and is unaffected: an Ice part inside an ice-spike Model is still an
+-- attack because its Model is.
+local DECOR_NAME_HINTS = {
+    "crystal", "glow", "lantern", "torch", "lamp", "light", "leaf", "leaves", "mushroom",
+    "flower", "vine", "grass", "bush", "tree", "root", "candle", "gem", "shard", "orb_deco",
+}
+
 local function isDamageBrick(part)
     if not part:IsA("BasePart") then return false end
 
@@ -539,6 +547,11 @@ local function isDamageBrick(part)
     local visualRoot = RT.visualRoot
     if visualRoot and part:IsDescendantOf(visualRoot) then return false end
     if part.Name == "Terrain" or part.Name == "Baseplate" then return false end
+    -- Status markers parented to a player (workspace.stunParts.<PlayerName>)
+    -- ride on that player and are not attacks.
+    local parent = part.Parent
+    if parent and parent.Name == "stunParts" then return false end
+    if Players:FindFirstChild(part.Name) then return false end
 
     -- =====================================================================
     -- GROUND TRUTH FIRST (3.4.0)
@@ -579,6 +592,17 @@ local function isDamageBrick(part)
     -- From here down it is guesswork, and a faded telegraph really has
     -- resolved, so transparency is a fair veto for anything unrecognised.
     if part.Transparency >= CFG.telegraphTransparencyCutoff then return false end
+
+    -- Decoration that glows is not an attack, however much it looks like one
+    -- to a scorer: the crystals and glows of the Enchanted Forest were being
+    -- highlighted by the dozen, for a minute at a time, and the highlights
+    -- alone were a frame cost.
+    for i = 1, #DECOR_NAME_HINTS do
+        if string.find(lname, DECOR_NAME_HINTS[i], 1, true) then
+            if not HZ.manualParts[part] and not HZ.learnedNames[lname] then return false end
+            break
+        end
+    end
 
     -- A hand-drawn zone IS the hazard: it exists only because someone said so.
     if part:GetAttribute("DQZone") then return true end
@@ -1793,6 +1817,16 @@ local function recordHit(damage)
     if not ok or not parts then return end
 
     local origin = root.Position
+    -- Everything detected is a candidate too: a 274-stud beam's centre is well
+    -- outside the search sphere while its edge is on top of us.
+    local seen = {}
+    for _, part in ipairs(parts) do seen[part] = true end
+    for _, part in ipairs(HZ.detected) do
+        if part.Parent and not seen[part] then
+            seen[part] = true
+            parts[#parts + 1] = part
+        end
+    end
     local ranked = {}
     for _, part in ipairs(parts) do
         if part:IsA("BasePart") and not isOwnedByPlayerOrTeammate(part)
@@ -1801,7 +1835,8 @@ local function recordHit(damage)
             local scenery = isMapGeometry(part)
             ranked[#ranked + 1] = {
                 part = part,
-                distance = (part.Position - origin).Magnitude,
+                -- To the nearest point of the part, not its centre.
+                distance = (closestPointOnPart(part, origin) - origin).Magnitude,
                 body = body, scenery = scenery,
                 known = HZ.groundTruth[part] == true or HZ.learnedNames[string.lower(part.Name)] == true,
             }
@@ -1825,7 +1860,11 @@ local function recordHit(damage)
         local p = culprit.part
         local model = p:FindFirstAncestorOfClass("Model")
         local name = string.lower((model and model ~= Workspace) and model.Name or p.Name)
-        if not GENERIC_PART_NAMES[name] and not NEVER_OWN[name] and not HZ.learnedNames[name] then
+        -- A part named after a player under workspace.stunParts is a status
+        -- marker riding on that player, not an attack. Learning it made a
+        -- hazard that followed the character everywhere.
+        local marker = (p.Parent and p.Parent.Name == "stunParts") or Players:FindFirstChild(p.Name) ~= nil
+        if not marker and not GENERIC_PART_NAMES[name] and not NEVER_OWN[name] and not HZ.learnedNames[name] then
             HZ.learnedNames[name] = true
             lines[#lines + 1] = "     LEARNED '" .. name .. "' as an attack"
             heavyDebug("Hit", string.format("Took %.0f damage next to '%s', which detection did not know. Learned it.", damage, name))
@@ -1835,21 +1874,16 @@ local function recordHit(damage)
     HZ.lastHitAt = now
     HZ.lastHitName = culprit and culprit.part.Name or (ranked[1] and ranked[1].part.Name) or "nothing nearby"
 
-    -- The NEAREST known attack, if it was still reading as a telegraph and
-    -- nothing already live was in range to explain the hit, was not a
-    -- telegraph. Only that one: blaming everything within six studs
-    -- condemned whole lattices at once. Late-bound; defined further down.
-    if S.noteTelegraphHit then
-        local nearestKnown, liveNearby = nil, false
+    -- The nearest known attack that was on us learns its window from this.
+    -- Late-bound; defined further down.
+    if S.noteAttackHit then
         for i = 1, math.min(#ranked, 8) do
             local r = ranked[i]
-            if r.known and r.distance <= 6 then
-                local st = HZ.armState[r.part]
-                if st and st.armedAt and not st.doneAt then liveNearby = true end
-                if not nearestKnown then nearestKnown = r end
+            if r.known and r.distance <= CFG.hitAttributeRadius then
+                S.noteAttackHit(r.part)
+                break
             end
         end
-        if nearestKnown and not liveNearby then S.noteTelegraphHit(nearestKnown.part) end
     end
 
     for _, l in ipairs(lines) do HZ.hitLog[#HZ.hitLog + 1] = l end
@@ -2422,27 +2456,76 @@ end
 -- invisible by construction and say nothing about whether the attack is over.
 local ANCHOR_NAMES = { primarypart = true, hitbox = true, precasthitbox = true }
 
-local function collectVisuals(model, into)
+-- Everything an attack can show itself through (4.9.0). Part transparency is
+-- one channel of several: a telegraph can be a Decal or Texture on an
+-- invisible part, a ParticleEmitter, a Beam, a Gui, a Highlight - and a Sound
+-- can mark the hit. The Northern mages' shots proved the point: their precast
+-- part sat at Transparency 1 for its entire seven-second life while the
+-- telegraph was plainly visible in the world, so a tracker that watched only
+-- part transparency saw nothing happen, ever.
+local function collectChannels(model, into)
     for _, d in ipairs(model:GetDescendants()) do
-        if d:IsA("BasePart") and not ANCHOR_NAMES[string.lower(d.Name)] then
+        if d:IsA("BasePart") then
+            if not ANCHOR_NAMES[string.lower(d.Name)] then into[#into + 1] = d end
+        elseif d:IsA("Decal") or d:IsA("Texture") or d:IsA("ParticleEmitter") or d:IsA("Beam")
+            or d:IsA("Trail") or d:IsA("SurfaceGui") or d:IsA("BillboardGui") or d:IsA("Highlight")
+            or d:IsA("Sound") then
             into[#into + 1] = d
         end
     end
 end
 
--- Least transparent of the attack's visible parts, and whether any are left.
-local function visualMin(st)
-    local m, any = math.huge, false
-    local vis = st.visuals
-    for i = 1, #vis do
-        local p = vis[i]
-        if p.Parent then
+local function channelOn(d)
+    if d:IsA("BasePart") or d:IsA("Decal") or d:IsA("Texture") then return d.Transparency < 0.97 end
+    local ok, e = pcall(function() return d.Enabled end)
+    return ok and e == true
+end
+
+-- Channels on, least-transparent part, a sound playing, anything left at all.
+local function channelState(st)
+    local on, partMin, sound, any = 0, math.huge, false, false
+    local ch = st.channels
+    for i = 1, #ch do
+        local d = ch[i]
+        if d.Parent then
             any = true
-            local tr = p.Transparency
-            if tr < m then m = tr end
+            if d:IsA("Sound") then
+                if d.IsPlaying then sound = true end
+            elseif channelOn(d) then
+                on = on + 1
+                if d:IsA("BasePart") and d.Transparency < partMin then partMin = d.Transparency end
+            end
         end
     end
-    return m, any
+    return on, partMin, sound, any
+end
+
+local function hitBoxSignature(hb)
+    if not hb or not hb.Parent then return nil end
+    local size = hb.Size
+    return string.format("%d%d%.2f%.0f", hb.CanTouch and 1 or 0, hb.CanQuery and 1 or 0,
+        hb.Transparency, size.X + size.Y + size.Z)
+end
+
+-- The attack's own timeline, for the capture file.
+local function note(st, age, text)
+    local ev = st.events
+    if #ev < 16 then ev[#ev + 1] = string.format("%.1f:%s", age, text) end
+end
+
+local function refreshChannels(st, model)
+    table.clear(st.channels)
+    collectChannels(model, st.channels)
+    -- An attack split across sibling Models (crossShuriken/hitBoxes beside
+    -- crossShuriken/precasts) has nothing to show in the half that hurts.
+    -- Watch the parent's channels for it.
+    if #st.channels == 0 and model.Parent and model.Parent:IsA("Model") then
+        collectChannels(model.Parent, st.channels)
+        if not st.precast then
+            local pc = model.Parent:FindFirstChild("precast", true)
+            st.precast = pc or false
+        end
+    end
 end
 
 local function updateArming(now)
@@ -2457,134 +2540,181 @@ local function updateArming(now)
                 local hb = model:FindFirstChild("hitBox") or model:FindFirstChild("hitbox")
                 local spawn = HZ.seenAt[part] or HZ.spawnTimes[part] or now
                 st = { name = name, spawn = spawn, precast = pc or false, hitBox = hb or false,
-                       visuals = {}, minT = math.huge, visMinEver = math.huge,
-                       armedAt = nil, impactAt = nil, seen = now, visualsAt = now }
-                collectVisuals(model, st.visuals)
-                -- An attack split across sibling Models (crossShuriken/hitBoxes
-                -- beside crossShuriken/precasts) has nothing visible in the
-                -- half that hurts. Watch the parent's visuals for it.
-                if #st.visuals == 0 and model.Parent and model.Parent:IsA("Model") then
-                    collectVisuals(model.Parent, st.visuals)
-                    if not pc then
-                        pc = model.Parent:FindFirstChild("precast", true)
-                        st.precast = pc or false
-                    end
-                end
+                       channels = {}, events = {}, minT = math.huge, visMinEver = math.huge,
+                       onMax = 0, lastOn = 0, armedAt = nil, impactAt = nil, seen = now, channelsAt = now }
+                refreshChannels(st, model)
+                st.descCount = #model:GetDescendants()
+                st.hbSig = hitBoxSignature(hb)
+                -- What is known about this attack's timing, by name. A span
+                -- learned from being hit - first and last age it hurt - beats
+                -- a delay learned from a fade, and either makes the attack
+                -- floor until its lead, danger through its window, and floor
+                -- again after.
+                local span = RT.armSpans[name]
                 local delay = RT.armDelays[name]
-                if not pc or delay == 0 then
-                    -- No precast, or one that has hit us while announced
-                    -- before (saved as 0): live from the start.
-                    st.armedAt = now
-                elseif delay then
+                if span then
+                    st.impactAt = spawn + span.first
+                    st.liveUntil = spawn + span.last + CFG.armAssumedLinger
+                elseif delay and delay > 0 then
                     st.impactAt = spawn + delay
+                end
+                if not st.precast or delay == 0 then
+                    st.armedAt = now
+                    st.armedBy = st.precast and "known live" or "no precast"
                 end
                 HZ.arming[model] = st
             end
             if st then
                 st.seen = now
-                -- Visuals can arrive after the Model does; look again now and then.
-                if #st.visuals == 0 and now - st.visualsAt > 0.5 then
-                    st.visualsAt = now
-                    collectVisuals(model, st.visuals)
+                local age = now - st.spawn
+
+                -- Parts, emitters and sounds arrive after the Model does, and
+                -- a new part appearing mid-life is often the hit itself.
+                if now - st.channelsAt > 0.5 then
+                    st.channelsAt = now
+                    local count = #model:GetDescendants()
+                    if count ~= st.descCount then
+                        note(st, age, string.format("%+d parts", count - st.descCount))
+                        if count > st.descCount and age > 0.3 and not st.armedAt and not st.impactAt then
+                            st.armedAt = now
+                            st.armedBy = "new parts"
+                        end
+                        st.descCount = count
+                        refreshChannels(st, model)
+                        if not st.hitBox then
+                            st.hitBox = model:FindFirstChild("hitBox") or model:FindFirstChild("hitbox") or false
+                        end
+                    end
                 end
 
-                -- The precast's darkest, tracked ALWAYS. It used to be tracked
-                -- only while pending, so an attack that armed the moment it
-                -- appeared - anything learned as live-from-spawn, which a
-                -- pulsing precast causes - never had a minimum to compare its
-                -- fade against, never counted as over, and stood as an
-                -- invisible wall until the game deleted it seconds later.
+                -- The hitBox changing - touch, query, size, transparency - is
+                -- the server arming it.
+                local sig = hitBoxSignature(st.hitBox)
+                if sig ~= st.hbSig then
+                    if st.hbSig ~= nil and sig ~= nil then
+                        note(st, age, "hitBox changed")
+                        if not st.armedAt then st.armedAt = now st.armedBy = "hitBox change" end
+                    end
+                    st.hbSig = sig
+                end
+
                 local pc = st.precast
                 local tr = nil
                 if pc and pc.Parent then
                     tr = pc.Transparency
                     if tr < st.minT then st.minT = tr end
                 end
-                local vm, anyVisual = visualMin(st)
-                if vm < st.visMinEver then st.visMinEver = vm end
+                local on, partMin, soundOn, anyChannel = channelState(st)
+                if partMin < st.visMinEver then st.visMinEver = partMin end
+                if on > st.onMax then st.onMax = on end
+                if on ~= st.lastOn then note(st, age, string.format("channels %d>%d", st.lastOn, on)) end
+                if soundOn and not st.soundWas then
+                    note(st, age, "sound")
+                    if not st.armedAt then st.armedAt = now st.armedBy = "sound" end
+                end
+                st.soundWas = soundOn
 
                 if not st.armedAt then
                     if pc and pc.Parent then
-                        if tr >= 0.97 and st.minT >= 0.97 then
-                            -- Never been visible. Some precasts rest at 1 and
-                            -- are faded IN by the server when the attack is
-                            -- announced (secondBossLines, the sweeping
-                            -- flames): live for now, and pending again the
-                            -- moment it shows.
+                        if tr >= 0.97 and st.minT >= 0.97 and on == 0 and not st.impactAt then
+                            -- Nothing has ever shown, on any channel, and
+                            -- nothing is known about its timing: live for now,
+                            -- pending again the moment it shows.
                             st.armedAt = now
+                            st.armedBy = "never shown"
                             st.byInvisible = true
                         elseif tr > st.minT + CFG.armFadeStep then
                             st.armedAt = now
+                            st.armedBy = "precast fade"
                         end
-                    else
-                        st.armedAt = now
                     end
-                    if not st.armedAt and getHazardMotion(part) then st.armedAt = now end
-                    if st.armedAt and not st.byInvisible then
-                        local age = st.armedAt - st.spawn
-                        local known = RT.armDelays[st.name]
-                        if known ~= 0 then
-                            if age >= CFG.armMinDelay then
-                                if not known or age < known then RT.armDelays[st.name] = age end
-                            else
-                                RT.armDelays[st.name] = 0
+                    if not st.armedAt and on < st.lastOn and st.onMax > 0 then
+                        st.armedAt = now
+                        st.armedBy = "channel off"
+                    end
+                    if not st.armedAt and getHazardMotion(part) then st.armedAt = now st.armedBy = "moving" end
+                    if not st.armedAt and st.impactAt and now >= st.impactAt then
+                        st.armedAt = now
+                        st.armedBy = "learned time"
+                    end
+                    if st.armedAt then
+                        note(st, age, "armed:" .. tostring(st.armedBy))
+                        if not st.byInvisible and st.armedBy ~= "learned time" then
+                            local known = RT.armDelays[st.name]
+                            if known ~= 0 then
+                                if age >= CFG.armMinDelay then
+                                    if not known or age < known then RT.armDelays[st.name] = age end
+                                else
+                                    RT.armDelays[st.name] = 0
+                                end
                             end
                         end
                     end
                 elseif st.byInvisible then
-                    -- Armed only because it had never shown. Now it shows:
-                    -- the telegraph has begun.
-                    if pc and pc.Parent and tr and tr < 0.9 then
+                    -- Armed only because it had never shown. Now it shows: the
+                    -- telegraph has begun.
+                    if (tr and tr < 0.9) or on > 0 then
+                        note(st, age, "shows")
                         st.byInvisible = nil
                         st.armedAt = nil
-                        st.minT = tr
+                        st.armedBy = nil
+                        if tr then st.minT = tr end
                         local delay = RT.armDelays[st.name]
                         if delay and delay > 0 then st.impactAt = st.spawn + delay end
                     end
                 end
+                st.lastOn = on
 
-                -- Over? Two signals, either is enough. The hitBox - the part
-                -- that hurts - has been removed while the rest of the Model
-                -- lingers for its effects. Or everything visible about the
-                -- attack has faded to transparent or been removed, after
-                -- having been visible: that is what "the attack finished"
-                -- looks like in this game for almost every attack, and it no
-                -- longer depends on how, or whether, the attack armed.
+                -- Over? The hitBox - the part that hurts - removed while the
+                -- rest lingers for effects. Everything that ever showed now
+                -- dark and silent, for a moment. Or the learned window closed:
+                -- an attack that hit us at most `last` seconds after appearing
+                -- is over `armAssumedLinger` after that, unless it is still
+                -- visibly on, in which case it gets two more seconds.
                 if not st.doneAt then
+                    local doneBy = nil
                     if st.hitBox and not st.hitBox.Parent then
-                        st.doneAt = now
-                    elseif st.visMinEver < 0.9 and (not anyVisual or vm >= 0.97) then
+                        doneBy = "hitBox gone"
+                    elseif st.onMax > 0 and on == 0 and not soundOn then
                         st.fadedAt = st.fadedAt or now
-                        if now - st.fadedAt >= CFG.armDoneLinger then st.doneAt = now end
+                        if now - st.fadedAt >= CFG.armDoneLinger then doneBy = "faded" end
                     else
                         st.fadedAt = nil
+                    end
+                    if not doneBy and st.liveUntil and now >= st.liveUntil
+                        and (on == 0 or now >= st.liveUntil + 2.0) then
+                        doneBy = "window over"
+                    end
+                    if doneBy then
+                        st.doneAt = now
+                        note(st, age, "done:" .. doneBy)
                     end
                 end
             end
         end
         HZ.armState[part] = st
     end
-    -- Lifecycles (4.8.0): one line per attack Model once it is gone or a
-    -- second past done - first seen, armed, over, removed, and how far its
-    -- precast and its visuals ever faded. This is what says why something
+
+    -- Lifecycles: one line per attack Model once it is gone or a second past
+    -- done - first seen, armed and by what, over and by what, removed, the
+    -- channels it had, and its own timeline. This is what says why something
     -- stayed red, instead of a guess from a screenshot.
     for model, st in pairs(HZ.arming) do
         if not st.logged and ((not model.Parent) or now - st.seen > 1.0 or (st.doneAt and now - st.doneAt > 1.0)) then
             st.logged = true
-            local vm = visualMin(st)
             HZ.lifeLog[#HZ.lifeLog + 1] = string.format(
-                "%-28s seen@%6.1f  armed %s  done %s  %s  pcMin %.2f pcNow %s  visMinEver %.2f visNow %s  hb=%s pc=%s vis=%d%s",
+                "%-26s seen@%6.1f  armed %s(%s)  done %s  %s  pcMin %.2f  partMin %.2f  ch=%d onMax=%d  hb=%s pc=%s  [%s]",
                 st.name, st.spawn,
                 st.armedAt and string.format("+%.1fs", st.armedAt - st.spawn) or "never",
+                tostring(st.armedBy or "-"),
                 st.doneAt and string.format("+%.1fs", st.doneAt - st.spawn) or "never",
-                model.Parent and "still present" or string.format("removed +%.1fs", now - st.spawn),
+                model.Parent and "present" or string.format("removed +%.1fs", now - st.spawn),
                 st.minT < math.huge and st.minT or 1,
-                (st.precast and st.precast.Parent) and string.format("%.2f", st.precast.Transparency) or "gone",
                 st.visMinEver < math.huge and st.visMinEver or 1,
-                vm < math.huge and string.format("%.2f", vm) or "none",
+                #st.channels, st.onMax,
                 st.hitBox and (st.hitBox.Parent and "yes" or "GONE") or "no",
-                st.precast and "yes" or "no", #st.visuals,
-                st.byInvisible and "  (armed by invisibility)" or "")
+                st.precast and "yes" or "no",
+                table.concat(st.events, " "))
             while #HZ.lifeLog > 400 do table.remove(HZ.lifeLog, 1) end
         end
     end
@@ -2619,27 +2749,33 @@ local function updateArming(now)
     for i = #kept, n + 1, -1 do kept[i] = nil end
 end
 
--- A hit taken while the nearest attack was still reading as a telegraph is
--- the one thing the fade rule cannot be allowed to be wrong about twice:
--- that attack is live from the start from now on.
-local function noteTelegraphHit(part)
+-- Being hit is the one signal that is never ambiguous. The attack nearest the
+-- hit learns its window: the first and last age at which it has hurt us. From
+-- the next cast on it is floor until the lead, danger through the window,
+-- and floor again after - and the one that just hit is certainly not over.
+local function noteAttackHit(part)
     local st = part and HZ.armState[part]
-    if st and not st.armedAt then
-        st.armedAt = os.clock()
-        -- First strike: forget the learned delay and learn it again from the
-        -- next fade. Second strike: saved as 0, live from spawn for good.
-        -- Pinning on the first hit was too eager - in a lattice of beams
-        -- one hit condemned every telegraph near it, and soon nothing was
-        -- ever floor.
-        RT.armStrikes[st.name] = (RT.armStrikes[st.name] or 0) + 1
-        if RT.armStrikes[st.name] >= 2 then
-            RT.armDelays[st.name] = 0
-            heavyDebug("Attacks", string.format("'%s' hit while announced twice; it is live from spawn from now on.", st.name))
-        else
-            RT.armDelays[st.name] = nil
-            heavyDebug("Attacks", string.format("'%s' hit while announced; its timing will be learned again.", st.name))
-        end
+    if not st then return end
+    local now = os.clock()
+    local age = now - st.spawn
+    local span = RT.armSpans[st.name]
+    if not span then
+        span = { first = age, last = age }
+        RT.armSpans[st.name] = span
+    else
+        if age < span.first then span.first = age end
+        if age > span.last then span.last = age end
     end
+    local known = RT.armDelays[st.name]
+    if known == nil or known == 0 or span.first < known then RT.armDelays[st.name] = span.first end
+    if not st.armedAt then st.armedAt = now st.armedBy = "hit" end
+    st.byInvisible = nil
+    st.liveUntil = math.max(st.liveUntil or 0, st.spawn + span.last + CFG.armAssumedLinger)
+    st.doneAt = nil
+    st.fadedAt = nil
+    note(st, age, "HIT")
+    heavyDebug("Attacks", string.format("'%s' hit at %.1fs; its window is now %.1f-%.1fs after it appears.",
+        st.name, age, span.first, span.last))
 end
 
 local function scanDamageBricks(rootPosition)
@@ -2658,13 +2794,22 @@ local function scanDamageBricks(rootPosition)
         -- underneath was never dodged at all.
         if instance.Parent
             and (HZ.groundTruth[instance] or instance.Transparency < CFG.telegraphTransparencyCutoff)
-            and not isOwnedByPlayerOrTeammate(instance) then
+            and not isOwnedByPlayerOrTeammate(instance)
+            and not HZ.scenery[instance] then
             if not HZ.recentParts[instance] then updateMotion(instance, now) end
             local closestPoint = hazardClosestPoint(instance, rootPosition)
             if (rootPosition - closestPoint).Magnitude <= CFG.damageBrickDetectionRange then
                 table.insert(found, instance)
                 if not HZ.spawnTimes[instance] then
                     HZ.spawnTimes[instance] = now
+                elseif not HZ.groundTruth[instance] and not HZ.manualParts[instance]
+                    and not HZ.learnedNames[string.lower(instance.Name)]
+                    and not instance:GetAttribute("DQZone")
+                    and now - HZ.spawnTimes[instance] > CFG.appearanceMaxAge then
+                    -- Flagged on looks alone and still here after this long:
+                    -- that is scenery, and it stays scenery.
+                    HZ.scenery[instance] = true
+                    table.remove(found)
                 end
             end
         else
@@ -2915,7 +3060,7 @@ S.updateHitboxVisualizer = updateHitboxVisualizer
 S.updateWallHighlights = updateWallHighlights
 S.noteOwnAction = noteOwnAction
 S.getHazardMotion = getHazardMotion
-S.noteTelegraphHit = noteTelegraphHit
+S.noteAttackHit = noteAttackHit
 S.findAttackRecord = findAttackRecord
 S.invalidateAttackBook = invalidateAttackBook
 S.describeRecord = describeRecord

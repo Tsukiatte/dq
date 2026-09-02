@@ -272,6 +272,7 @@ local function buildConfigTable()
         maps = maps,
         attacksByMap = RT.attackData,
         armDelays = RT.armDelays,
+        armSpans = RT.armSpans,
         zonesByMap = RT.zoneData,
     }
 end
@@ -435,7 +436,13 @@ local function applyConfigData(data)
 
     if type(data.learnedTelegraphNames) == "table" then
         for _, name in ipairs(data.learnedTelegraphNames) do
-            if type(name) == "string" then
+            -- A player's name is a status marker that got learned, never an
+            -- attack. Dropped here so an old save cannot bring it back.
+            local isPlayer = false
+            for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
+                if string.lower(player.Name) == name then isPlayer = true break end
+            end
+            if type(name) == "string" and not isPlayer then
                 HZ.learnedNames[name] = true
             end
         end
@@ -453,6 +460,18 @@ local function applyConfigData(data)
     end
     for name, delay in pairs(S.DEFAULT_ARM_DELAYS or {}) do
         if RT.armDelays[name] == nil then RT.armDelays[name] = delay end
+    end
+    table.clear(RT.armSpans)
+    if type(data.armSpans) == "table" then
+        for name, span in pairs(data.armSpans) do
+            if type(name) == "string" and type(span) == "table"
+                and type(span.first) == "number" and type(span.last) == "number" and span.first >= 0 then
+                RT.armSpans[name] = { first = span.first, last = math.max(span.last, span.first) }
+                if RT.armDelays[name] == nil or RT.armDelays[name] == 0 or span.first < RT.armDelays[name] then
+                    RT.armDelays[name] = span.first
+                end
+            end
+        end
     end
     table.clear(RT.attackData)
     if type(data.attacksByMap) == "table" then
