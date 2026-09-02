@@ -11,6 +11,28 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.10.0 - 2026-09-02 - "Stay out of the hub"
+
+In the Studio recreation of the Midgardian Champion, every remaining hit came
+with `danger=1.00` and a safe box 18 studs away: at melee standoff the
+character stands where every beam crosses, and two crossing beams cannot be
+cleared inside their 1.5 s telegraph. Pushed out to ~60 studs it took **no
+hits for a minute**.
+
+An enemy that long line attacks pass through is a **hub** (`DG.hubs`). Each
+new line part (>= 60 studs) whose axis passes within 12 studs of an enemy is
+counted once; the rate over the last 10 s and the interval between volleys
+are kept per enemy. Then:
+
+- every candidate carries a radial cost: `rate x (width / (pi x distance)) x dwell`,
+  the chance a random line through the hub covers that spot over the time
+  we would stand there;
+- the approach to melee is allowed only when `now + approachTime + exit <
+  lastVolley + period + armingDelay`, i.e. there is time to go in and get
+  back out before the next volley fires (`DG.hubHold`, shown in the status).
+
+Enemies that fire no lines are untouched.
+
 ## 4.9.9 - 2026-09-02
 
 - A parked Model (dormant, or silent for 30 s) never gets the blame for a
