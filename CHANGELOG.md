@@ -11,6 +11,18 @@ file and that table in sync on every edit.
 
 ---
 
+## 2.5.1 - 2026-09-01
+- **Fixed: the macro Record and Bind buttons could not be reached.** The Route
+  panel was only ever opened by the **Edit Path** button, and that same button
+  also armed the free-fly camera editor and paused the loop. So the only path to
+  the recorder was Edit Path -> Macros, by which point the camera was flying and
+  the character could not be driven - which is the one thing recording requires.
+  The feature shipped unusable.
+- Opening the panel and arming the editor are now **separate**: the main-window
+  button is **Route Panel** (it just shows the panel), and **Freecam** lives
+  inside the panel's waypoint view, where it is hidden in macro mode because it
+  means nothing there.
+
 ## 2.5.0 - 2026-09-01 - "Playback"
 Macro Waypoints: record a run, keep the recordings per map, play them back.
 

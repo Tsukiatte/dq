@@ -1029,13 +1029,17 @@ local function createControlUI()
     UI.wallDisplayButton.Parent = mainFrame
     addCorner(UI.wallDisplayButton, 7)
 
+    -- Opens the Route panel. It does NOT arm the free-fly editor any more: that
+    -- lives on its own button inside the panel's waypoint view. Tying the two
+    -- together meant the only way to reach the macro recorder was to hijack the
+    -- camera first, which is exactly what makes recording impossible.
     UI.pathEditButton = Instance.new("TextButton")
     UI.pathEditButton.Size = UDim2.fromOffset(132, 32)
     UI.pathEditButton.Position = UDim2.fromOffset(156, 705)
-    UI.pathEditButton.BackgroundColor3 = Color3.fromRGB(180, 64, 64)
+    UI.pathEditButton.BackgroundColor3 = Color3.fromRGB(148, 92, 232)
     UI.pathEditButton.BorderSizePixel = 0
     UI.pathEditButton.Font = Enum.Font.GothamBold
-    UI.pathEditButton.Text = "Edit Path: OFF"
+    UI.pathEditButton.Text = "Route Panel"
     UI.pathEditButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     UI.pathEditButton.TextSize = 13
     UI.pathEditButton.Parent = mainFrame
@@ -1217,7 +1221,7 @@ local function createControlUI()
     end))
 
     local showRadiusButton = Instance.new("TextButton")
-    showRadiusButton.Size = UDim2.new(1, -20, 0, 26)
+    showRadiusButton.Size = UDim2.fromOffset(120, 26)
     showRadiusButton.Position = UDim2.fromOffset(10, 140)
     showRadiusButton.BackgroundColor3 = Color3.fromRGB(180, 64, 64)
     showRadiusButton.BorderSizePixel = 0
@@ -1232,6 +1236,40 @@ local function createControlUI()
         showRadiusButton.Text = "Show Radius: " .. (NAV.showRadius and "ON" or "OFF")
         showRadiusButton.BackgroundColor3 = NAV.showRadius and Color3.fromRGB(52, 168, 83) or Color3.fromRGB(180, 64, 64)
         renderPathMarkers()
+    end)
+
+    -- The free-fly waypoint editor, on its own button (2.5.1). Only meaningful
+    -- in the waypoint view, so it is hidden with the rest of it in macro mode.
+    local freecamButton = Instance.new("TextButton")
+    freecamButton.Size = UDim2.fromOffset(120, 26)
+    freecamButton.Position = UDim2.fromOffset(138, 140)
+    freecamButton.BackgroundColor3 = Color3.fromRGB(180, 64, 64)
+    freecamButton.BorderSizePixel = 0
+    freecamButton.Font = Enum.Font.GothamBold
+    freecamButton.Text = "Freecam: OFF"
+    freecamButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    freecamButton.TextSize = 12
+    freecamButton.Parent = pathPanel
+    addCorner(freecamButton, 6)
+    freecamButton.MouseButton1Click:Connect(function()
+        local turnOn = not NAV.pathEditEnabled
+        if turnOn then
+            -- Farming pauses while editing so the character holds still and
+            -- only the camera flies; the state is restored on exit.
+            NAV.farmWasEnabled = RT.farmEnabled
+            RT.farmEnabled = false
+            stopCharacterMovement()
+            setLoopButtonState()
+        end
+        setPathEditEnabled(turnOn)
+        if turnOn then S.refreshPathPanel() end
+        freecamButton.Text = "Freecam: " .. (turnOn and "ON" or "OFF")
+        freecamButton.BackgroundColor3 = turnOn
+            and Color3.fromRGB(232, 168, 52) or Color3.fromRGB(180, 64, 64)
+        if not turnOn and NAV.farmWasEnabled then
+            RT.farmEnabled = true
+            setLoopButtonState()
+        end
     end)
 
     local pathList = Instance.new("ScrollingFrame")
@@ -1289,7 +1327,7 @@ local function createControlUI()
     -- are alternative answers to "what do I do when there is nothing to
     -- fight", so exactly one is in charge and this picks which.
     -- =====================================================================
-    local legacyWidgets = { pathHint, radiusLabel, radiusTrack, showRadiusButton, pathList }
+    local legacyWidgets = { pathHint, radiusLabel, radiusTrack, showRadiusButton, freecamButton, pathList }
 
     local macroView = Instance.new("Frame")
     macroView.Name = "MacroView"
@@ -1994,24 +2032,10 @@ local function createControlUI()
     S.refreshMapPanel()
 
     UI.pathEditButton.MouseButton1Click:Connect(function()
-        local turnOn = not NAV.pathEditEnabled
-        if turnOn then
-            -- Pause farming while editing so the character holds still and only
-            -- the camera flies; remember the state to restore on exit.
-            NAV.farmWasEnabled = RT.farmEnabled
-            RT.farmEnabled = false
-            stopCharacterMovement()
-            setLoopButtonState()
-        end
-        setPathEditEnabled(turnOn)
-        pathPanel.Visible = turnOn
-        if turnOn then S.refreshPathPanel() end
-        UI.pathEditButton.Text = turnOn and "Edit Path: ON" or "Edit Path: OFF"
-        UI.pathEditButton.BackgroundColor3 = turnOn
-            and Color3.fromRGB(232, 168, 52) or Color3.fromRGB(180, 64, 64)
-        if not turnOn and NAV.farmWasEnabled then
-            RT.farmEnabled = true
-            setLoopButtonState()
+        pathPanel.Visible = not pathPanel.Visible
+        if pathPanel.Visible then
+            S.refreshPathPanel()
+            S.refreshMacroPanel()
         end
     end)
 
