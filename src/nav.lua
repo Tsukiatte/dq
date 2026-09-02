@@ -9,6 +9,7 @@ local CFG = S.CFG
 local LocalPlayer = S.LocalPlayer
 local HZ = S.HZ
 local getPlayerHitboxMetrics = S.getPlayerHitboxMetrics
+local getEnemyStandoff = S.getEnemyStandoff
 local heavyDebug = S.heavyDebug
 local evaluateHazardPenaltyAtPoint = S.evaluateHazardPenaltyAtPoint
 local isPositionSafeFromDamageBricks = S.isPositionSafeFromDamageBricks
@@ -648,14 +649,11 @@ local function getStandOffPosition(root, enemyRoot)
         directionAway = flatLook.Magnitude > 0.001 and flatLook.Unit or Vector3.new(0, 0, 1)
     end
 
-    -- In Clone mode the grid draws a circle around every enemy and calls it
-    -- unsafe, but the chase used CFG.safeDistance (8) and walked straight
-    -- through it into melee range - the dodge kept its distance and the
-    -- pursuit gave it back. Chasing now stops at the same circle.
-    local standoff = math.max(CFG.safeDistance, 2)
-    if S.DG and S.DG.active then
-        standoff = math.max(standoff, CFG.dodgeEnemyRadius)
-    end
+    -- The enemy is the distance: its body plus a swing, capped by our own
+    -- reach. The dodge draws its enemy circle from the same number, so the
+    -- chase and the dodge agree on where to stand.
+    local model = enemyRoot:FindFirstAncestorOfClass("Model") or enemyRoot.Parent
+    local standoff = model and getEnemyStandoff(model) or math.max(CFG.attackRange - 1.5, 2)
     return enemyPosition + (directionAway * standoff)
 end
 
@@ -1167,6 +1165,35 @@ local function computePursuitPath(root, enemy, targetPosition)
     return true
 end
 
+-- Navmesh waypoints can run within a stud of a wall, and the character is
+-- wider than that: it walks into the wall and slides, or stops. Two rays at
+-- hip height to either side of the direction of travel; a wall closer than
+-- the character's clearance pushes the goal off it by the deficit, so the
+-- next MoveTo angles away from the wall instead of along it.
+local wallParams = RaycastParams.new()
+wallParams.FilterType = Enum.RaycastFilterType.Exclude
+wallParams.IgnoreWater = true
+local function keepOffWalls(root, goal, enemy)
+    local to = Vector3.new(goal.X - root.Position.X, 0, goal.Z - root.Position.Z)
+    if to.Magnitude < 0.5 then return goal end
+    local dir = to.Unit
+    local side = Vector3.new(-dir.Z, 0, dir.X)
+    local _, playerRadius = getPlayerHitboxMetrics()
+    local clearance = math.max(CFG.wallPadding, playerRadius + 0.6)
+    local origin = root.Position + Vector3.new(0, 0.5, 0)
+    wallParams.FilterDescendantsInstances = getRaycastExclusions(enemy)
+    local shift = 0
+    for _, s in ipairs({ 1, -1 }) do
+        local hit = Workspace:Raycast(origin, side * (s * clearance), wallParams)
+        if hit and hit.Instance and hit.Instance.CanCollide then
+            local room = (hit.Position - origin).Magnitude
+            shift = shift - s * (clearance - room)
+        end
+    end
+    if shift == 0 then return goal end
+    return goal + side * shift
+end
+
 local function updatePursuitMovement(enemy, humanoid, root, enemyRoot)
     local benchedUntil = NAV.benched[enemy]
     if benchedUntil and os.clock() < benchedUntil then
@@ -1254,6 +1281,7 @@ local function updatePursuitMovement(enemy, humanoid, root, enemyRoot)
             -- Steer each frame rather than caching: obstacles are only known by
             -- probing, so the heading has to be re-evaluated as the bot moves.
             moveTarget, steerAngle = steerTowards(root, waypoint.Position, enemy)
+            moveTarget = keepOffWalls(root, moveTarget, enemy)
             -- Only re-send the goal when the carrot has actually shifted. The
             -- steer result is a fixed world point held for a beat, so hammering
             -- MoveTo with it every frame just restarts the humanoid's approach
@@ -1327,6 +1355,7 @@ local function updatePursuitMovement(enemy, humanoid, root, enemyRoot)
                 NAV.needsRecompute = true
             end
         end
+        moveGoal = keepOffWalls(root, moveGoal, enemy)
 
         if not NAV.lastIssuedMove
             or (NAV.lastIssuedMove - moveGoal).Magnitude > CFG.moveReissueThreshold then

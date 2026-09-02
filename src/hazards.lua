@@ -38,6 +38,31 @@ local function getPlayerHitboxMetrics()
     return size, radius, totalHeight, Vector3.zero
 end
 
+-- How big an enemy is: half the wider of its planar extents, cached briefly.
+-- GetExtentsSize includes whatever it is holding, which is fine - a long
+-- weapon is reach.
+local enemyExtentCache = setmetatable({}, { __mode = "k" })
+local function getEnemyExtent(model)
+    local e = enemyExtentCache[model]
+    local now = os.clock()
+    if e and now - e.t < 0.5 then return e.r end
+    local r = 2
+    local ok, size = pcall(function() return model:GetExtentsSize() end)
+    if ok and size then r = math.clamp(math.max(size.X, size.Z) * 0.5, 1, 24) end
+    enemyExtentCache[model] = { r = r, t = now }
+    return r
+end
+
+-- Where to stand against an enemy (4.4.0): at the edge of its melee - its body
+-- plus an ordinary swing - but never further than our own attack reaches,
+-- because a standoff we cannot hit from is a bot that stands and watches.
+-- This replaces the Safe distance and Enemy space sliders; the enemy itself
+-- is the distance.
+local function getEnemyStandoff(model)
+    local extent = getEnemyExtent(model)
+    return math.max(math.min(extent + CFG.enemyMeleeReach, CFG.attackRange - 1.5), extent + 1)
+end
+
 local function clearHitboxVisualizer()
     if HZ.hitboxFolder then
         HZ.hitboxFolder:Destroy()
@@ -2587,6 +2612,8 @@ S.evaluateHazardPenaltyAtPoint = evaluateHazardPenaltyAtPoint
 S.flushClassificationCaches = flushClassificationCaches
 S.getActiveHazardRepulsionVector = getActiveHazardRepulsionVector
 S.getPlayerHitboxMetrics = getPlayerHitboxMetrics
+S.getEnemyExtent = getEnemyExtent
+S.getEnemyStandoff = getEnemyStandoff
 S.isDamageBrick = isDamageBrick
 S.isInvisibleWall = isInvisibleWall
 S.isPositionSafeFromDamageBricks = isPositionSafeFromDamageBricks
