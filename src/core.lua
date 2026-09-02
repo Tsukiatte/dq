@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 4.5.1
+    VERSION : 4.6.0
     BUILD   : 2026-09-02
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "4.5.1"
+local SCRIPT_VERSION = "4.6.0"
 local SCRIPT_BUILD_DATE = "2026-09-02"
-local SCRIPT_CODENAME = "Telegraphs are floor"
+local SCRIPT_CODENAME = "Northern Lands knows"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "4.6.0", date = "2026-09-02", notes = "Northern Lands knows. Read from the game's own client handler for northernBossSpecficEvents and from the attack models live in Studio: every timed attack of the three bosses and the bonus boss is sent to the client before it happens with the numbers the client animates it with, and those numbers are the attack. The script now hooks that remote and reads the game's own synced clock. Rolling projectiles - the criss cross, the seeking spike, the big spike, the moving beam, the sideways missile - become scripted paths: the dodge asks where each one WILL be at the moment it would be somewhere, from start, distance and duration, instead of extrapolating a mesh from two frames of motion. Ground spikes become circles with exact impact times and the spike's real radius. Orb beam pillars are zones held open for their six seconds. The bonus boss's tall swirly registers the arena explosion at its exact time and turns the matching colour spots into a timed safe window - outside them is the danger, but only around the explosion. The flame marker that follows a player is never a hazard itself; the flame lands where it stops. Spearman and warrior line strikes are cubes. Precasts that rest fully invisible and are faded in by the server - the lattice of secondBossLines, the sweeping flames - are live until they show and a telegraph from then, instead of live forever. The full model table is in game/attack_models.txt." },
     { version = "4.5.1", date = "2026-09-02", notes = "Two things from two screenshots. A played-out attack is nothing now: a precast that was visible and has faded all the way, plus a short linger, marks its attack as over, and it leaves the detected set - no danger, no highlight, not in the count. The strips of a beam pattern stayed red for seconds after the beams had fired and the dodge kept weaving between attacks that were over. The amber colour and the tag are honest now: amber and floor 2.3s only while the dodge actually treats the part as floor, arms in when its impact is within the lead, announced when its timing is unknown and it is being dodged as live. A hit taken while announced saves that attack as live-from-spawn permanently rather than letting it be re-learned from its fade next session. And the wall: every pursuit probe looked at chest height, and the plinth of a pillar is below that, so the probes said clear, the feet hit the plinth, and the character stood into the wall. Forward, side and segment probes have a shin-height ray now, and a character that has stopped moving on a path for more than a moment sidesteps, alternating sides, hops, and lets the path recompute." },
     { version = "4.5.0", date = "2026-09-02", notes = "Telegraphs are floor. The boss arena was a lattice of red strips for five seconds before a single beam fired, and the dodge treated every strip as live from the moment it appeared, carving its safe ground into slivers to avoid attacks that were not happening - the video showed forty-one telegraphs and the character weaving between strips at 1.5 seconds old that fired at 4.8. The game's own client script says how to tell: every attack is a Model with an invisible hitBox and a visible precast, and the precast is faded OUT at the instant the hit lands. So a visible precast is a telegraph, the fade is the hit, and a hitBox that moves is live regardless. Each attack's arming age is learned by its Model name and saved, so the next cast is time-aware from the moment it appears: floor until its lead, then danger. The first cast of anything is still dodged as if live, and a hit taken while an attack reads as a telegraph makes that attack live from spawn from then on. Announced-but-not-live parts are drawn amber with arms in 2.3s on the tag and turn red the frame they arm. And the floor probe now starts just above the root rather than four studs up: under the pipes of a boss room it was reading a pipe as the floor and rejecting every spot - waiting for a gap with nothing wrong but the ceiling, in the corner the character then died in." },
     { version = "4.4.1", date = "2026-09-02", notes = "Two numbers from 4.4.0 were wrong in the same direction. The enemy circle was body plus swing at 1.5, and enemies were extrapolated by their velocity out to the dwell - so a mob walking at you was predicted onto every spot near you and the only safe ground was always further back: the character kited two idle melee bots backward into a wall two rooms away. The hard circle is the body and nothing more now - the swing is an attack, and the game spawns a hitBox for it that is detected like any other - with a soft ring out to the standoff as a preference, and enemies are extrapolated 0.4 seconds ahead at most. And inside the boss's ball the exit was chosen sideways and slowly: the discount that ended the shuffle zeroed every path sample inside the ball, so nothing said shortest time inside, and the new turn cost then picked the exit by whichever way the character had last walked. Path samples inside the thing already hitting you keep half their cost in the average, so three samples in the ball cost more than one and the nearest edge wins; the turn cost is switched off while something is on you; and the pull toward the boss applies only to spots whose whole line is clean, undiscounted, so the exit nearest the boss cannot beat the exit nearest the edge." },
@@ -471,6 +472,10 @@ CFG.armFadeStep = 0.08
 CFG.armMinDelay = 0.3
 -- Seconds after a precast has fully faded before the attack counts as over.
 CFG.armDoneLinger = 0.3
+-- Northern Lands boss remote (4.6.0).
+CFG.useNorthern = true
+CFG.northernSafeLead = 2.5     -- seconds before the swirly explodes that the colour spot becomes the only safe ground
+CFG.northernFlameDelay = 0.5   -- seconds after the flame marker stops that the flame lands (not in the client script; a guess)
 CFG.dodgeMoverMinSpeed = 3       -- studs/sec before a hazard counts as moving
 CFG.dodgeMoverWindow = 0.15      -- half-width, seconds, of a mover's swept segment
 CFG.dodgeMaxClimb = 3.0
@@ -890,6 +895,10 @@ ZN.preview = nil
 -- Announced attacks, newest last: { shape, cframe|position, size|radius,
 -- startTime, delay, impactAt, part }. Filled by the precastHitbox listener.
 PC.zones = {}
+-- Northern Lands (4.6.0): scripted projectiles and timed safe windows, from
+-- the boss remote. See northern.lua.
+PC.paths = {}
+PC.safeWindows = {}
 PC.parts = {}
 PC.folder = nil
 PC.connection = nil

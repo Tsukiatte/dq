@@ -1,0 +1,184 @@
+# ReplicatedStorage.enemyProjectiles models that carry a `precast` and/or `hitBox`,
+# read live from Roblox Studio (place 85776757589518, 2026-09-02) via the Studio MCP.
+# pc = precast part: Transparency at rest, shape, size. hb = hitBox part: Transparency, CanTouch, size.
+# hitBox is invisible (tr=1.00) in every attack; the visible precast is the telegraph.
+# A precast at tr=1.00 AT REST is faded IN by the client when the attack is announced.
+#
+# 246 models
+Kraken Tentacle  pc tr=0.50 Block 13x16x119  hb tr=1.00 touch=true 13x16x119
+Mystical Garden/firstBossDebriFall  pc tr=0.80 Cylinder 2x40x40  hb tr=1.00 touch=true 40x40x40
+Mystical Garden/secondBossRandomLineShot  pc tr=0.80 Block 10x2x179  hb tr=1.00 touch=true 10x21x178
+Realm Of The Gods/bossForwardBeam  pc tr=0.80 Block 10x2x100  hb tr=1.00 touch=true 10x44x100
+Realm Of The Gods/bossHorizontalBeam  pc tr=0.80 Block 10x2x100  hb tr=1.00 touch=true 10x44x100
+Realm Of The Gods/lionShot  pc tr=0.80 Block 10x2x179  hb tr=1.00 touch=true 10x21x178
+Realm Of The Gods/minionExplosion  pc tr=0.80 Cylinder 2x40x40  hb tr=1.00 touch=true 40x40x40
+Realm Of The Gods/secondBossDebriFall  pc tr=0.50 Cylinder 2x28x28  hb tr=1.00 touch=true 28x28x28
+Realm Of The Gods/secondBossHorizontalBeam  pc tr=0.50 Block 7x2x100  hb tr=1.00 touch=true 7x44x100
+Realm Of The Gods/secondBossPull  pc tr=0.20 Block 10x2x179  hb tr=1.00 touch=true 10x21x178
+Realm Of The Gods/secondBossShootPlayer  pc tr=0.50 Cylinder 2x20x20  hb tr=1.00 touch=true 20x20x20
+Realm Of The Gods/secondBossVerticalBeam  pc tr=0.50 Block 7x2x200  hb tr=1.00 touch=true 7x44x200
+Steampunk/bossCannonBeam  pc tr=0.80 Block 10x2x150  hb tr=1.00 touch=true 10x44x150
+Steampunk/bossHorizontalBeam  pc tr=0.80 Block 10x2x300  hb tr=1.00 touch=true 10x44x300
+Steampunk/outwardBlastSize1  pc tr=0.80 Cylinder 2x14x14  hb tr=1.00 touch=true 14x14x14
+Steampunk/outwardBlastSize2  pc tr=0.80 Cylinder 2x21x21  hb tr=1.00 touch=true 21x21x21
+Steampunk/outwardBlastSize3  pc tr=0.80 Cylinder 2x32x32  hb tr=1.00 touch=true 32x32x32
+Steampunk/outwardBlastSize4  pc tr=0.80 Cylinder 2x50x50  hb tr=1.00 touch=true 50x50x50
+Steampunk/outwardBlastSize5  pc tr=0.80 Cylinder 2x50x50  hb tr=1.00 touch=true 50x50x50
+Steampunk/secondBossOrbShot  pc tr=0.80 Block 10x2x179  hb tr=1.00 touch=true 10x21x178
+Steampunk/secondBossPunchCircle  pc tr=0.80 Cylinder 3x50x50  hb tr=1.00 touch=true 50x50x50
+Steampunk/secondBossPunchHorizontalBeam  pc tr=0.80 Block 70x2x10  hb tr=1.00 touch=true 70x43x10
+Steampunk/secondBossZigZag  pc tr=0.80 Block 10x2x25  hb tr=1.00 touch=true 10x21x25
+aggressiveLavaWalkerHit  pc tr=0.40 Block 25x1x10  hb tr=1.00 touch=true 25x21x10
+aoeSwipe  pc tr=0.75 Cylinder 2x35x35  hb tr=1.00 touch=true 27x33x33
+artilleryMobShot  pc tr=0.80 Cylinder 1x17x17  hb tr=1.00 touch=true 17x17x17
+azrallikPunch  pc tr=0.75 Cylinder 4x35x35  hb tr=1.00 touch=true 35x35x35
+azrallikPunchSpread  pc tr=0.85 Block 270x1x8  hb tr=1.00 touch=true 270x34x8
+bellyFlopHit  pc tr=0.60 Cylinder 2x23x23  hb tr=1.00 touch=true 23x23x23
+bigMageBeam  pc tr=0.85 Cylinder 4x25x25  hb tr=1.00 touch=true 25x25x25
+bonusBossGroundFlame  pc tr=0.70 Cylinder 2x35x35  hb=nil
+bonusBossLongLine  pc tr=0.70 Block 10x2x274  hb tr=1.00 touch=true 10x59x274
+bonusBossSmallSpiralFlame  pc tr=0.70 Cylinder 2x17x17  hb=nil
+bonusBossSweepingFlames/1..9  pc tr=1.00 Block 256x4x25  hb tr=1.00 touch=true 256x164x25
+bookClone  pc tr=0.80 Cylinder 1x30x30  hb tr=1.00 touch=true 29x29x29
+bossHunterInnerFlameShot  pc tr=0.75 Block 10x1x13  hb tr=1.00 touch=true 10x9x13
+bossHunterMiddleFire  pc tr=0.75 Block 195x1x24  hb tr=1.00 touch=true 197x8x24
+bossHunterSideFire1  pc tr=0.75 Block 195x1x12  hb tr=1.00 touch=true 197x8x12
+bossHunterSideFire2  pc tr=0.75 Block 195x1x12  hb tr=1.00 touch=true 197x8x12
+bossMageBIGSideShot  pc tr=0.75 Block 400x1x2  hb tr=1.00 touch=true 400x8x2
+bossMageMainLaser  pc tr=0.75 Block 128x1x7  hb tr=1.00 touch=true 128x8x7
+bossMageSideShot  pc tr=0.75 Block 128x1x2  hb tr=1.00 touch=true 128x8x2
+bossMelee  pc=nil  hb tr=1.00 touch=true 4x7x7
+bossRandomStrike/circleHit (x2)  pc tr=0.80 Cylinder 2x17x17  hb tr=1.00 touch=true 17x17x17
+bossRandomStrike/crossBeam (x2)  pc tr=0.80 Block 10x2x300  hb tr=1.00 touch=true 10x44x300
+bossRandomStrike/crossBeam (x2)  pc tr=1.00 Block 10x2x300  hb tr=1.00 touch=true 10x44x300
+bossShot/model (x3)  pc tr=0.50 Block 2x1x40  hb tr=1.00 touch=true 2x16x40
+canalsnpcMageShot  pc tr=0.75 Block 60x1x4  hb tr=1.00 touch=true 60x53x4
+cannonBarrageCannonHit  pc tr=0.50 Cylinder 2x25x25  hb tr=1.00 touch=true 25x25x25
+cannonBarrageHit  pc tr=0.80 Cylinder 3x45x45  hb=nil
+cannonCrabShot  pc tr=0.60 Cylinder 2x23x23  hb tr=1.00 touch=true 23x23x23
+chickenMage  pc tr=0.90 Block 6x1x55  hb tr=1.00 touch=true 6x15x55
+chickenMelee  pc=nil  hb tr=1.00 touch=true 5x4x7
+circleHit  pc tr=0.80 Cylinder 3x23x23  hb tr=1.00 touch=true 23x23x23
+cool placeHoleThing?  pc tr=0.15 Cylinder 1x17x17  hb tr=1.00 touch=true 17x17x17
+corruptLineFire  pc tr=0.70 Block 100x1x5  hb tr=1.00 touch=true 100x13x5
+corruptMolotov  pc tr=0.70 Cylinder 2x30x30  hb tr=1.00 touch=true 30x30x30
+crossShot  pc tr=0.80 Block 6x1x100  hb tr=1.00 touch=true 6x36x100
+crossShuriken/hitBoxes  pc=nil  hb tr=1.00 touch=true 5x36x139
+crossShuriken/precasts  pc tr=0.75 Block 5x1x139  hb=nil
+doubleFlameBeam  pc tr=0.65 Block 4x7x280  hb tr=1.00 touch=true 4x38x280
+droneShot/shot (x3)  pc tr=0.80 Block 4x1x86  hb tr=1.00 touch=true 4x21x86
+easterSecondBossRandomLine  pc tr=0.80 Block 7x2x203  hb tr=1.00 touch=true 7x39x203
+electricTowerHit  pc tr=0.70 Cylinder 1x17x17  hb tr=1.00 touch=true 17x17x17
+eliteSwordsmanSpin  pc tr=0.80 Cylinder 2x22x22  hb tr=1.00 touch=true 22x22x22
+explosiveMobShot1  pc tr=0.85 Cylinder 1x15x15  hb tr=1.00 touch=true 17x17x17
+explosiveMobShot2  pc tr=0.85 Cylinder 1x22x22  hb tr=1.00 touch=true 22x22x22
+explosiveMobShot3  pc tr=0.85 Cylinder 1x28x28  hb tr=1.00 touch=true 28x28x28
+finalBossArrowShotHitbox  pc tr=0.70 Cylinder 2x15x15  hb tr=1.00 touch=true 15x15x15
+finalBossLineBlast  pc=nil  hb tr=1.00 touch=true 12x39x260
+fingerBlastHit  pc tr=0.85 Cylinder 4x15x15  hb tr=1.00 touch=true 15x15x15
+firstBossBeamShot  pc tr=0.80 Block 7x1x106  hb tr=1.00 touch=true 7x32x106
+firstBossBeamTrackerLine  pc tr=0.70 Block 10x3x1  hb tr=1.00 touch=true 10x85x1
+firstBossBombExplosion  pc tr=0.90 Cylinder 1x36x36  hb tr=1.00 touch=true 36x36x36
+firstBossCrystal  pc tr=1.00 Cylinder 1x31x31  hb=nil
+firstBossFlameShot  pc tr=0.40 Block 4x1x86  hb tr=1.00 touch=true 4x21x86
+firstBossGatlingGunShot  pc tr=0.80 Block 4x1x86  hb tr=1.00 touch=true 4x21x86
+firstBossIceRadius  pc tr=0.80 Cylinder 1x40x40  hb tr=1.00 touch=true 40x40x40
+firstBossJumpSlam  pc tr=0.55 Cylinder 4x67x67  hb tr=1.00 touch=true 67x67x67
+firstBossLaserPrecast  pc tr=1.00 Block 16x1x150  hb=nil
+firstBossLeftHandShot  pc tr=0.85 UnionOperation 165x4x165  hb tr=1.00 touch=true 10x13x57
+firstBossLongLine  pc tr=0.70 Block 8x2x274  hb tr=1.00 touch=true 8x59x274
+firstBossMinionExplosion  pc tr=0.50 Cylinder 1x26x26  hb tr=1.00 touch=true 26x26x26
+firstBossOrbPrecastLine  pc tr=0.00 Block 10x2x1  hb=nil
+firstBossPassiveCricleHitbox  pc tr=0.60 Cylinder 2x26x26  hb=nil
+firstBossRightHandShot  pc tr=0.80 Block 6x1x126  hb tr=1.00 touch=true 6x64x126
+firstBossRocketHitbox  pc tr=0.50 Cylinder 1x22x22  hb tr=1.00 touch=true 22x22x22
+firstBossShootPlayer/model (x5)  pc tr=0.80 Block 10x2x179  hb tr=1.00 touch=true 10x21x178
+firstBossSiegeShot  pc tr=0.85 Cylinder 1x26x26  hb tr=1.00 touch=true 26x26x26
+firstBossSkyShot  pc tr=0.85 Cylinder 7x26x26  hb=nil
+firstBossSlamGround/crossBeam (x4)  pc tr=0.80 Block 15x2x300  hb tr=1.00 touch=true 15x44x300
+firstBossTurretShot  pc tr=0.40 Block 7x1x125  hb tr=1.00 touch=true 7x21x125
+firstBossUpShot  pc tr=0.85 Cylinder 1x18x18  hb tr=1.00 touch=true 18x18x18
+flameBeam  pc tr=0.65 Block 4x7x150  hb tr=1.00 touch=true 4x60x150
+flameLashPrecast  pc tr=0.75 Block 195x14x22  hb tr=1.00 touch=true 197x117x22
+flameShurikenHit  pc tr=0.65 Cylinder 4x40x40  hb tr=1.00 touch=true 39x39x39
+gank  pc tr=0.75 Cylinder 2x26x26  hb tr=1.00 touch=true 36x25x25
+ghastlyRiflemanShot  pc tr=0.80 Block 2x1x45  hb tr=1.00 touch=true 3x6x45
+golemRockClap  pc tr=0.80 Cylinder 2x40x40  hb tr=1.00 touch=true 39x39x39
+golemRockThrow  pc tr=0.80 Cylinder 2x34x34  hb tr=1.00 touch=true 33x33x33
+golemRockThrowSmall  pc tr=0.80 Cylinder 2x26x26  hb tr=1.00 touch=true 25x25x25
+hammerBotHit  pc tr=0.80 Cylinder 1x22x22  hb tr=1.00 touch=true 22x22x22
+hitmanStrike  pc tr=0.85 Block 7x1x8  hb tr=1.00 touch=true 7x7x8
+horizontalBeam  pc tr=0.85 Block 251x1x16  hb tr=1.00 touch=true 170x88x16
+iceAOE  pc=nil  hb tr=1.00 touch=true 11x17x9
+iceBeam  pc=nil  hb tr=1.00 touch=true 3x3x265
+iceBeamIndicator  pc=nil  hb tr=1.00 touch=true 6x6x265
+initialHunterBossEntry  pc=nil  hb tr=1.00 touch=true 51x17x140
+initialKingBossEntry  pc=nil  hb tr=1.00 touch=true 441x73x151
+initialMageBossEntry  pc=nil  hb tr=1.00 touch=true 121x10x118
+kingLandingArea  pc tr=0.75 Cylinder 2x66x66  hb tr=1.00 touch=true 65x65x65
+kolvumarSpit  pc tr=0.85 Cylinder 4x35x35  hb tr=1.00 touch=true 35x35x35
+krakenHitbox  pc tr=0.50 Block 13x16x119  hb tr=1.00 touch=true 13x16x119
+krakenInkHit/hitModel (x9)  pc tr=0.50 Block 2x10x103  hb tr=1.00 touch=true 15x10x103
+largeIceSpikes  pc tr=0.75 Cylinder 4x80x80  hb=nil
+laserBeam  pc=nil  hb tr=0.00 touch=true 50x2x2
+mageBossStrraightShot  pc=nil  hb tr=1.00 touch=true 6x39x100
+mageHorizontalBeam  pc=nil  hb tr=1.00 touch=true 6x39x100
+mediumIceSpikes  pc tr=0.75 Cylinder 4x50x50  hb=nil
+npcMageShot  pc tr=0.75 Block 60x1x2  hb tr=1.00 touch=true 60x53x3
+npcMageSpikes  pc tr=0.75 Block 60x1x6  hb tr=1.00 touch=true 60x53x6
+npcShurikenThrow  pc tr=0.60 Block 4x1x73  hb tr=1.00 touch=true 4x29x73
+overgrowthLongLineSpikes  pc tr=0.85 Block 251x4x16  hb tr=1.00 touch=true 251x88x16
+overgrowthSpikes  pc=nil  hb tr=1.00 touch=true 13x88x154
+riflemanShot  pc=nil  hb tr=1.00 touch=true 60x8x3
+rockshatter  pc tr=0.75 Block 5x1x230  hb tr=1.00 touch=true 5x36x230
+secondBossBigCircle  pc tr=0.80 Cylinder 2x80x80  hb=nil
+secondBossCheckeredLine  pc tr=0.85 Block 7x1x196  hb tr=1.00 touch=true 7x21x196
+secondBossCircleHit  pc tr=0.50 Cylinder 1x17x17  hb tr=1.00 touch=true 17x17x17
+secondBossCricleHitbox  pc tr=0.60 Cylinder 2x22x22  hb=nil
+secondBossCrossBeam  pc=nil  hb tr=1.00 touch=true 8x39x160
+secondBossGeyserShot  pc tr=0.50 Cylinder 1x22x22  hb tr=1.00 touch=true 22x22x22
+secondBossGroundSlamCircle  pc tr=0.60 Cylinder 3x26x26  hb=nil
+secondBossHorizontalLine  pc tr=0.75 Block 10x3x292  hb=nil
+secondBossLines/1..11  pc tr=1.00 Block 12x1x275  hb tr=1.00 touch=true 12x32x275
+secondBossLongLinePassive  pc tr=0.70 Block 10x3x274  hb tr=1.00 touch=true 10x59x274
+secondBossLongLingeringLine  pc tr=0.70 Block 8x3x274  hb tr=1.00 touch=true 8x59x274
+secondBossPassiveCircle  pc tr=0.80 Cylinder 2x30x30  hb=nil
+secondBossPulseWave/beam (x6)  pc tr=0.85 Block 12x1x275  hb tr=1.00 touch=true 12x32x275
+secondBossRandomLine  pc tr=0.50 Block 5x2x127  hb tr=1.00 touch=true 5x25x127
+secondBossRandomPulse  pc tr=0.85 Cylinder 2x30x30  hb tr=1.00 touch=true 30x30x30
+secondBossRandomSquare/Model (x4)  pc=nil  hb tr=1.00 touch=true 24-31x40x7
+secondBossRockHit  pc tr=0.90 Cylinder 1x32x32  hb tr=1.00 touch=true 32x32x32
+secondBossShootPlayer/model (x11)  pc tr=0.80 Block 10x2x179  hb tr=1.00 touch=true 10x21x178
+secondBossVerticalLine  pc tr=0.70 Block 8x2x350  hb tr=1.00 touch=true 8x59x350
+serpentFireHitbox  pc tr=1.00 Block 71x3x69  hb tr=1.00 touch=true 71x37x69
+serpentPlayerShot  pc tr=0.80 Cylinder 2x23x23  hb tr=1.00 touch=true 23x23x23
+serpentWaterHitbox/hitModel (x6)  pc tr=0.80 Block 8x1x160  hb tr=1.00 touch=true 8x20x160
+sharkThrowhitBox  pc tr=0.50 Cylinder 1x22x22  hb tr=1.00 touch=true 22x22x22
+shooterShot  pc tr=0.50 Block 2x1x40  hb tr=1.00 touch=true 2x16x40
+shurikenThrow/row (x3)  pc tr=0.80 Block 4x1x73  hb tr=1.00 touch=true 4x29x73
+silkBlast  pc tr=0.80 Block 37x1x186  hb tr=1.00 touch=true 37x9x186
+smallIceSpikes  pc tr=0.75 Cylinder 4x30x30  hb=nil
+spinBotSpin  pc tr=0.85 Cylinder 1x26x26  hb tr=1.00 touch=true 26x26x26
+spiritStrike  pc tr=0.75 Cylinder 2x15x15  hb tr=1.00 touch=true 61x15x15
+steampunkRangeMobShot  pc tr=0.80 Block 4x1x45  hb tr=1.00 touch=true 4x16x45
+thirdBossBeamShot  pc tr=0.80 Block 7x1x106  hb tr=1.00 touch=true 7x32x106
+thirdBossCircleHit  pc tr=0.75 Cylinder 1x17x17  hb tr=1.00 touch=true 17x17x17
+thirdBossCircleHit2  pc tr=0.75 Cylinder 1x28x28  hb tr=1.00 touch=true 28x28x28
+thirdBossDualSwingLine  pc tr=0.80 Block 15x1x212  hb tr=1.00 touch=true 15x21x212
+thirdBossExplosionShot  pc tr=0.80 Cylinder 1x36x36  hb tr=1.00 touch=true 36x36x36
+thirdBossExplosionShot/Model (x5)  pc tr=1.00 Block 10x1x180  hb tr=1.00 touch=true 10x40x180
+thirdBossFlameWallHitBox  pc=nil  hb tr=1.00 touch=true 187x100x15
+thirdBossLavaLine  pc tr=0.80 Block 12x2x300  hb tr=1.00 touch=true 12x39x300
+thirdBossLifeStealHitbox  pc=nil  hb tr=1.00 touch=true 31x34x160
+thirdBossLineShot  pc tr=0.65 Block 13x7x219  hb tr=1.00 touch=true 13x138x219
+thirdBossMassSafeSpotCircles  pc tr=0.80 Cylinder 3x40x40  hb=nil
+thirdBossMemoryDamageZone  pc tr=0.00 UnionOperation 23x400x400  hb=nil
+thirdBossMemorySafeZone  pc tr=0.00 Cylinder 2x40x40  hb=nil
+thirdBossRandomLine  pc tr=0.85 Block 7x2x203  hb tr=1.00 touch=true 7x39x203
+thirdBossSShapeCircle  pc tr=0.70 Cylinder 2x19x19  hb=nil
+thirdBossSafeSpot  pc tr=0.15 Cylinder 1x17x17  hb=nil
+thirdBossSafeSpots  pc tr=0.75 UnionOperation 332x4x333  hb tr=1.00 touch=true 13x8x142
+thirdBossSpiralShot  pc tr=0.80 Cylinder 2x13x13  hb=nil
+thirdBossSpreadLine  pc tr=0.00 Block 11x1x246  hb tr=1.00 touch=true 11x21x246
+volcanicFirstBossFlameShot  pc tr=0.40 Block 4x1x125  hb tr=1.00 touch=true 4x21x125
+volcanicSecondBossRandomLine  pc tr=0.40 Block 7x1x225  hb tr=1.00 touch=true 7x21x225

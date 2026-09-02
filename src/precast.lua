@@ -148,6 +148,9 @@ end
 
 -- Drops zones whose attack has resolved, and recolours the rest by urgency.
 local function precastStep()
+    -- Northern Lands housekeeping rides on the same clock. Late-bound: that
+    -- module loads after this one.
+    if S.northernStep then S.northernStep() end
     -- Keep the Attacks panel honest. It used to be rendered once at build and
     -- never again, so it read zero however many attacks had gone past.
     if #PC.zones ~= PC.lastShown or PC.total ~= PC.lastTotal then
@@ -159,7 +162,7 @@ local function precastStep()
     for i = #PC.zones, 1, -1 do
         local zone = PC.zones[i]
         local eta = zone.impactAt - now
-        if eta < -CFG.precastLingerTime then
+        if eta < -(CFG.precastLingerTime + (zone.holdFor or 0)) then
             if zone.part then zone.part:Destroy() end
             table.remove(PC.zones, i)
         elseif zone.part and zone.part.Parent then
@@ -279,4 +282,5 @@ S.precastStep = precastStep
 S.isPositionSafeFromPrecast = isPositionSafeFromPrecast
 S.precastTimeToImpact = precastTimeToImpact
 S.clearPrecastZones = clearZones
+S.addPrecastZone = addZone
 end

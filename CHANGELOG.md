@@ -11,6 +11,36 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.6.0 - 2026-09-02 - "Northern Lands knows"
+
+Read from the game's client handler for `northernBossSpecficEvents` and from
+the attack models live in Roblox Studio (via the Studio MCP). Every timed
+attack of the three NL bosses and the bonus boss is sent to the client
+*before* it happens, with the numbers the client animates it with. Those
+numbers are the attack. New module `src/northern.lua` hooks the remote and
+requires the game's own `timeSync` clock, so it reads the same timestamps.
+
+| event | what we do |
+|---|---|
+| First Boss Criss Cross Projectile, Seeking Spike, Big Spike | scripted **path**: position(t) from start CFrame, distance, duration, start/end time |
+| Second Boss Big Hitting Ground Spikes | circle zone, radius 15/25/40, **exact** impact time, held 0.7 s |
+| Second Boss Moving Beam | scripted path, a 57-stud bar sweeping along its look vector |
+| Third Boss Bouncing Orb Beam, Bonus Boss Freezing Orb Beam | pillar zone held open 6 s |
+| Third Boss Sideways Missile | scripted path with the missile's 10-stud head start |
+| Spearman Strike, Warrior Line Strike | cube zone behind the cframe, 0.5 s |
+| Bonus Boss Tall Swirly | arena explosion at its exact time + a **timed safe window** on the matching colour spots |
+| Bonus Boss Flame Pre Target | the marker is never a hazard; the flame lands where it stops |
+
+The dodge gained three sources: `PC.paths` (where a projectile *will* be at
+time t, as a box in its own frame), zones with `holdFor`, and
+`PC.safeWindows` (outside the spot is danger only around the explosion).
+
+Also: precasts that rest fully invisible and are faded *in* by the server
+(`secondBossLines/1-11`, `bonusBossSweepingFlames`) are live until they show
+and a telegraph from then on, rather than live forever. The full model table
+(246 attacks, precast/hitBox sizes and transparencies) is in
+`game/attack_models.txt`.
+
 ## 4.5.1 - 2026-09-02
 
 ### Played-out attacks
