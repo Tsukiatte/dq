@@ -127,19 +127,20 @@ local function vlist(instance, gap, order)
     return l
 end
 
--- Let a child eat the slack in a list layout. UIFlexItem is recent enough that
--- a client without it is possible, so there is an explicit-size fallback:
--- `reserve` is the width the siblings and the gap take up.
+-- Let a child eat the slack in a horizontal list: `reserve` is the width its
+-- siblings and the gaps between them take up.
+--
+-- This used to add a UIFlexItem in Fill mode, and that is what made every row
+-- label render blank in 2.7.0. Flex GROWS an item from its base size, and the
+-- labels had a base width of 100% - so the pass had negative slack to hand out
+-- and collapsed them to nothing. The buttons were fine because their base width
+-- was already 0. Explicit arithmetic is one line, needs no guessing about how
+-- flex distributes, and cannot fail silently: a wrong `reserve` gives a label
+-- that is slightly the wrong width, not an invisible one.
 local function flexFill(instance, reserve)
-    local ok = pcall(function()
-        local flex = Instance.new("UIFlexItem")
-        flex.FlexMode = Enum.UIFlexMode.Fill
-        flex.Parent = instance
-    end)
-    if not ok and reserve then
-        instance.Size = UDim2.new(1, -reserve, instance.Size.Y.Scale, instance.Size.Y.Offset)
-    end
-    return ok
+    if not reserve then return false end
+    instance.Size = UDim2.new(1, -reserve, instance.Size.Y.Scale, instance.Size.Y.Offset)
+    return true
 end
 
 local function hlist(instance, gap)
@@ -904,10 +905,9 @@ local function buttonRow(parent, order)
         local b = button(holder, text, style, onClick, count, explain)
         b.Size = UDim2.new(0, 0, 1, 0)
         buttons[count] = b
-        if not flexFill(b) then
-            for _, sibling in ipairs(buttons) do
-                sibling.Size = UDim2.new(1 / count, -(Theme.GapMd * (count - 1)) / count, 1, 0)
-            end
+        -- Equal widths, recomputed as each button is added.
+        for _, sibling in ipairs(buttons) do
+            sibling.Size = UDim2.new(1 / count, -(Theme.GapMd * (count - 1)) / count, 1, 0)
         end
         return b
     end
@@ -1312,7 +1312,7 @@ local function segmented(parent, options, get, set, order, explain)
         b.BackgroundColor3 = Theme.SurfaceField
         b.BackgroundTransparency = 1
         b.BorderSizePixel = 0
-        b.Size = UDim2.new(1 / #options, -3, 1, 0)
+        b.Size = UDim2.new(1 / #options, -(3 * (#options - 1)) / #options, 1, 0)
         b.Text = option.label or tostring(option.value)
         b.TextSize = 12
         b.AutoButtonColor = false
@@ -1320,7 +1320,6 @@ local function segmented(parent, options, get, set, order, explain)
         setFont(b, "sans", Enum.FontWeight.SemiBold)
         b.Parent = holder
         corner(b, Theme.RadiusSm)
-        flexFill(b)
         accentGradient(b, 0).Enabled = false
         buttons[option.value] = b
         tip(b, option.tip)
