@@ -255,7 +255,7 @@ local function dangerAt(px, py, pz, t)
             -- anything is dodged as if it were, and the second is not.
             local st = HZ.armState[part]
             if st then
-                if st.doneAt then
+                if st.doneAt or st.dormant then
                     live = false
                 elseif not st.armedAt and st.impactAt then
                     live = t >= (st.impactAt - DG.clock) - lead

@@ -552,6 +552,13 @@ local function isDamageBrick(part)
     local parent = part.Parent
     if parent and parent.Name == "stunParts" then return false end
     if Players:FindFirstChild(part.Name) then return false end
+    -- Nothing the size of the arena is an attack you can step out of. The
+    -- Northern Lands boss room has an invisible 217-stud cube (FirstPart)
+    -- around it; treated as a hazard it put the whole fight inside danger.
+    do
+        local size = part.Size
+        if size.X >= 100 and size.Z >= 100 and size.Y >= 40 then return false end
+    end
 
     -- =====================================================================
     -- GROUND TRUTH FIRST (3.4.0)
@@ -1882,7 +1889,8 @@ local function recordHit(damage)
         -- Attacks are young. Something that has stood here for twenty seconds
         -- is the map, whatever was next to us when we were hit - FirstPart
         -- got learned this way.
-        local old = HZ.seenAt[p] ~= nil and now - HZ.seenAt[p] > 20
+        -- No index timestamp means it was here before we were: older still.
+        local old = HZ.seenAt[p] == nil or now - HZ.seenAt[p] > 20
         if not marker and not old and not GENERIC_PART_NAMES[name] and not NEVER_OWN[name] and not HZ.learnedNames[name] then
             HZ.learnedNames[name] = true
             lines[#lines + 1] = "     LEARNED '" .. name .. "' as an attack"
@@ -2613,6 +2621,39 @@ local function updateArming(now)
                 -- a new part appearing mid-life is often the hit itself.
                 if now - st.channelsAt > 0.5 then
                     st.channelsAt = now
+                    -- Pooled attacks (the 14 passive beams parked at the arena
+                    -- centre) sit unchanged for the whole fight and are moved
+                    -- into place when used. Movement is a fresh spawn.
+                    local anchor = st.hitBox or st.precast
+                    if anchor and anchor.Parent then
+                        local p = anchor.Position
+                        if st.pivot and (p - st.pivot).Magnitude > 0.5 then
+                            note(st, age, "moved")
+                            st.spawn = now
+                            age = 0
+                            st.armedAt, st.armedBy, st.doneAt, st.byInvisible, st.dormant = nil, nil, nil, nil, nil
+                            st.minT, st.visMinEver, st.onMax, st.fadedAt = math.huge, math.huge, 0, nil
+                            table.clear(st.events)
+                            local span = RT.armSpans[st.name]
+                            local delay = RT.armDelays[st.name]
+                            if span then
+                                st.impactAt = now + span.first
+                                st.liveUntil = now + span.last + CFG.armAssumedLinger
+                            elseif delay and delay > 0 then
+                                st.impactAt = now + delay
+                                st.liveUntil = nil
+                            else
+                                st.impactAt, st.liveUntil = nil, nil
+                            end
+                        end
+                        st.pivot = p
+                    end
+                    -- Never shown, never moved, never hit us, and still here
+                    -- after this long: parked, not attacking.
+                    if not st.dormant and not st.hit and st.onMax == 0 and age > CFG.dormantAfter then
+                        st.dormant = true
+                        note(st, age, "dormant")
+                    end
                     local count = #model:GetDescendants()
                     if count ~= st.descCount then
                         note(st, age, string.format("%+d parts", count - st.descCount))
@@ -2634,6 +2675,7 @@ local function updateArming(now)
                 if sig ~= st.hbSig then
                     if st.hbSig ~= nil and sig ~= nil then
                         note(st, age, "hitBox changed")
+                        st.dormant = nil
                         if not st.armedAt then st.armedAt = now st.armedBy = "hitBox change" end
                     end
                     st.hbSig = sig
@@ -2646,6 +2688,10 @@ local function updateArming(now)
                     if tr < st.minT then st.minT = tr end
                 end
                 local on, partMin, soundOn, anyChannel = channelState(st)
+                if st.dormant and (on > 0 or soundOn) then
+                    st.dormant = nil
+                    note(st, age, "woke")
+                end
                 if partMin < st.visMinEver then st.visMinEver = partMin end
                 if on > st.onMax then st.onMax = on end
                 if on ~= st.lastOn then note(st, age, string.format("channels %d>%d", st.lastOn, on)) end
@@ -2771,7 +2817,7 @@ local function updateArming(now)
         local st = HZ.armState[part]
         local drop = false
         if st then
-            if st.doneAt then
+            if st.doneAt or st.dormant then
                 drop = true
             else
                 local lname = string.lower(part.Name)
@@ -2811,6 +2857,8 @@ local function noteAttackHit(part)
     if known == nil or known == 0 or span.first < known then RT.armDelays[st.name] = span.first end
     if not st.armedAt then st.armedAt = now st.armedBy = "hit" end
     st.byInvisible = nil
+    st.dormant = nil
+    st.hit = true
     st.liveUntil = math.max(st.liveUntil or 0, st.spawn + span.last + CFG.armAssumedLinger)
     st.doneAt = nil
     st.fadedAt = nil

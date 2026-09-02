@@ -287,7 +287,7 @@ end
 -- Mage shot: a 60-stud line from a caster position toward the player. Nothing
 -- visible for 0.9 s, then the precast shows AND the hit lands. Removed at 8 s.
 local MAGE_POSTS = {
-    CENTRE + Vector3.new(70, 0, 0), CENTRE + Vector3.new(-50, 0, 60), CENTRE + Vector3.new(-40, 0, -65),
+    CENTRE + Vector3.new(48, 0, 0), CENTRE + Vector3.new(-34, 0, 40), CENTRE + Vector3.new(-30, 0, -42),
 }
 local function mageShot()
     local from = MAGE_POSTS[math.random(#MAGE_POSTS)]
