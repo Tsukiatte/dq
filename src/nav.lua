@@ -1584,4 +1584,6 @@ S.clearPointRoute = clearPointRoute
 S.castSolid = castSolid
 S.getRaycastExclusions = getRaycastExclusions
 S.steerTowards = steerTowards
+S.projectToGround = projectToGround
+S.isPathSegmentClear = isPathSegmentClear
 end

@@ -55,6 +55,10 @@ local MC = S.MC
 local recordStep = S.recordStep
 local runMacroPlayback = S.runMacroPlayback
 local startMacroInput = S.startMacroInput
+local CL = S.CL
+local cloneStep = S.cloneStep
+local runCloneEvasion = S.runCloneEvasion
+local buildClones = S.buildClones
 
 -- Trial runs (2.3.0): every drop in health is handed to the correlator while a
 -- trial run is on. The connection is per character and rebuilt on respawn.
@@ -433,6 +437,9 @@ local function startAutofarm()
         root = newChar:WaitForChild("HumanoidRootPart")
         watchOwnAnimations(newChar)
         watchHealth(newChar)
+        -- The ring is sized from the character's own hitbox, so a respawn
+        -- means rebuilding it rather than leaving volumes around the old body.
+        if CL.active then buildClones() end
     end)
 
     -- Index maintenance + throttled enemy scan. The index step runs even while
@@ -549,6 +556,11 @@ local function startAutofarm()
 
             useAutoAbilities()
 
+            -- The clone ring follows the character whether or not anything is
+            -- threatening, so its pads are already telling the truth by the
+            -- time one is needed.
+            if CL.active then cloneStep(root) end
+
             -- Whichever branch below actually moves the character toward a goal
             -- sets this; the recovery detector reads it after the branch.
             NAV.driving = false
@@ -585,7 +597,7 @@ local function startAutofarm()
 
                 -- Recompute when the route runs out, the destination stopped being
                 -- safe (a new telegraph landed on it), or the cache went stale.
-                if not NAV.computingEscape
+                if not CL.active and not NAV.computingEscape
                     and (routeSpent or not targetStillSafe
                         or (clock - NAV.lastEscapeTime) >= CFG.escapeRecomputeInterval) then
                     NAV.lastEscapeTime = clock
@@ -596,7 +608,16 @@ local function startAutofarm()
                     end)
                 end
 
-                if not followEscapeRoute(humanoid, root) then
+                if CL.active then
+                    -- Clone mode dodges by stepping into the best green volume
+                    -- rather than searching for an escape point each time.
+                    if not runCloneEvasion(humanoid, root) then
+                        local repulsion = getActiveHazardRepulsionVector(root.Position)
+                        local fallbackDir = repulsion.Magnitude > 0.1 and repulsion.Unit or Vector3.new(0, 0, 1)
+                        humanoid:MoveTo(root.Position + (fallbackDir * 10))
+                        setMovementState("CLONE - repulsion fallback")
+                    end
+                elseif not followEscapeRoute(humanoid, root) then
                     local repulsion = getActiveHazardRepulsionVector(root.Position)
                     local fallbackDir = repulsion.Magnitude > 0.1 and repulsion.Unit or Vector3.new(0, 0, 1)
                     humanoid:MoveTo(root.Position + (fallbackDir * 10))
@@ -648,7 +669,7 @@ local function startAutofarm()
                 -- fight - and only in legacy mode, since the waypoint path and
                 -- the macro list are two answers to the same question and the
                 -- dropdown picks which one is in charge.
-                local walking = CFG.followPath and MC.mode == "legacy"
+                local walking = CFG.followPath and MC.mode ~= "macro"
                     and not NAV.pathEditEnabled
                     and followPath(humanoid, root)
 

@@ -11,6 +11,53 @@ file and that table in sync on every edit.
 
 ---
 
+## 2.9.0 - 2026-09-02 - "Clone"
+Clone evasion: a third mode beside Legacy and Macro.
+
+### What it is
+- A ring of **player-sized volumes** follows the character - a tall prism the
+  size of your own hitbox, with a **flat pad beneath it that is green when
+  nothing would be hitting you there and red when something would**. The bot
+  dodges by stepping into the best green one.
+- Legacy and Clone are the same bot and differ only in how they dodge: Legacy
+  searches for an escape point each time something lands near you, Clone reads
+  a field of standing answers. Macro still replaces both with a recording. The
+  island at the top of the Autofarm window picks between all three, and only
+  the sections belonging to the current mode are shown.
+
+### Why a fixed ring rather than a search
+- The candidates are **fixed relative to the character**, so the answer is
+  stable frame to frame instead of being re-derived under pressure - and it is
+  **on screen**, so a dodge that goes wrong can be watched rather than
+  reconstructed from a log afterwards.
+- **Projectiles come free.** Safety goes through
+  `isPositionSafeFromDamageBricks`, which measures against `hazardClosestPoint`,
+  which already sweeps a moving hazard along the strip it will cross over the
+  next `CFG.projectileLookahead` seconds. So a volume standing in the line of an
+  incoming projectile is red *before* the projectile gets there. That is the
+  whole reason to test positions rather than test contact.
+
+### Details
+- **Two interleaved rings** by default (24 volumes): a near option and a far
+  one, offset by half a step so there are no spokes with gaps between them.
+- A volume is also red if there is no floor under it, or the floor is more than
+  `CFG.cloneMaxDrop` below / `CFG.cloneMaxClimb` above you - a spot you cannot
+  stand on is not a dodge.
+- The chosen volume is **held for `CFG.cloneCommitTime`**, so the character does
+  not stutter between two equally good options under a moving hazard. Ranking is
+  hazard penalty first, distance as the tie-break, because a shorter dash is a
+  dash you finish. Only the best five get a reachability raycast.
+- Positions update every frame (a CFrame write); safety is re-tested on its own
+  `CFG.cloneEvalInterval` clock, because that is what costs raycasts. The pool
+  is built once and reused - no per-frame Instance churn.
+- The ring is **rebuilt when the count, rings or radius change and on respawn**
+  (it is sized from your character's own hitbox), and **torn down on a mode
+  switch or Destruct**.
+- If every volume is red the log says so and names the likely cause: the attack
+  is wider than the ring. Widen **Radius**.
+- Settings: volumes, rings, radius, safety margin, commit time, show the ring,
+  and both colours. All saved.
+
 ## 2.8.0 - 2026-09-02 - "Account"
 - **Account panel**, built from Window E of the kit: your Roblox headshot
   (`GetUserThumbnailAsync`, fetched off-thread since it yields), your in-game

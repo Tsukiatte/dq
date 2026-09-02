@@ -11,6 +11,7 @@ local NAV = S.NAV
 local HZ = S.HZ
 local LD = S.LD
 local MC = S.MC
+local CL = S.CL
 local K = S.UIKit
 local T = S.UIKit.Theme
 local LocalPlayer = S.LocalPlayer
@@ -169,6 +170,7 @@ local function destructScript()
     setTelegraphPickerEnabled(false)
     setPathEditEnabled(false)
     stopMacroSubsystem()
+    S.setCloneActive(false)
     -- Through setLowDetailEnabled, so the mode flag is cleared first and the
     -- effect restore is not immediately undone.
     setLowDetailEnabled(false)
@@ -505,25 +507,31 @@ local function createControlUI()
     -- the sections belonging to the one you are NOT using are hidden rather
     -- than left on screen to be scrolled past.
     -- ------------------------------------------------------------------
-    local legacySections, macroSections = {}, {}
+    -- Legacy and Clone both fight and pathfind and differ only in how they
+    -- dodge, so they share every section except their own. Macro replaces the
+    -- lot with a recording.
+    local legacySections, macroSections, cloneSections = {}, {}, {}
     local modeIsland
     local function applyMode()
-        local macroMode = MC.mode == "macro"
-        for _, sec in ipairs(legacySections) do sec.holder.Visible = not macroMode end
-        for _, sec in ipairs(macroSections) do sec.holder.Visible = macroMode end
+        local mode = MC.mode
+        for _, sec in ipairs(legacySections) do sec.holder.Visible = mode ~= "macro" end
+        for _, sec in ipairs(macroSections) do sec.holder.Visible = mode == "macro" end
+        for _, sec in ipairs(cloneSections) do sec.holder.Visible = mode == "clone" end
         if modeIsland then modeIsland.render() end
     end
 
     modeIsland = K.segmented(autofarm.body, {
         { value = "legacy", label = "Legacy",
-          tip = "The pathfinding bot: finds enemies, walks to them, fights them, dodges attack markers." },
+          tip = "Finds enemies, walks to them, fights them, and dodges by searching for a safe point each time something lands near you." },
+        { value = "clone", label = "Clone",
+          tip = "The same bot, dodging differently: a visible ring of player-sized volumes around you, each green or red, and it steps into the best green one." },
         { value = "macro", label = "Macro",
           tip = "Replays runs you recorded yourself - where you walked, where you looked, what you pressed." },
     }, function() return MC.mode end, function(v)
         setMacroMode(v)
         applyMode()
         if S.refreshMacroPanel then S.refreshMacroPanel() end
-    end, 1, "Which system drives your character. Only one can be in charge, so only one set of settings is shown.")
+    end, 1, "Which system drives your character. Only one can be in charge, so only its settings are shown.")
     track(modeIsland)
 
     -- ------------------------------------------------------------------
@@ -753,6 +761,44 @@ local function createControlUI()
     end
     refreshNameLists()
     S.refreshNameLists = refreshNameLists
+
+    -- ------------------------------------------------------------------
+    -- Clone evasion
+    -- ------------------------------------------------------------------
+    local cloneSection = K.section(autofarm.body, "Clone ring", nextOrder(),
+        "The ring of volumes Clone mode dodges with. Green means nothing would be hitting you there; red means something would.")
+    table.insert(cloneSections, cloneSection)
+    K.caption(cloneSection.content,
+        "Each volume is the size of your character. A moving hazard turns one red before it arrives, because safety is measured against where the projectile is going, not where it is now.", 1)
+    track(K.slider(cloneSection.content, "Volumes", "How many candidate positions",
+        8, 48, false,
+        function() return CFG.cloneCount end, function(v) CFG.cloneCount = v end, 2,
+        "More volumes means finer choice and more raycasts. 24 is the default."))
+    track(K.slider(cloneSection.content, "Rings", "Spread over this many circles",
+        1, 3, false,
+        function() return CFG.cloneRings end, function(v) CFG.cloneRings = v end, 3,
+        "Two rings give a near option and a far one, and interleave so there are no spokes with gaps between them."))
+    track(K.slider(cloneSection.content, "Radius", "How far out the outer ring sits",
+        4, 40, false,
+        function() return CFG.cloneRadius end, function(v) CFG.cloneRadius = v end, 4,
+        "If an attack is wider than this, every volume goes red and there is nowhere in the ring to go. Widen it for big AOEs."))
+    track(K.slider(cloneSection.content, "Safety margin", "Extra clearance a volume needs",
+        0, 6, true,
+        function() return CFG.cloneSafetyMargin end, function(v) CFG.cloneSafetyMargin = v end, 5,
+        "How much room beyond the hazard's edge a volume must have before it counts as green."))
+    track(K.slider(cloneSection.content, "Commit time", "Seconds before it reconsiders",
+        0.1, 1.5, true,
+        function() return CFG.cloneCommitTime end, function(v) CFG.cloneCommitTime = v end, 6,
+        "Holding a chosen volume briefly stops the character stuttering between two equally good ones under a moving hazard."))
+    track(K.toggle(cloneSection.content, "Show the ring",
+        function() return CFG.showClones end, function(v) CFG.showClones = v end, 7,
+        "Draw the volumes. Turning them off keeps the dodging - only the drawing stops."))
+    track(K.colorRow(cloneSection.content, "Safe colour",
+        function() return CFG.colorCloneSafe end, function(c) CFG.colorCloneSafe = c end, 8,
+        "The pad colour when nothing would be hitting you there."))
+    track(K.colorRow(cloneSection.content, "Danger colour",
+        function() return CFG.colorCloneDanger end, function(c) CFG.colorCloneDanger = c end, 9,
+        "The pad colour when something would."))
 
     -- ------------------------------------------------------------------
     -- Attack Book

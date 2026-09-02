@@ -220,6 +220,12 @@ local function buildConfigTable()
             loopPath = CFG.loopPath,
             waypointClearRadius = CFG.waypointClearRadius,
             macroMode = MC.mode,
+            cloneCount = CFG.cloneCount,
+            cloneRings = CFG.cloneRings,
+            cloneRadius = CFG.cloneRadius,
+            cloneSafetyMargin = CFG.cloneSafetyMargin,
+            cloneCommitTime = CFG.cloneCommitTime,
+            showClones = CFG.showClones,
             macroLoop = CFG.macroLoop,
             macroShowRoute = CFG.macroShowRoute,
             macroRecordBind = MC.recordBind.Name,
@@ -326,9 +332,16 @@ local function loadConfig()
         if combat.recoveryEnabled ~= nil then
             CFG.recoveryEnabled = combat.recoveryEnabled == true
         end
-        if combat.macroMode == "macro" or combat.macroMode == "legacy" then
+        if combat.macroMode == "macro" or combat.macroMode == "legacy"
+            or combat.macroMode == "clone" then
             MC.mode = combat.macroMode
         end
+        CFG.cloneCount = tonumber(combat.cloneCount) or CFG.cloneCount
+        CFG.cloneRings = tonumber(combat.cloneRings) or CFG.cloneRings
+        CFG.cloneRadius = tonumber(combat.cloneRadius) or CFG.cloneRadius
+        CFG.cloneSafetyMargin = tonumber(combat.cloneSafetyMargin) or CFG.cloneSafetyMargin
+        CFG.cloneCommitTime = tonumber(combat.cloneCommitTime) or CFG.cloneCommitTime
+        if combat.showClones ~= nil then CFG.showClones = combat.showClones == true end
         if combat.macroLoop ~= nil then CFG.macroLoop = combat.macroLoop == true end
         if combat.macroShowRoute ~= nil then CFG.macroShowRoute = combat.macroShowRoute == true end
         if type(combat.macroRecordBind) == "string" then
