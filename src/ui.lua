@@ -1087,6 +1087,13 @@ local function createControlUI()
     local cloneSection = K.section(autofarm.body, "Clone grid", nextOrder(),
         "The field of positions Clone mode dodges across. Green means your whole body fits there untouched, red means something would hit you, and the blue trail is the way out it has found.")
     table.insert(cloneSections, cloneSection)
+    local recommendRow = K.buttonRow(cloneSection.content, 0.5)
+    recommendRow.add("Recommended settings", "accent", function()
+        S.applyRecommendedClone()
+        refreshAllWidgets()
+        setMovementState("clone settings reset to recommended")
+    end, "Set the whole of this section back to the values tuned across the dungeons so far: dense grid, honest probe, survival-first caution, sliced evaluation for the frame rate.")
+
     K.caption(cloneSection.content,
         "Discs are the size of your hitbox and overlap, so a safe pocket a few studs wide between two attacks still shows up. The way out is searched cell by cell and never crosses red it could go around.", 1)
     track(K.toggle(cloneSection.content, "Manual run (no autofarm)",
@@ -1146,6 +1153,14 @@ local function createControlUI()
     track(K.toggle(cloneSection.content, "Projectile paths",
         function() return CFG.threatSweepEnabled end, function(v) CFG.threatSweepEnabled = v end, 7.16,
         "A moving hazard heats the whole corridor it is about to sweep, not just the square it is in. Without this the ground in front of an incoming shot reads as perfectly cool and the bot walks into it."))
+    track(K.slider(cloneSection.content, "Projectile lead", "Seconds before a pass that count",
+        0.2, 3, true,
+        function() return CFG.threatProjectileLead end, function(v) CFG.threatProjectileLead = v end, 7.18,
+        "How long before a projectile reaches a spot that spot is already dangerous. Being early is how you get hit, so this is generous. Raise it if the bot still steps into things."))
+    track(K.slider(cloneSection.content, "Projectile wake", "Seconds after it passes",
+        0, 1.5, true,
+        function() return CFG.threatProjectileWake end, function(v) CFG.threatProjectileWake = v end, 7.19,
+        "How long the ground stays dangerous once a projectile has gone by. Short on purpose: behind a projectile is the safest place on the map, and treating it as lethal made the bot flee the one spot that could not hurt it."))
     track(K.slider(cloneSection.content, "Path length", "Seconds of flight treated as dangerous",
         0.5, 8, true,
         function() return CFG.threatSweepTime end, function(v) CFG.threatSweepTime = v end, 7.17,

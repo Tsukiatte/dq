@@ -263,6 +263,8 @@ local function buildConfigTable()
             cloneKeepDistance = CFG.cloneKeepDistance,
             threatWeight = CFG.threatWeight,
             threatMoveAt = CFG.threatMoveAt,
+            threatProjectileLead = CFG.threatProjectileLead,
+            threatProjectileWake = CFG.threatProjectileWake,
             threatProbeRadius = CFG.threatProbeRadius,
             threatMargin = CFG.threatMargin,
             cloneEvalBudget = CFG.cloneEvalBudget,
@@ -414,6 +416,8 @@ local function applyConfigData(data)
         if combat.cloneKeepDistance ~= nil then CFG.cloneKeepDistance = combat.cloneKeepDistance == true end
         CFG.threatWeight = tonumber(combat.threatWeight) or CFG.threatWeight
         CFG.threatMoveAt = tonumber(combat.threatMoveAt) or CFG.threatMoveAt
+        CFG.threatProjectileLead = tonumber(combat.threatProjectileLead) or CFG.threatProjectileLead
+        CFG.threatProjectileWake = tonumber(combat.threatProjectileWake) or CFG.threatProjectileWake
         CFG.threatProbeRadius = tonumber(combat.threatProbeRadius) or CFG.threatProbeRadius
         CFG.threatMargin = tonumber(combat.threatMargin) or CFG.threatMargin
         CFG.cloneEvalBudget = tonumber(combat.cloneEvalBudget) or CFG.cloneEvalBudget
@@ -785,6 +789,33 @@ local function watchDungeonName()
     return true
 end
 
+-- One button's worth of tuning. These are the values arrived at across the
+-- dungeons tested so far, kept here rather than in the UI so the defaults and
+-- the reset cannot drift apart.
+local RECOMMENDED_CLONE = {
+    cloneGridSpacing = 1.5, cloneRadius = 22, cloneMaxCells = 900,
+    cloneEvalBudget = 320, cloneDiscScale = 1.0,
+    threatProbeRadius = 0, threatMargin = 0.4,
+    threatWeight = 2.6, threatLethal = 55, threatMoveAt = 6,
+    threatHorizon = 4.0, threatCurve = 3.0, threatFalloff = 7.0,
+    threatFutureBias = 0.65, threatColorBands = 9,
+    threatSweepTime = 3.0, threatProjectileLead = 1.1, threatProjectileWake = 0.3,
+    cloneEnemyRadius = 12.0, cloneEnemySoftRadius = 20.0,
+    cloneSafeDwell = 1.6, cloneCommitTime = 0.35, cloneDepthBonus = 1.5,
+}
+
+local function applyRecommendedClone()
+    for key, value in pairs(RECOMMENDED_CLONE) do CFG[key] = value end
+    CFG.threatSweepEnabled = true
+    CFG.dodgeProjectiles = true
+    CFG.showThreatGradient = true
+    CFG.cloneAutoRings = true
+    CFG.cloneKeepDistance = true
+    CFG.showClonePrisms = false
+    heavyDebug("Clone", "Clone settings reset to the recommended tuning.")
+end
+
+S.applyRecommendedClone = applyRecommendedClone
 S.setCurrentMap = setCurrentMap
 S.watchDungeonName = watchDungeonName
 S.applyDetectedMap = applyDetectedMap

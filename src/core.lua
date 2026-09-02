@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 3.2.0
+    VERSION : 3.2.1
     BUILD   : 2026-09-01
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "3.2.0"
+local SCRIPT_VERSION = "3.2.1"
 local SCRIPT_BUILD_DATE = "2026-09-01"
 local SCRIPT_CODENAME = "Thrift"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "3.2.1", date = "2026-09-02", notes = "Projectiles were using the ground-attack urgency ramp, which got the timing wrong in both directions: a corridor a shot reached in two seconds read as 12 out of 100 so the bot strolled into it, and the ground BEHIND a projectile stayed at 100, so it fled the safest place on the map. A projectile is dangerous in a WINDOW around the moment it passes, not on a ramp. The core of that window is geometric - the projectile width plus yours, over its speed - so a fast shot is lethal for a fraction of a second while a wide slow tornado owns the ground for seconds either side, from one formula. Around it sit a generous lead, because being early is how you get hit, and a short wake, because gone is gone. Also added a Recommended settings button that resets the whole Clone section to the tuning arrived at so far." },
     { version = "3.2.0", date = "2026-09-02", notes = "Performance. getPlayerHitboxMetrics was being called inside the per-cell threat query, which at 900 cells and two time samples was 3,600 Instance lookups per evaluation, twelve times a second, re-deriving numbers that had not changed - it is computed once per pass now. The two time samples walk the threat sources once instead of twice, halving the dominant cost. The grid is evaluated in SLICES with verdicts persisting between passes, so a large radius no longer has to judge every cell inside one frame. A* stopped clearing four arrays of 900 entries on every call (a quarter of a million pointless writes a second while dodging) in favour of a generation stamp, and its open set is a real binary heap over parallel numeric arrays rather than a linear scan. Painting writes only the properties that actually changed. Separately: the safety probe is now its own setting rather than the drawn disc - probing with the whole body including limbs made the grid blind to any pocket narrower than your shoulders, which is why small safe zones went unseen." },
     { version = "3.1.2", date = "2026-09-02", notes = "A delayed attack is harmless until it nearly lands, and the squared urgency ramp did not say that - it went lethal a FULL SECOND before impact, which quietly turned every marker into a wall. With attacks overlapping, walls everywhere means no route at all; a gradient always leaves somewhere to flow to. The ramp is now cubed and adjustable, so a marker reads green through most of its wind-up and reddens hard at the end. Goal choice weights the heat where you WILL be over the heat where you land, because a square that is cool now and hot in a moment is a trap. And when nothing is safe at all it stops committing to a destination and simply flows downhill every pass, which is the behaviour that survives a saturated field. The discs are a nine-band ramp now - dark green, green, yellow-green, light yellow, dark yellow, orange, red - because across hundreds of discs a two-stop blend cannot show the difference between cool and coolest." },
     { version = "3.1.1", date = "2026-09-02", notes = "Two fixes. A projectile is a line through space and time, not a place: a moving hazard now heats the whole corridor it is about to sweep, weighted by whether it arrives there about when you would, so the ground in front of an oncoming shot stops reading as perfectly cool. Tornadoes and other slow drifters count too, at a much lower speed bar than the sidestep reflex uses. And the bigger one - entering evasion at all was still decided by the OLD binary test, so a heat-40 square was called safe and the bot skipped dodging entirely to go pursue an enemy through it. The field was being computed and then ignored for the one decision that matters. In Clone mode any heat at or above Move at heat now means relocate." },
@@ -538,6 +539,12 @@ CFG.threatMoveAt = 6
 -- square it currently occupies.
 CFG.threatSweepEnabled = true
 CFG.threatSweepTime = 3.0        -- seconds of flight path treated as dangerous
+-- A projectile is dangerous in a WINDOW around the moment it passes, not on a
+-- ramp. Before it arrives you can cross and be gone; once it has passed, the
+-- ground behind it is the safest on the map. The ground-attack ramp got both
+-- of those backwards.
+CFG.threatProjectileLead = 1.1   -- seconds before the pass that still count
+CFG.threatProjectileWake = 0.3   -- seconds after it, before the ground is clear
 CFG.showThreatGradient = true    -- colour discs by heat rather than safe/unsafe
 -- Discrete bands rather than a continuous blend. Across several hundred discs a
 -- smooth ramp turns to mush; banding makes "this patch is cooler than that one"
