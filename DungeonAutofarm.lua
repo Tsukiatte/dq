@@ -11215,7 +11215,11 @@ local function applyConfigData(data)
     table.clear(RT.armDelays)
     if type(data.armDelays) == "table" then
         for name, delay in pairs(data.armDelays) do
-            if type(name) == "string" and type(delay) == "number" and delay >= 0 then RT.armDelays[name] = delay end
+            -- A saved 0 (live from spawn) is not trusted across sessions: the
+            -- rule that wrote it used to blame every attack near a hit, and
+            -- a wrong 0 means an attack is never floor again. Seeds keep
+            -- theirs; anything else earns its 0 again in play.
+            if type(name) == "string" and type(delay) == "number" and delay > 0 then RT.armDelays[name] = delay end
         end
     end
     for name, delay in pairs(S.DEFAULT_ARM_DELAYS or {}) do
