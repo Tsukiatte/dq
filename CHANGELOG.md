@@ -11,6 +11,46 @@ file and that table in sync on every edit.
 
 ---
 
+## 3.2.5 - 2026-09-02
+
+### Every boss attack in the game was missing
+Bosses keep their attacks in a **subfolder of their own**:
+
+```
+enemyProjectiles.Steampunk.bossCannonBeam.hitBox
+enemyProjectiles.Steampunk.bossCannonBeam.precast
+```
+
+The name table was built from **top-level children only**, and then dropped
+Folders to avoid picking up gear — which threw away every per-boss folder, and
+with it **111 attack models**. That is exactly why nothing on the Cyclops Siege
+Bot registered.
+
+Rebuilt recursively from both dumps: **519 names, up from 238**. Equipment is
+still excluded, now at any depth.
+
+Note `hitbox` and `precast` in the list. Every one of those boss models is built
+the same way — a PrimaryPart, a `hitBox` and a `precast` — so those two names
+alone catch attacks from bosses nobody has dumped yet.
+
+### Cornered, and doing nothing about it
+Two separate failures, which compounded into the behaviour you described.
+
+- **The grid only sees about twenty studs.** Boxed in with attacks filling all
+  of it, the genuinely clear ground is outside the window and `bestGoal` cannot
+  consider it — so it picks the least bad cell it *can* see, which when you are
+  cornered is the corner. When the whole window is hot it now samples **16
+  bearings well beyond the grid** and heads for the coolest. Only the direction
+  comes from out there; the A\* still does the local routing, because beyond the
+  window it has no idea what the floor does.
+- **The stuck detector is switched off while dodging** — holding position inside
+  a telegraph's clearance is sometimes correct, so that suppression is right in
+  general. But it meant **nothing at all** was watching for the character being
+  wedged between a wall and an enemy, and it would push into the corner
+  indefinitely. Clone mode has its own now: after `Unstick after` seconds
+  without progress it hops, abandons the goal, and marks what it was pushing
+  against impassable so the search stops choosing the same wall.
+
 ## 3.2.4 - 2026-09-02
 
 ### The drifting yellow circles

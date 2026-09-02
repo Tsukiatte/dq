@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 3.2.4
+    VERSION : 3.2.5
     BUILD   : 2026-09-01
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "3.2.4"
+local SCRIPT_VERSION = "3.2.5"
 local SCRIPT_BUILD_DATE = "2026-09-01"
 local SCRIPT_CODENAME = "Thrift"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "3.2.5", date = "2026-09-02", notes = "Every boss attack in the game was missing from the name table. Bosses keep their attacks in a subfolder of their own - enemyProjectiles.Steampunk.bossCannonBeam and so on - and the table was built from top-level children only, then dropped Folders to avoid picking up gear, which threw away 111 attack models. Rebuilt recursively from both dumps: 519 names, up from 238. Every one of those models is built the same way, a PrimaryPart plus a hitBox and a precast, so those two names now catch attacks from bosses nobody has dumped. Two fixes for being cornered. The grid only sees about twenty studs, so boxed in with attacks filling all of it the clear ground was invisible and the bot settled for the least bad corner; when the whole window is hot it now samples bearings well beyond the grid and heads for the coolest. And the ordinary stuck detector is switched off while dodging, so nothing at all was watching for the character being wedged between a wall and an enemy - it now hops, drops the goal and marks the obstruction impassable." },
     { version = "3.2.4", date = "2026-09-02", notes = "The drifting yellow circles were the wall-edge pass treating cells the slicing had not reached yet as if they were walls. Since 3.2.0 only a slice of the grid is measured per pass, so after every window shift most cells are simply unknown - and each freshly measured cell next to one was being given edge heat of 21, which is 38 percent of lethal and lands exactly in the yellow band. It now only counts neighbours that have actually been measured and found impassable. Separately, heights were compared against the root part centre rather than the floor underfoot, and the root sits about three studs up: Step height 2.5 really described a rise of five and a half, so the slider said one thing and the grid did another. It measures from the floor now." },
     { version = "3.2.3", date = "2026-09-02", notes = "The basic attack no longer needs the mouse. The weapon is a Tool whose Activated event the server handles, and Tool:Activate() raises that same event straight from the client - no cursor involved, so there is nothing to press by accident and nothing to fight the player over. Auto uses it whenever a weapon is equipped and falls back to a click otherwise; Tool only never touches the mouse at all. And when a click IS used it goes to the middle of the viewport rather than wherever the cursor happens to be resting, which is what made the bot press buttons. Allow auto-clicking is the off switch." },
     { version = "3.2.2", date = "2026-09-02", notes = "Terrain is a threat now, not just a floor check. The grid only ever asked whether a cell had a floor within reach, which says nothing about whether you can get there: a wall has a floor, and so does a ledge you would have to jump onto. Both read as open ground and the bot found out by walking into them. Cells are probed upward through the space the character would occupy, so anything solid standing there is out; a rise above Step height is reachable but charged Wall threat in proportion, because a jump mid-fight is a moment spent not dodging. Ground beside anything impassable is warmed too, so the cheapest route stops hugging walls, which is where you get cornered. Wall threat, Step height and the edge warming are all adjustable." },
@@ -490,6 +491,19 @@ CFG.cloneMaxClimb = 6.0
 CFG.cloneStepHeight = 2.5
 CFG.threatWallWeight = 60        -- heat for ground you cannot simply walk onto
 CFG.threatWallSpread = true      -- warm the cells beside a wall as well
+
+-- Looking past the edge of the grid (3.2.5). The window only reaches about
+-- twenty studs; cornered with attacks inside all of it, the genuinely clear
+-- ground is simply invisible and the bot settles for the least bad corner.
+CFG.escapeScanEnabled = true
+CFG.escapeScanRays = 16          -- directions sampled beyond the grid
+CFG.escapeScanFar = 2.8          -- times the grid radius
+CFG.escapeMargin = 12            -- heat it must beat the local best by to bother
+
+-- Being pinned is its own failure, and the ordinary stuck detector is switched
+-- off while dodging.
+CFG.cloneStuckTime = 0.7         -- seconds of no progress before intervening
+CFG.cloneStuckDistance = 1.5     -- studs that counts as progress
 CFG.cloneCommitTime = 0.35       -- hold a chosen clone this long before reconsidering
 -- Where the innermost ring sits. Not a fraction of the radius: a fraction
 -- means the hole around the character grows every time you widen the ring,
@@ -892,6 +906,10 @@ CL.signature = ""
 CL.footprintRadius = 1.5
 CL.footprintCheckedAt = -math.huge
 CL.evalCursor = 1
+CL.progressPos = nil
+CL.progressAt = 0
+CL.escapeDir = nil
+CL.escapeAt = 0
 CL.searchGen = 0
 -- Last verdict per world cell, so a window shift can carry the answer over
 -- instead of blanking it. See the flicker note in clone.lua.

@@ -1167,6 +1167,17 @@ local function createControlUI()
     track(K.toggle(cloneSection.content, "Avoid wall edges",
         function() return CFG.threatWallSpread end, function(v) CFG.threatWallSpread = v end, 6.9,
         "Warm the ground beside anything impassable. Without it the cheapest route hugs every wall, which is exactly where you get cornered when an attack lands."))
+    track(K.toggle(cloneSection.content, "Look past the grid",
+        function() return CFG.escapeScanEnabled end, function(v) CFG.escapeScanEnabled = v end, 6.95,
+        "When everything inside the grid is hot, sample directions well beyond it and head for the coolest. Without this the bot can only choose between cells it can see, and cornered that means picking the least bad corner and staying in it."))
+    track(K.slider(cloneSection.content, "Look distance", "Times the grid radius",
+        1.5, 6, true,
+        function() return CFG.escapeScanFar end, function(v) CFG.escapeScanFar = v end, 6.96,
+        "How far out the escape scan looks. Only the direction is taken from out here; the grid still does the local routing, because out there it has no idea what the floor does."))
+    track(K.slider(cloneSection.content, "Unstick after", "Seconds pinned before it acts",
+        0.2, 3, true,
+        function() return CFG.cloneStuckTime end, function(v) CFG.cloneStuckTime = v end, 6.97,
+        "The ordinary stuck detector is off while dodging, since holding position inside a telegraph is sometimes right. This is the one that watches for being wedged against a wall: it hops, drops the goal and routes around."))
     track(K.slider(cloneSection.content, "Caution", "Studs of detour one point of heat is worth",
         0.5, 8, true,
         function() return CFG.threatWeight end, function(v) CFG.threatWeight = v end, 7,

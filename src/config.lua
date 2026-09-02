@@ -267,6 +267,9 @@ local function buildConfigTable()
             threatWeight = CFG.threatWeight,
             threatMoveAt = CFG.threatMoveAt,
             threatWallWeight = CFG.threatWallWeight,
+            escapeScanEnabled = CFG.escapeScanEnabled,
+            escapeScanFar = CFG.escapeScanFar,
+            cloneStuckTime = CFG.cloneStuckTime,
             threatWallSpread = CFG.threatWallSpread,
             cloneStepHeight = CFG.cloneStepHeight,
             threatProjectileLead = CFG.threatProjectileLead,
@@ -428,6 +431,9 @@ local function applyConfigData(data)
         CFG.threatWeight = tonumber(combat.threatWeight) or CFG.threatWeight
         CFG.threatMoveAt = tonumber(combat.threatMoveAt) or CFG.threatMoveAt
         CFG.threatWallWeight = tonumber(combat.threatWallWeight) or CFG.threatWallWeight
+        CFG.escapeScanFar = tonumber(combat.escapeScanFar) or CFG.escapeScanFar
+        CFG.cloneStuckTime = tonumber(combat.cloneStuckTime) or CFG.cloneStuckTime
+        if combat.escapeScanEnabled ~= nil then CFG.escapeScanEnabled = combat.escapeScanEnabled == true end
         CFG.cloneStepHeight = tonumber(combat.cloneStepHeight) or CFG.cloneStepHeight
         if combat.threatWallSpread ~= nil then CFG.threatWallSpread = combat.threatWallSpread == true end
         CFG.threatProjectileLead = tonumber(combat.threatProjectileLead) or CFG.threatProjectileLead
@@ -815,6 +821,7 @@ local RECOMMENDED_CLONE = {
     threatFutureBias = 0.65, threatColorBands = 9,
     threatSweepTime = 3.0, threatProjectileLead = 1.1, threatProjectileWake = 0.3,
     threatWallWeight = 60, cloneStepHeight = 2.5,
+    escapeScanFar = 2.8, escapeMargin = 12, cloneStuckTime = 0.7,
     cloneEnemyRadius = 12.0, cloneEnemySoftRadius = 20.0,
     cloneSafeDwell = 1.6, cloneCommitTime = 0.35, cloneDepthBonus = 1.5,
 }
@@ -823,6 +830,7 @@ local function applyRecommendedClone()
     for key, value in pairs(RECOMMENDED_CLONE) do CFG[key] = value end
     CFG.threatSweepEnabled = true
     CFG.threatWallSpread = true
+    CFG.escapeScanEnabled = true
     CFG.dodgeProjectiles = true
     CFG.showThreatGradient = true
     CFG.cloneAutoRings = true
