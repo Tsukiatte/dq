@@ -35,6 +35,8 @@ local refreshLowDetail = S.refreshLowDetail
 local serializeMacros = S.serializeMacros
 local serializeZones = S.serializeZones
 local loadZones = S.loadZones
+local serializeRejected = S.serializeRejected
+local loadRejected = S.loadRejected
 local loadMacros = S.loadMacros
 
 local CONFIG_FILE = "DungeonAutofarm_config.json"
@@ -86,6 +88,7 @@ local function syncCurrentMapToStore()
     for _, record in ipairs(HZ.attackBook) do table.insert(book, record) end
     RT.attackData[RT.currentMap] = book
     RT.zoneData[RT.currentMap] = serializeZones()
+    RT.rejectData[RT.currentMap] = serializeRejected()
 
     RT.mapData[RT.currentMap] = { waypath = waypath, keep = keep }
     -- Macros are bulky and live in their own file; the map store only carries
@@ -177,6 +180,8 @@ local function applyMapFromStore(code)
     end
     S.invalidateAttackBook()
     local zoneCount = loadZones(RT.zoneData[code])
+    loadRejected(RT.rejectData[code])
+    S.clearRecommendations()
 
     local keepCount = 0
     for _ in pairs(LD.keepNames) do keepCount = keepCount + 1 end
@@ -247,6 +252,10 @@ local function buildConfigTable()
             cloneAutoRings = CFG.cloneAutoRings,
             cloneRingSpacing = CFG.cloneRingSpacing,
             pathfindingEnabled = CFG.pathfindingEnabled,
+            recommendEnabled = CFG.recommendEnabled,
+            recommendRate = CFG.recommendRate,
+            recommendMax = CFG.recommendMax,
+            recommendTTL = CFG.recommendTTL,
             dodgeEnabled = CFG.dodgeEnabled,
             cloneSafetyMargin = CFG.cloneSafetyMargin,
             cloneCommitTime = CFG.cloneCommitTime,
@@ -298,6 +307,7 @@ local function buildConfigTable()
         maps = maps,
         attacksByMap = RT.attackData,
         zonesByMap = RT.zoneData,
+        rejectedByMap = RT.rejectData,
     }
 end
 
@@ -367,6 +377,10 @@ local function applyConfigData(data)
         CFG.cloneRingSpacing = tonumber(combat.cloneRingSpacing) or CFG.cloneRingSpacing
         if combat.cloneAutoRings ~= nil then CFG.cloneAutoRings = combat.cloneAutoRings == true end
         if combat.pathfindingEnabled ~= nil then CFG.pathfindingEnabled = combat.pathfindingEnabled == true end
+        if combat.recommendEnabled ~= nil then CFG.recommendEnabled = combat.recommendEnabled == true end
+        CFG.recommendRate = tonumber(combat.recommendRate) or CFG.recommendRate
+        CFG.recommendMax = tonumber(combat.recommendMax) or CFG.recommendMax
+        CFG.recommendTTL = tonumber(combat.recommendTTL) or CFG.recommendTTL
         if combat.dodgeEnabled ~= nil then CFG.dodgeEnabled = combat.dodgeEnabled == true end
         CFG.cloneSafetyMargin = tonumber(combat.cloneSafetyMargin) or CFG.cloneSafetyMargin
         CFG.cloneCommitTime = tonumber(combat.cloneCommitTime) or CFG.cloneCommitTime
@@ -457,6 +471,12 @@ local function applyConfigData(data)
     if type(data.attacksByMap) == "table" then
         for code, list in pairs(data.attacksByMap) do
             if MAP_LABELS[code] and type(list) == "table" then RT.attackData[code] = list end
+        end
+    end
+    table.clear(RT.rejectData)
+    if type(data.rejectedByMap) == "table" then
+        for code, list in pairs(data.rejectedByMap) do
+            if MAP_LABELS[code] and type(list) == "table" then RT.rejectData[code] = list end
         end
     end
     table.clear(RT.zoneData)

@@ -515,6 +515,8 @@ local function isDamageBrick(part)
     if HZ.ownParts[part] then return false end
     local partName = string.lower(part.Name)
     if HZ.ownNames[partName] then return false end
+    -- Told "no" in the recommendations list: not an attack, whatever it looks like.
+    if HZ.rejectedNames[partName] then return false end
 
     if isOwnedByPlayerOrTeammate(part) then return false end
 
@@ -1894,6 +1896,8 @@ local function lowDetailStep()
     LD.cursor = cursor
 end
 
+local recommendStep
+
 local function worldIndexStep()
     local now = os.clock()
 
@@ -1952,6 +1956,7 @@ local function worldIndexStep()
     -- keep happening (and HZ.recentParts keeps being pruned) with the loop off.
     trackRecentParts(now)
     updateZones()
+    if recommendStep then recommendStep(now) end
     lowDetailStep()
 end
 
@@ -2056,6 +2061,229 @@ local function recordDamageEvent(damage, now)
     for i = 1, math.min(#suspects, CFG.damageSuspectLimit) do
         learnAttackPart(suspects[i].part, damage, now)
     end
+end
+
+-- =========================================================================
+-- RECOMMENDATIONS (2.14.0)
+--
+-- The scorer already has an opinion about every part on screen. Freeze-and-
+-- pick made you find the right one with the mouse in a field of held copies;
+-- this puts the opinion forward instead, one part at a time, each held in the
+-- world in its own colour with a number on it, and you answer from a list.
+--
+-- Yes writes a book entry from the signature captured when it was put forward,
+-- so it works after the part is long gone. No is remembered per map and vetoes
+-- the name in isDamageBrick, so the bot stops dodging it too. The entry
+-- outlives the part on purpose: an attack is on screen for a fraction of a
+-- second, and that was the whole reason freeze existed.
+-- =========================================================================
+
+local RECOMMEND_PALETTE = {
+    Color3.fromRGB(80, 220, 255),   -- cyan
+    Color3.fromRGB(255, 90, 220),   -- magenta
+    Color3.fromRGB(255, 150, 40),   -- orange
+    Color3.fromRGB(150, 255, 80),   -- lime
+    Color3.fromRGB(170, 110, 255),  -- violet
+    Color3.fromRGB(255, 200, 60),   -- gold
+    Color3.fromRGB(60, 230, 190),   -- teal
+    Color3.fromRGB(255, 120, 120),  -- salmon
+}
+
+local function recommendFolder()
+    if HZ.recommendFolder and HZ.recommendFolder.Parent then return HZ.recommendFolder end
+    local folder = Instance.new("Folder")
+    folder.Name = "Recommended"
+    folder.Parent = getVisualRoot()
+    HZ.recommendFolder = folder
+    return folder
+end
+
+local function dropRecommendation(index)
+    local entry = table.remove(HZ.recommendations, index)
+    if not entry then return end
+    HZ.recommendedNames[entry.partName] = nil
+    if entry.copy then entry.copy:Destroy() end
+end
+
+local function clearRecommendations()
+    for i = #HZ.recommendations, 1, -1 do dropRecommendation(i) end
+    if HZ.recommendFolder then HZ.recommendFolder:Destroy() end
+    HZ.recommendFolder = nil
+    if S.refreshRecommendPanel then S.refreshRecommendPanel() end
+end
+
+-- A held copy of the part in its list colour, numbered, so what the list is
+-- talking about is unmistakable in the world.
+local function makeRecommendCopy(part, entry)
+    local ok, copy = pcall(function() return part:Clone() end)
+    if not ok or not copy then return nil end
+    for _, child in ipairs(copy:GetChildren()) do child:Destroy() end
+    copy.Name = "Recommended_" .. entry.index
+    copy.Anchored = true
+    copy.CanCollide = false
+    copy.CanTouch = false
+    copy.CanQuery = false
+    copy.CastShadow = false
+    copy.Material = Enum.Material.Neon
+    copy.Color = entry.color
+    copy.Transparency = 0.35
+    copy.Parent = recommendFolder()
+
+    local hl = Instance.new("Highlight")
+    hl.FillColor = entry.color
+    hl.OutlineColor = entry.color
+    hl.FillTransparency = 0.6
+    hl.OutlineTransparency = 0
+    hl.Adornee = copy
+    hl.Parent = copy
+
+    local tag = Instance.new("BillboardGui")
+    tag.Size = UDim2.fromOffset(200, 30)
+    tag.StudsOffsetWorldSpace = Vector3.new(0, copy.Size.Y * 0.5 + 2, 0)
+    tag.AlwaysOnTop = true
+    tag.MaxDistance = 300
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.fromScale(1, 1)
+    label.BackgroundTransparency = 1
+    label.Font = Enum.Font.GothamBold
+    label.TextColor3 = entry.color
+    label.TextStrokeTransparency = 0.1
+    label.TextSize = 15
+    label.Text = string.format("#%d  %s", entry.index, entry.name)
+    label.Parent = tag
+    tag.Parent = copy
+    return copy
+end
+
+local function playerPosition()
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    return root and root.Position or nil
+end
+
+-- Whether a candidate is worth putting forward at all.
+local function recommendable(part)
+    if not part.Parent then return false end
+    if part:GetAttribute("DQZone") then return false end
+    if RT.visualRoot and part:IsDescendantOf(RT.visualRoot) then return false end
+    local lname = string.lower(part.Name)
+    if HZ.recommendedNames[lname] or HZ.rejectedNames[lname] or HZ.ownNames[lname] then return false end
+    if findAttackRecord(part) then return false end
+    return true
+end
+
+recommendStep = function(now)
+    -- Expire entries whose part has been gone long enough, whatever the rate.
+    local changed = false
+    for i = #HZ.recommendations, 1, -1 do
+        local entry = HZ.recommendations[i]
+        if not entry.gone and not entry.part.Parent then
+            entry.gone = now
+            changed = true
+        end
+        if entry.gone and now - entry.gone > CFG.recommendTTL then
+            dropRecommendation(i)
+            changed = true
+        end
+    end
+
+    if CFG.recommendEnabled and #HZ.recommendations < CFG.recommendMax
+        and now - HZ.lastRecommendTime >= 1 / math.max(CFG.recommendRate, 0.05) then
+        -- Nearest first: the one that matters is the one about to hit you.
+        local origin = playerPosition()
+        local best, bestDist = nil, math.huge
+        for _, part in ipairs(HZ.candidates) do
+            if recommendable(part) then
+                local d = origin and (part.Position - origin).Magnitude or 0
+                if d < bestDist then best, bestDist = part, d end
+            end
+        end
+        if best then
+            HZ.lastRecommendTime = now
+            HZ.recommendSerial = HZ.recommendSerial + 1
+            local model = best:FindFirstAncestorOfClass("Model")
+            local entry = {
+                part = best,
+                sig = partSignature(best),
+                name = autoAttackName(best),
+                partName = string.lower(best.Name),
+                parentName = (best.Parent and best.Parent ~= Workspace) and best.Parent.Name or "",
+                index = HZ.recommendSerial,
+                color = RECOMMEND_PALETTE[(HZ.recommendSerial - 1) % #RECOMMEND_PALETTE + 1],
+                since = now,
+                gone = nil,
+                distance = bestDist,
+                melee = model ~= nil and model:FindFirstChildOfClass("Humanoid") ~= nil,
+                moving = getHazardMotion(best) ~= nil,
+            }
+            entry.copy = makeRecommendCopy(best, entry)
+            HZ.recommendedNames[entry.partName] = true
+            table.insert(HZ.recommendations, entry)
+            changed = true
+            heavyDebug("Recommend", string.format("#%d '%s' put forward (%s, %.0f studs away).",
+                entry.index, entry.name, describeRecord(entry.sig), bestDist))
+        end
+    end
+
+    if changed and S.refreshRecommendPanel then S.refreshRecommendPanel() end
+end
+
+-- Yes: it is an attack. A book record from the signature captured when it was
+-- put forward, so this works after the part has gone.
+local function acceptRecommendation(index)
+    local entry = HZ.recommendations[index]
+    if not entry then return false end
+    local record = entry.sig
+    record.name = entry.name
+    record.hits = 0
+    record.damage = 0
+    record.melee = entry.melee
+    record.enabled = not entry.melee
+    record.moving = entry.moving
+    record.learnedAt = os.time()
+    table.insert(HZ.attackBook, record)
+    invalidateAttackBook()
+    heavyDebug("Recommend", string.format("#%d '%s' confirmed and added to this map's Attack Book%s.",
+        entry.index, entry.name, entry.melee and " (inside a creature model, so OFF by default)" or ""))
+    dropRecommendation(index)
+    if S.refreshRecommendPanel then S.refreshRecommendPanel() end
+    if S.refreshAttackBookPanel then S.refreshAttackBookPanel() end
+    return true
+end
+
+-- No: it only looks like one. Remembered per map, and vetoed as a hazard from
+-- now on, so the bot stops dodging it as well as stops asking.
+local function rejectRecommendation(index)
+    local entry = HZ.recommendations[index]
+    if not entry then return false end
+    HZ.rejectedNames[entry.partName] = true
+    heavyDebug("Recommend", string.format(
+        "#%d '%s' rejected: not an attack on this map. It will not be dodged or asked about again.",
+        entry.index, entry.name))
+    for i = #HZ.recommendations, 1, -1 do
+        if HZ.recommendations[i].partName == entry.partName then dropRecommendation(i) end
+    end
+    HZ.catalogDirty = true
+    if S.refreshRecommendPanel then S.refreshRecommendPanel() end
+    return true
+end
+
+local function serializeRejected()
+    local out = {}
+    for name in pairs(HZ.rejectedNames) do table.insert(out, name) end
+    table.sort(out)
+    return out
+end
+
+local function loadRejected(list)
+    table.clear(HZ.rejectedNames)
+    if type(list) == "table" then
+        for _, name in ipairs(list) do
+            if type(name) == "string" then HZ.rejectedNames[string.lower(name)] = true end
+        end
+    end
+    HZ.catalogDirty = true
+    return #serializeRejected()
 end
 
 local function removeAttackRecord(index)
@@ -2370,5 +2598,10 @@ S.serializeZones = serializeZones
 S.loadZones = loadZones
 S.rebuildZones = rebuildZones
 S.clearZones = clearZones
+S.acceptRecommendation = acceptRecommendation
+S.rejectRecommendation = rejectRecommendation
+S.clearRecommendations = clearRecommendations
+S.serializeRejected = serializeRejected
+S.loadRejected = loadRejected
 S.clearZonePreview = clearZonePreview
 end

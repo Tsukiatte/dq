@@ -11,6 +11,36 @@ file and that table in sync on every edit.
 
 ---
 
+## 2.14.0 - 2026-09-02 - "Second opinion"
+
+### Recommendations
+The scorer already has an opinion about every part on screen. Freeze-and-pick
+made you find the right one with the mouse in a field of held copies; this
+**puts the opinion forward instead** and you answer from a list.
+
+- **One candidate at a time**, nearest first, at a rate you set (**Rate**,
+  recommendations per second). Never one already in the book, already answered,
+  or already in the list.
+- Each is **held in the world in its own colour with a number on it** - a neon
+  copy with a highlight and a label - and listed in the Attacks panel with the
+  same colour down its left edge. "The cyan one" means the same thing in both
+  places.
+- **Tick**: it is an attack. A book entry is written from the signature
+  captured when it was put forward, **so it works after the part is long
+  gone**. Inside a creature model it is added OFF, like a learned swing hitbox.
+- **Cross**: it only looks like one. **Remembered per map**, and vetoed in
+  `isDamageBrick`, so the bot stops dodging it as well as stops asking.
+- **Entries outlive their part on purpose.** An attack is on screen for a
+  fraction of a second, and that was the whole reason freeze existed. They
+  expire a while after the part is gone (`recommendTTL`), or when you answer.
+- **List size** caps how many wait at once; nothing new arrives until you
+  answer something or one expires. **Clear list** drops them all without
+  learning or rejecting anything.
+- Freeze, Select attack and Draw zone remain underneath as the manual route.
+
+### Also
+- List entries can carry a colour bar; tick and cross icons join the kit.
+
 ## 2.13.0 - 2026-09-02 - "Floor"
 
 ### Testing switches
