@@ -687,8 +687,6 @@ local function evaluateCells(root)
                     end
                 end
 
-                local enclosure = samples > 0 and (sum / samples) * weight or 0
-
                 -- Cover is a discount, not a bonus: it removes a share of the
                 -- danger rather than inventing safety, so a covered cell that is
                 -- also standing in a pool of fire is still a bad idea.
@@ -696,6 +694,15 @@ local function evaluateCells(root)
                 covered, coverBudget = coverAt(cell, coverParams, coverBudget)
                 cell.covered = covered
                 local relief = covered and (1 - CFG.coverRelief) or 1
+
+                -- And being pressed against the thing that is shielding you is
+                -- the WHOLE POINT, so cover is exempt from the enclosure
+                -- penalty. Without this the two rules fight each other: cover
+                -- pulls the bot behind the pillar and enclosure - which counts
+                -- any solid neighbour as heat - shoves it back out into the
+                -- open, which is where the beams are.
+                local enclosure = samples > 0 and (sum / samples) * weight or 0
+                if covered then enclosure = enclosure * (1 - CFG.coverRelief) end
 
                 cell.threat = (cell.baseThreat or huge) * relief + enclosure
                 cell.threatLater = (cell.baseThreatLater or huge) * relief + enclosure

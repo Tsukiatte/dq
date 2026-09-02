@@ -352,6 +352,12 @@ local function refreshThreatSources()
     -- The dominant source of danger, for the cover test: whatever is throwing
     -- the most at us. A radial burst has a centre, and that centre is what you
     -- need something solid between yourself and.
+    -- Where the danger RADIATES FROM, for the cover test. This has to be the
+    -- thing casting the attacks, not the attacks themselves: a fan of beams is
+    -- a dozen separate zones, and a ray from the middle of one beam to a cell
+    -- says nothing about whether anything is shielding you. The boss is the
+    -- convergence point, so the nearest enemy wins outright and an announced
+    -- zone is only a fallback for when there is no enemy to blame.
     TH.origin = nil
     local bestScore = huge
     local rootPart = character and character:FindFirstChild("HumanoidRootPart")
@@ -361,14 +367,14 @@ local function refreshThreatSources()
             local d = (epos - here).Magnitude
             if d < bestScore then bestScore, TH.origin = d, epos end
         end
-        -- An announced attack that is about to land outranks a distant enemy:
-        -- it is the thing actually filling the floor.
-        local soonest = huge
-        for _, zone in ipairs(PC.zones) do
-            local eta = zone.impactAt - Workspace:GetServerTimeNow()
-            if eta > 0 and eta < soonest and eta < CFG.threatHorizon then
-                soonest = eta
-                TH.origin = zone.position or (zone.cframe and zone.cframe.Position)
+        if not TH.origin then
+            local soonest = huge
+            for _, zone in ipairs(PC.zones) do
+                local eta = zone.impactAt - Workspace:GetServerTimeNow()
+                if eta > 0 and eta < soonest and eta < CFG.threatHorizon then
+                    soonest = eta
+                    TH.origin = zone.position or (zone.cframe and zone.cframe.Position)
+                end
             end
         end
     end
