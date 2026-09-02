@@ -825,6 +825,21 @@ local function createControlUI()
     -- Modules: which panels exist on screen.
     -- ------------------------------------------------------------------
     local panelToggles = {}
+    -- The menu key, above everything else in Modules: it is the one setting
+    -- that decides whether you can reach the rest.
+    local menuKeyRow = K.buttonRow(modules.body, 0)
+    local menuKeyButton
+    local function refreshMenuKeyButton()
+        if not menuKeyButton then return end
+        menuKeyButton.Text = RT.menuBindCapture and "press a key" or ("Menu key: " .. CFG.menuKey)
+        menuKeyButton.BackgroundColor3 = RT.menuBindCapture and T.AccentMid or T.SurfaceElement
+        menuKeyButton.TextColor3 = RT.menuBindCapture and T.TextOnAccent or T.TextPrimary
+    end
+    menuKeyButton = menuKeyRow.add("Menu key: " .. CFG.menuKey, "ghost", function()
+        RT.menuBindCapture = not RT.menuBindCapture
+        refreshMenuKeyButton()
+    end, "The key that opens and closes the whole interface. Click, then press the key you want. Escape cancels.")
+
     K.caption(modules.body,
         "Switch a panel off and it stays off when you open the interface. This panel is always here, so there is always a way back.", 1)
 
@@ -1103,58 +1118,58 @@ local function createControlUI()
     -- ------------------------------------------------------------------
     -- Clone evasion
     -- ------------------------------------------------------------------
-    local cloneSection = K.section(autofarm.body, "Clone ring", nextOrder(),
-        "The ring of volumes Clone mode dodges with. Green means nothing would be hitting you there; red means something would.")
+    local cloneSection = K.section(autofarm.body, "Clone grid", nextOrder(),
+        "The field of positions Clone mode dodges across. Green means your whole body fits there untouched, red means something would hit you, and the blue trail is the way out it has found.")
     table.insert(cloneSections, cloneSection)
     K.caption(cloneSection.content,
-        "Each volume is the size of your character. A moving hazard turns one red before it arrives, because safety is measured against where the projectile is going, not where it is now.", 1)
+        "Discs are the size of your hitbox and overlap, so a safe pocket a few studs wide between two attacks still shows up. The way out is searched cell by cell and never crosses red it could go around.", 1)
     track(K.toggle(cloneSection.content, "Manual run (no autofarm)",
-        function() return CFG.cloneManual end, function(v) CFG.cloneManual = v end, 15,
-        "The ring dodges for you and nothing else runs: no target hunting, no pursuit, no waypoints. You drive, it pulls you out of attacks."))
-    track(K.slider(cloneSection.content, "Volumes", "How many candidate positions",
-        8, CFG.cloneMaxVolumes, false,
-        function() return CFG.cloneCount end, function(v) CFG.cloneCount = v end, 2,
-        "More volumes means finer choice and more raycasts. 24 is the default."))
-    track(K.slider(cloneSection.content, "Rings", "Spread over this many circles",
-        1, CFG.cloneMaxRings, false,
-        function() return CFG.cloneRings end, function(v) CFG.cloneRings = v end, 3,
-        "The fewest rings to use. With Auto rings on, more are added as the radius grows so the gap between rings never opens up."))
-    track(K.slider(cloneSection.content, "Radius", "How far out the outer ring sits",
-        4, 40, false,
+        function() return CFG.cloneManual end, function(v) CFG.cloneManual = v end, 2,
+        "The grid dodges for you and nothing else runs: no target hunting, no pursuit, no waypoints. You drive, it pulls you out of attacks."))
+    track(K.slider(cloneSection.content, "Spacing", "Studs between discs",
+        1, 4, true,
+        function() return CFG.cloneGridSpacing end, function(v) CFG.cloneGridSpacing = v end, 3,
+        "Smaller finds smaller pockets and costs more tests. 1.5 suits boss fights."))
+    track(K.slider(cloneSection.content, "Radius", "How far the grid reaches",
+        6, 40, false,
         function() return CFG.cloneRadius end, function(v) CFG.cloneRadius = v end, 4,
-        "If an attack is wider than this, every volume goes red and there is nowhere in the ring to go. Widen it for big AOEs."))
-    track(K.slider(cloneSection.content, "Inner radius", "Where the first ring sits",
-        2, 12, true,
-        function() return CFG.cloneInnerRadius end, function(v) CFG.cloneInnerRadius = v end, 5,
-        "The nearest volumes stay this close no matter how wide the ring is. It used to be a fraction of the radius, so widening the ring opened a hole around you."))
-    track(K.toggle(cloneSection.content, "Auto rings",
-        function() return CFG.cloneAutoRings end, function(v) CFG.cloneAutoRings = v end, 6,
-        "Add rings as the radius grows so the gap between them stays about Ring spacing. Rings becomes the minimum rather than the answer."))
-    track(K.slider(cloneSection.content, "Ring spacing", "Studs between rings with Auto rings on",
-        3, 12, true,
-        function() return CFG.cloneRingSpacing end, function(v) CFG.cloneRingSpacing = v end, 7,
-        "Smaller means denser coverage and more raycasts."))
-    track(K.slider(cloneSection.content, "Safety margin", "Extra clearance a volume needs",
-        0, 6, true,
-        function() return CFG.cloneSafetyMargin end, function(v) CFG.cloneSafetyMargin = v end, 8,
-        "How much room beyond the hazard's edge a volume must have before it counts as green."))
+        "Capped by the cell budget: at 1.5 spacing and 900 cells the grid reaches about 22 studs whatever you ask for."))
+    track(K.slider(cloneSection.content, "Cell budget", "Most discs at once",
+        100, 1600, false,
+        function() return CFG.cloneMaxCells end, function(v) CFG.cloneMaxCells = v end, 5,
+        "The cap is the promise, the radius is the request. Every disc is tested against every attack each evaluation."))
+    track(K.slider(cloneSection.content, "Safety margin", "Clearance beyond your hitbox",
+        0, 4, true,
+        function() return CFG.cloneSafetyMargin end, function(v) CFG.cloneSafetyMargin = v end, 6,
+        "How much room past the edge of an attack a disc needs before it counts as green. Raise it if you are being grazed."))
+    track(K.slider(cloneSection.content, "Danger cost", "How much it hates crossing red",
+        5, 60, false,
+        function() return CFG.cloneDangerCost end, function(v) CFG.cloneDangerCost = v end, 7,
+        "A red cell costs this many green cells to cross. It still will, when there is no way around."))
+    track(K.slider(cloneSection.content, "Depth bonus", "Prefer the middle of a safe area",
+        0, 4, true,
+        function() return CFG.cloneDepthBonus end, function(v) CFG.cloneDepthBonus = v end, 8,
+        "Each cell of distance from the nearest red is worth this many studs of extra travel. 0 means the nearest green wins."))
     track(K.slider(cloneSection.content, "Commit time", "Seconds before it reconsiders",
         0.1, 1.5, true,
         function() return CFG.cloneCommitTime end, function(v) CFG.cloneCommitTime = v end, 9,
-        "Holding a chosen volume briefly stops the character stuttering between two equally good ones under a moving hazard."))
-    track(K.toggle(cloneSection.content, "Show the ring",
+        "Holding a chosen goal briefly stops the character stuttering between two equally good regions. The path to it is re-planned constantly."))
+    track(K.toggle(cloneSection.content, "Show the grid",
         function() return CFG.showClones end, function(v) CFG.showClones = v end, 10,
-        "Draw the volumes. Turning them off keeps the dodging - only the drawing stops."))
+        "Draw the discs. Turning them off keeps the dodging - only the drawing stops."))
+    track(K.toggle(cloneSection.content, "Tall prisms",
+        function() return CFG.showClonePrisms end, function(v) CFG.showClonePrisms = v end, 11,
+        "A player-sized prism on every disc. Off by default: at boss density that is hundreds of parts."))
     track(K.colorRow(cloneSection.content, "Safe colour",
-        function() return CFG.colorCloneSafe end, function(c) CFG.colorCloneSafe = c end, 11,
-        "The pad colour when nothing would be hitting you there."))
+        function() return CFG.colorCloneSafe end, function(c) CFG.colorCloneSafe = c end, 12,
+        "Nothing would be hitting you there. Dimmer at the edge of a safe area."))
     track(K.colorRow(cloneSection.content, "Danger colour",
-        function() return CFG.colorCloneDanger end, function(c) CFG.colorCloneDanger = c end, 12,
-        "The pad colour when something would."))
+        function() return CFG.colorCloneDanger end, function(c) CFG.colorCloneDanger = c end, 13,
+        "Something would."))
+    track(K.colorRow(cloneSection.content, "Path colour",
+        function() return CFG.colorClonePath end, function(c) CFG.colorClonePath = c end, 14,
+        "The way out, and the cell it is heading for."))
 
-    -- ------------------------------------------------------------------
-    -- Attack Book
-    -- ------------------------------------------------------------------
     -- The Attack Book lives in the Attacks panel (it is per map, and it
     -- belongs with the pickers that fill it). These are the widgets it uses.
     local bookList = attackList
@@ -1916,9 +1931,23 @@ local function createControlUI()
         function(v) CFG.showHud = v end,
         "The panel in the bottom-left corner. Unlike the rest it stays on screen with the interface closed - it is the only thing that does.")
     table.insert(sliderConnections, UserInputService.InputBegan:Connect(function(input, processed)
+        if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
+        if RT.menuBindCapture then
+            -- Escape cancels rather than binding itself.
+            if input.KeyCode ~= Enum.KeyCode.Escape and input.KeyCode ~= Enum.KeyCode.Unknown then
+                CFG.menuKey = input.KeyCode.Name
+                heavyDebug("UI", "Menu key set to " .. CFG.menuKey .. ".")
+            end
+            RT.menuBindCapture = false
+            refreshMenuKeyButton()
+            return
+        end
         if processed then return end
-        if input.KeyCode == Enum.KeyCode.RightShift then
-            setOpen(not autofarm.frame.Visible)
+        -- Toggle the interface state, not a window's visibility: with a window
+        -- pinned, "is Autofarm visible" was true while the interface was
+        -- closed, and the key could never open it again.
+        if input.KeyCode.Name == CFG.menuKey then
+            setOpen(not guiOpen)
         end
     end))
 

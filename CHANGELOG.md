@@ -11,6 +11,46 @@ file and that table in sync on every edit.
 
 ---
 
+## 2.15.0 - 2026-09-02 - "Grid"
+
+### Clone mode: a grid, and a search across it
+The ring is gone. Clone mode now keeps a **grid anchored to the world**, and
+dodges by **searching across it** rather than dashing to a point.
+
+- **Dense.** Discs the size of your hitbox every 1.5 studs, overlapping, so a
+  safe pocket a few studs wide between two boss attacks still shows up. Green
+  means your whole body fits there untouched: the test uses the hitbox radius
+  plus **Safety margin**, not the centre point. Raise the margin if you are
+  being grazed.
+- **World-anchored.** A cell has an identity, so its floor height is raycast
+  once and cached, and its verdict stays valid while you walk toward it. The
+  ring slid under you and was re-derived every frame.
+- **Pathfinding.** Dijkstra from your cell across the window. A red cell costs
+  **Danger cost** green ones to cross, so it is crossed only when there is no
+  way around - and there often is not, when you are standing inside the
+  attack. Pits and walls are never crossed. Diagonals require both orthogonal
+  neighbours clear, so the corner of a red cell is never clipped on the way
+  past. The old ring checked the straight line for walls only and would run
+  through a red strip to a green node behind it.
+- **Depth.** A wave from every red cell outward tells each green one how far it
+  is from trouble, and **Depth bonus** lets the chooser prefer the interior of
+  a safe region to a single green cell about to close. Edge cells draw dimmer.
+- **Walls are learned by trying.** A blocked first step marks that cell
+  impassable until its next refresh and the next search routes around it.
+- **Drawn.** The path is a blue trail across the discs and the goal is solid
+  blue, so when it runs somewhere you can see why.
+- The cell budget caps the cost (900 by default, about 22 studs of reach at 1.5
+  spacing). **Tall prisms** are off by default at that density.
+
+### Also
+- **The menu key is rebindable**, at the top of Modules. Click, press a key,
+  Escape cancels. Only a name `Enum.KeyCode` actually has is accepted on load,
+  so a typo in the config cannot lock the interface behind a key that does not
+  exist.
+- **Fixed: a pinned window stopped the menu key from reopening the interface.**
+  The handler toggled on "is Autofarm visible", which was true while pinned and
+  closed, so the key only ever closed. It toggles the interface state now.
+
 ## 2.14.0 - 2026-09-02 - "Second opinion"
 
 ### Recommendations
