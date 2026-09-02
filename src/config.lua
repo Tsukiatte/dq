@@ -269,6 +269,8 @@ local function buildConfigTable()
             adaptiveLookahead = CFG.adaptiveLookahead,
             threatWallWeight = CFG.threatWallWeight,
             threatEnclosureWeight = CFG.threatEnclosureWeight,
+            coverEnabled = CFG.coverEnabled,
+            coverRelief = CFG.coverRelief,
             threatEnclosureRange = CFG.threatEnclosureRange,
             escapeScanEnabled = CFG.escapeScanEnabled,
             escapeScanFar = CFG.escapeScanFar,
@@ -436,6 +438,8 @@ local function applyConfigData(data)
         if combat.adaptiveLookahead ~= nil then CFG.adaptiveLookahead = combat.adaptiveLookahead == true end
         CFG.threatWallWeight = tonumber(combat.threatWallWeight) or CFG.threatWallWeight
         CFG.threatEnclosureWeight = tonumber(combat.threatEnclosureWeight) or CFG.threatEnclosureWeight
+        CFG.coverRelief = tonumber(combat.coverRelief) or CFG.coverRelief
+        if combat.coverEnabled ~= nil then CFG.coverEnabled = combat.coverEnabled == true end
         CFG.threatEnclosureRange = tonumber(combat.threatEnclosureRange) or CFG.threatEnclosureRange
         CFG.escapeScanFar = tonumber(combat.escapeScanFar) or CFG.escapeScanFar
         CFG.cloneStuckTime = tonumber(combat.cloneStuckTime) or CFG.cloneStuckTime
@@ -829,6 +833,7 @@ local RECOMMENDED_CLONE = {
     threatWallWeight = 60, cloneStepHeight = 2.5,
     escapeScanFar = 2.8, escapeMargin = 12, cloneStuckTime = 0.7,
     threatEnclosureWeight = 0.55, threatEnclosureRange = 6.0,
+    coverRelief = 0.75, threatSliceMid = 1.0, threatSliceLate = 2.6,
     cloneEnemyRadius = 12.0, cloneEnemySoftRadius = 20.0,
     cloneSafeDwell = 1.6, cloneCommitTime = 0.35, cloneDepthBonus = 1.5,
 }
@@ -838,6 +843,7 @@ local function applyRecommendedClone()
     CFG.threatSweepEnabled = true
     CFG.threatWallSpread = true
     CFG.escapeScanEnabled = true
+    CFG.coverEnabled = true
     CFG.dodgeProjectiles = true
     CFG.showThreatGradient = true
     CFG.cloneAutoRings = true

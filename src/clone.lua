@@ -22,6 +22,7 @@ local isPathSegmentClear = S.isPathSegmentClear
 local releaseFacing = S.releaseFacing
 local getThreatAt = S.getThreatAt
 local refreshThreatSources = S.refreshThreatSources
+local getThreatSlices = S.getThreatSlices
 local TH = S.TH
 
 -- =========================================================================
@@ -158,6 +159,7 @@ local function pruneCaches()
     if n > 6000 then
         table.clear(CL.floorCache)
         table.clear(CL.verdictCache)
+        table.clear(CL.coverCache)
     end
 end
 
@@ -225,6 +227,7 @@ local function buildClones()
             standable = false, safe = false, holds = false, depth = 0, eta = 0,
             threat = huge, threatLater = huge, wallHeat = 0, blocked = false,
             baseThreat = huge, baseThreatLater = huge, measured = false,
+            h0 = huge, h1 = huge, h2 = huge,
             onPath = false, isGoal = false,
             pad = pad, prism = prism, halfHeight = totalHeight * 0.5,
         }
@@ -344,6 +347,7 @@ local function positionCells(root)
                 cell.blocked = verdict.blocked or false
                 cell.baseThreat = verdict.baseThreat or huge
                 cell.baseThreatLater = verdict.baseThreatLater or huge
+                cell.h0, cell.h1, cell.h2 = verdict.h0, verdict.h1, verdict.h2
             else
                 cell.standable = false
                 cell.safe = false
@@ -422,6 +426,10 @@ local function paintCells()
                 color = pathColor
             elseif cell.onPath then
                 color = trailColor
+            elseif cell.covered and CFG.coverEnabled then
+                -- Tinted toward the cover colour so hiding reads as a decision
+                -- rather than the bot wandering behind a pillar.
+                color = heatColor((cell.threat or 0) / lethal):Lerp(CFG.colorCover, 0.45)
             elseif CFG.showThreatGradient then
                 color = heatColor((cell.threat or 0) / lethal)
             elseif cell.threat >= lethal then
@@ -453,6 +461,54 @@ local function paintCells()
             end
         end
     end
+end
+
+-- COVER
+--
+-- When a radial burst fills the arena there is no open safe ground, and hunting
+-- for the least bad patch of it is the wrong question. The right one is whether
+-- there is something solid between you and where the attack is coming from -
+-- and the arena pillars are exactly that. Until now the grid saw them only as
+-- obstacles to route around, never as the answer.
+--
+-- One ray from the threat origin to the cell, budgeted and cached by world
+-- position: a full pass over the grid would be hundreds of casts.
+local function coverAt(cell, params, budget)
+    if not CFG.coverEnabled or not TH.origin then return false, budget end
+    local entry = CL.coverCache[cell.key]
+    local now = os.clock()
+    if entry and (now - entry.t) < CFG.coverRefresh then return entry.covered, budget end
+    if budget <= 0 then return entry and entry.covered or false, budget end
+
+    local origin = TH.origin
+    local target = Vector3.new(cell.x, (cell.y or origin.Y) + 2.5, cell.z)
+    local delta = target - origin
+    local hit = Workspace:Raycast(origin, delta, params)
+    -- Covered when something solid stops the ray well short of the cell: a
+    -- graze at the very end is the cell's own floor, not cover.
+    local covered = false
+    if hit then
+        covered = (hit.Position - target).Magnitude > 2.5
+    end
+    CL.coverCache[cell.key] = { covered = covered, t = now }
+    return covered, budget - 1
+end
+
+-- Heat at an arbitrary moment, from the three stored slices. Piecewise linear
+-- between them and flat outside, which is plenty: the slices exist to capture
+-- "this is fine now and lethal in two seconds", not to model a curve exactly.
+local function cellHeatAt(cell, t)
+    local h0, h1, h2 = cell.h0, cell.h1, cell.h2
+    if not h0 then return cell.threat or huge end
+    local mid, late = CFG.threatSliceMid, CFG.threatSliceLate
+    if t <= 0 then return h0 end
+    if t >= late then return h2 end
+    if t <= mid then
+        local f = t / max(mid, 0.01)
+        return h0 + (h1 - h0) * f
+    end
+    local f = (t - mid) / max(late - mid, 0.01)
+    return h1 + (h2 - h1) * f
 end
 
 -- Throttled AND sliced. Floor, standability, then the heat at the moment we
@@ -553,6 +609,7 @@ local function evaluateCells(root)
             cell.holds = max(nowHeat, laterHeat) < lethal
             cell.safe = nowHeat < lethal
         else
+            cell.h0, cell.h1, cell.h2 = huge, huge, huge
             cell.baseThreat = huge
             cell.baseThreatLater = huge
             cell.threat = huge
@@ -564,6 +621,7 @@ local function evaluateCells(root)
             standable = cell.standable, safe = cell.safe, holds = cell.holds,
             threat = cell.threat, threatLater = cell.threatLater,
             baseThreat = cell.baseThreat, baseThreatLater = cell.baseThreatLater,
+            h0 = cell.h0, h1 = cell.h1, h2 = cell.h2,
             wallHeat = cell.wallHeat, blocked = cell.blocked,
         }
     end
@@ -591,6 +649,11 @@ local function evaluateCells(root)
     if CFG.threatWallSpread then
         local n, side = CL.reach, CL.side
         local spacing = max(CFG.cloneGridSpacing, 0.5)
+        local coverBudget = CFG.coverEnabled and CFG.coverBudget or 0
+        local coverParams = RaycastParams.new()
+        coverParams.FilterType = Enum.RaycastFilterType.Exclude
+        coverParams.FilterDescendantsInstances = getRaycastExclusions(nil)
+        pcall(function() coverParams.RespectCanCollide = true end)
         local ring = max(2, floor(CFG.threatEnclosureRange / spacing))
         local weight = CFG.threatEnclosureWeight
         local lethal = CFG.threatLethal
@@ -625,8 +688,17 @@ local function evaluateCells(root)
                 end
 
                 local enclosure = samples > 0 and (sum / samples) * weight or 0
-                cell.threat = (cell.baseThreat or huge) + enclosure
-                cell.threatLater = (cell.baseThreatLater or huge) + enclosure
+
+                -- Cover is a discount, not a bonus: it removes a share of the
+                -- danger rather than inventing safety, so a covered cell that is
+                -- also standing in a pool of fire is still a bad idea.
+                local covered
+                covered, coverBudget = coverAt(cell, coverParams, coverBudget)
+                cell.covered = covered
+                local relief = covered and (1 - CFG.coverRelief) or 1
+
+                cell.threat = (cell.baseThreat or huge) * relief + enclosure
+                cell.threatLater = (cell.baseThreatLater or huge) * relief + enclosure
                 cell.safe = cell.threat < lethal
                 cell.holds = max(cell.threat, cell.threatLater) < lethal
             end
@@ -667,6 +739,10 @@ end
 -- the same guarantee for free: an entry whose stamp is not the current
 -- generation is simply treated as unset.
 local gScore, fScore, cameFrom, stamp = {}, {}, {}, {}
+-- Arrival time at each node, carried alongside the cost. This is what makes the
+-- search space (x, z, t) rather than (x, z): a cell reached the long way round
+-- is entered LATER, and by then it may be lethal.
+local tScore = {}
 -- Binary min-heap over two parallel NUMERIC arrays. A heap of {k, f} tables
 -- would allocate per push, which is exactly the churn this is avoiding; two
 -- number arrays allocate nothing after they have grown once.
@@ -728,8 +804,12 @@ local function astar(goalK, allowLethal)
     CL.searchGen = CL.searchGen + 1
     local gen = CL.searchGen
 
+    local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+    local speed = max((humanoid and humanoid.WalkSpeed) or 16, 4)
+
     stamp[startK] = gen
     gScore[startK] = 0
+    tScore[startK] = 0
     cameFrom[startK] = nil
     local count = heapPush(0, startK, heuristic(cells[startK].x, cells[startK].z, gx, gz))
 
@@ -740,6 +820,7 @@ local function astar(goalK, allowLethal)
 
         local cell = cells[topK]
         local base = gScore[topK]
+        local baseTime = tScore[topK]
         local zeroed = topK - 1
         local di, dj = zeroed % side - n, floor(zeroed / side) - n
         local cellY = cell.y or 0
@@ -751,7 +832,8 @@ local function astar(goalK, allowLethal)
                 local other = cells[nk]
                 if other.inRange and other.standable
                     and abs((other.y or 0) - cellY) <= maxClimb then
-                    local passable = allowLethal or other.threat < lethal
+                    local arriveGuess = baseTime + spacing * nb[3] / speed
+                    local passable = allowLethal or cellHeatAt(other, arriveGuess) < lethal
                     if passable and nb[4] then
                         -- Diagonal: both orthogonal neighbours must be walkable,
                         -- or the corner of a hot cell gets clipped on the way.
@@ -762,13 +844,19 @@ local function astar(goalK, allowLethal)
                     end
                     if passable then
                         local step = nb[3]
-                        -- Heat paid per unit of exposure, so crossing something
-                        -- hot quickly costs less than loitering in something warm.
-                        local heat = min(other.threat, 200) * weight * step
-                        local tentative = base + spacing * step + heat
+                        local stepDistance = spacing * step
+                        -- When we would actually ENTER this cell, having walked
+                        -- everything before it. The whole point of the third
+                        -- dimension: a telegraph that goes live while we are
+                        -- still crossing now costs us, where sampling at the
+                        -- straight-line ETA said the cell was fine.
+                        local arriveAt = baseTime + stepDistance / speed
+                        local heat = min(cellHeatAt(other, arriveAt), 200) * weight * step
+                        local tentative = base + stepDistance + heat
                         if stamp[nk] ~= gen or tentative < gScore[nk] then
                             stamp[nk] = gen
                             gScore[nk] = tentative
+                            tScore[nk] = arriveAt
                             cameFrom[nk] = topK
                             count = heapPush(count, nk,
                                 tentative + heuristic(other.x, other.z, gx, gz) * spacing)
@@ -881,6 +969,62 @@ local function buildPath(parent, start, goalK)
     if goalK then CL.cells[goalK].isGoal = true end
 end
 
+-- LAST RESORT
+--
+-- Every branch below that used to give up now comes here instead. Enveloped by
+-- something, with no goal, no route, or a "best" cell that is the one you are
+-- already standing in, the old code simply stopped - which is the single worst
+-- thing to do while standing inside an attack.
+--
+-- This ignores the grid entirely. It does not need a safe destination; it needs
+-- a direction that is less bad than here, and any of the three below will do.
+local function fleeBlindly(humanoid, root, reason)
+    local rootPos = root.Position
+    local direction
+
+    -- 1. The bearing the beyond-grid scan liked, if it has one.
+    direction = CL.escapeDir
+
+    -- 2. Directly away from whatever is throwing the most at us.
+    if not direction and TH.origin then
+        local away = rootPos - TH.origin
+        away = Vector3.new(away.X, 0, away.Z)
+        if away.Magnitude > 0.5 then direction = away.Unit end
+    end
+
+    -- 3. The coolest of the eight directions immediately around us, judged
+    -- fresh rather than from the cached field, because the field is what has
+    -- just failed us.
+    if not direction then
+        S.prepareThreatPass()
+        local getThreatPair = S.getThreatPair
+        local step = max(CFG.cloneGridSpacing, 0.5) * 4
+        local bestHeat = huge
+        for i = 0, 7 do
+            local angle = (i / 8) * math.pi * 2
+            local dx, dz = math.cos(angle), math.sin(angle)
+            local probe = Vector3.new(rootPos.X + dx * step, rootPos.Y, rootPos.Z + dz * step)
+            local heat = getThreatPair(probe, 0.2, 0.8)
+            if heat < bestHeat then
+                bestHeat = heat
+                direction = Vector3.new(dx, 0, dz)
+            end
+        end
+    end
+
+    if not direction then return false end
+
+    local target = rootPos + direction * (max(CFG.cloneGridSpacing, 0.5) * 8)
+    releaseFacing(humanoid)
+    humanoid:MoveTo(Vector3.new(target.X, rootPos.Y, target.Z))
+    NAV.lastIssuedMove = target
+    NAV.driving = true
+    heavyDebugThrottled("clone_flee", 1.0, "Clone",
+        "No usable route (" .. reason .. ") - running anyway rather than standing in it.")
+    setMovementState("CLONE - running (" .. reason .. ")")
+    return true
+end
+
 -- The dodge. Called from the hazard branch of the main loop while clone mode
 -- is on. Returns true if it is driving the character.
 local function runCloneEvasion(humanoid, root)
@@ -952,10 +1096,9 @@ local function runCloneEvasion(humanoid, root)
 
     if not goalK then
         CL.goalI, CL.goalJ = nil, nil
-        setMovementState("CLONE - nowhere to stand")
         buildPath(nil, nil, nil)
         paintCells()
-        return false
+        return fleeBlindly(humanoid, root, "nowhere to stand")
     end
 
     -- Lethal cells are impassable; if that leaves no route, run it again with
@@ -967,10 +1110,9 @@ local function runCloneEvasion(humanoid, root)
             "Every route out crosses something lethal; taking the coolest one rather than standing still.")
     end
     if not parent then
-        setMovementState("CLONE - no route")
         buildPath(nil, nil, nil)
         paintCells()
-        return false
+        return fleeBlindly(humanoid, root, "no route out")
     end
 
     buildPath(parent, startK, goalK)
@@ -979,7 +1121,16 @@ local function runCloneEvasion(humanoid, root)
     local goal = CL.cells[goalK]
     if #CL.path == 0 or Vector3.new(goal.x - rootPos.X, 0, goal.z - rootPos.Z).Magnitude <= 1.0 then
         CL.goalI, CL.goalJ = nil, nil
-        setMovementState(string.format("CLONE holding (heat %.0f)", goal.threat))
+        -- Standing still is only ever right when HERE is actually cool. The
+        -- chooser can land on the cell we are already in - everything else
+        -- scored worse - and that used to mean holding position inside an
+        -- attack because nowhere better existed. Nowhere better is not a
+        -- reason to stay in it.
+        local hereHeat = S.getThreatAt(rootPos, 0) or 0
+        if hereHeat >= CFG.threatMoveAt then
+            return fleeBlindly(humanoid, root, string.format("enveloped, heat %.0f", hereHeat))
+        end
+        setMovementState(string.format("CLONE holding (heat %.0f)", hereHeat))
         return true
     end
 

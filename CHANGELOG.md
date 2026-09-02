@@ -11,6 +11,49 @@ file and that table in sync on every edit.
 
 ---
 
+## 3.5.0 - 2026-09-02 - "Space-time"
+
+### Space-time A\*
+Each cell now stores its heat at **three fixed moments**, and the search
+interpolates for the time it would *actually* arrive having gone round whatever
+was in the way. Arrival time is carried alongside cost through the search, which
+makes the space genuinely `(x, z, t)` rather than `(x, z)`.
+
+The rule that was not being enforced before: **if a telegraph goes live along
+the route while you are still crossing, the route is discarded.** Sampling each
+cell at its straight-line ETA said "that cell is fine" for a cell you would only
+reach much later, by which time it was lethal.
+
+The geometry per threat source is computed once and only the time weighting is
+evaluated three times, so the third slice is nearly free.
+
+### Cover
+When a radial burst fills the arena there is **no open safe ground**, and
+hunting for the least bad patch of it is the wrong question. The right one is
+whether something solid is between you and where the attack is coming from —
+and the arena pillars are exactly that. The grid used to see them only as
+obstacles to route around.
+
+One ray from the dominant threat origin to the cell, budgeted and cached by
+world position. **Cover is a discount, not a bonus**: it removes a share of the
+danger rather than inventing safety, so a covered spot standing in a pool of
+fire is still a bad idea. Covered cells are tinted blue so hiding reads as a
+decision rather than the bot wandering behind a pillar.
+
+### Enveloped no longer means stopping
+Three branches used to give up and stand still, and the worst was the quietest:
+`bestGoal` can pick **the cell you are already standing in** — everything else
+scored worse — so `#path == 0` and it held position *inside the attack*.
+
+Every one of those now runs anyway:
+1. The bearing the beyond-grid scan liked.
+2. Directly away from whatever is throwing the most at us.
+3. The coolest of the eight directions around us, judged fresh rather than from
+   the cached field — because the field is what has just failed.
+
+And the current cell is no longer offered as a destination while it is hot.
+Nowhere better existing is not a reason to stay in an attack.
+
 ## 3.4.0 - 2026-09-02 - "Ground truth first"
 
 ### The capture found it

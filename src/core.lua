@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 3.4.0
+    VERSION : 3.5.0
     BUILD   : 2026-09-01
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "3.4.0"
+local SCRIPT_VERSION = "3.5.0"
 local SCRIPT_BUILD_DATE = "2026-09-01"
-local SCRIPT_CODENAME = "Ground truth first"
+local SCRIPT_CODENAME = "Space-time"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "3.5.0", date = "2026-09-02", notes = "Space-time A*. Each cell stores its heat at three fixed moments and the search interpolates for the time it would ACTUALLY arrive, having gone round whatever was in the way - so a telegraph that goes live while we are still crossing now costs us, where sampling at the straight-line ETA said the cell was fine. Arrival time is carried alongside cost through the search, which makes the space (x, z, t) rather than (x, z). Cover: one ray from the dominant threat origin to a cell says whether something solid is in the way, and cover discounts that danger rather than inventing safety - when a radial burst fills the arena there is no open safe ground and a pillar is the answer, where the grid used to see pillars only as obstacles to route around. And being enveloped no longer stops it: every branch that used to give up - no goal, no route, or a best cell that is the one you are already standing in - now runs on a bearing anyway, because nowhere better existing is not a reason to stand in an attack." },
     { version = "3.4.0", date = "2026-09-02", notes = "The capture found it. In this game the hitBox - the part that actually damages you - is created at Transparency 1, fully invisible, exactly as GAME_NOTES records for PrecastHitbox. And isDamageBrick rejected anything at 0.99 or above BEFORE checking a single name, so hammerBotHit.hitBox and spinBotSpin.hitBox were thrown away with their names sitting in the table, never reached: 895 of 900 parts missed. Appearance scoring was overruling ground truth. Detection is now structural and runs first: a part whose name or ancestor model is a known attack, or a hitBox/precast inside any non-character model, is an attack whatever it looks like - which also generalises to bosses nobody has dumped, since every attack in the game is built that way. Transparency and the CanCollide gate now apply only to the guesswork underneath. Own-attack learning can no longer claim shared grammar names like precast or hitBox, which would have poisoned every attack in the game at once." },
     { version = "3.3.0", date = "2026-09-02", notes = "Attack capture: Record what spawns logs every part that appears near you along with the verdict, then Save capture writes it to a file. A place file says what exists in ReplicatedStorage; it does not say what a part is named, parented or shaped when it actually spawns in a fight, and both dumps had an empty Workspace.enemies - so misses have been diagnosed by inference twice and got it wrong twice. The misses are the point: a part judged harmless appears in no other log. Enclosure: cells inherit a share of the heat around them, so a green pocket ringed by red reads hot because it is a trap, and walls count as heat so corners do too. Open ground now beats an enclosed pocket of equal local safety, which is what stops the bot backing into a corner instead of strafing out. And adaptive lookahead, taken from the standalone heatmap prototype: horizons stretch when WalkSpeed is low, because a slow character cannot dodge reactively and has to see danger earlier." },
     { version = "3.2.6", date = "2026-09-02", notes = "The pathfinding window is a circle rather than a square. The corners of a square are its furthest cells - 1.4 times the radius - so they were the least useful ground in the grid and the most expensive to path to, and they were a quarter of the total work. Dropping them costs nothing and buys about three more studs of sight for the same cell budget: 24 studs instead of 21 at the default. The cell array stays square because the indexing is arithmetic; the corners are simply never active, never measured, never drawn and never routed through - and because they are never measured they cannot be mistaken for walls by the edge pass." },
@@ -498,6 +499,22 @@ CFG.threatWallSpread = true      -- warm the cells beside a wall as well
 -- now and have nowhere to go the moment it closes. Cells inherit a share of the
 -- heat around them, so an enclosed pocket reads hotter than open ground of the
 -- same local safety and the bot strafes out instead of backing into a corner.
+-- Space-time slices (3.5.0). Each cell stores its heat at three moments, and
+-- the search interpolates for the time it would actually arrive having gone
+-- round whatever was in the way. Sampling a cell at its straight-line ETA is a
+-- different question from what it will be when you really get there.
+-- Cover (3.5.0). When a radial burst fills the arena there is no open safe
+-- ground, and the answer is not to find the least bad patch of it - it is to
+-- put something solid between you and the source. The arena pillars are exactly
+-- that, and until now the grid treated them only as obstacles to route round.
+CFG.coverEnabled = true
+CFG.coverRelief = 0.75           -- share of a source's heat that cover removes
+CFG.coverBudget = 90             -- line-of-sight rays per pass
+CFG.coverRefresh = 0.4           -- seconds a cover verdict is trusted
+CFG.colorCover = Color3.fromRGB(90, 160, 255)
+
+CFG.threatSliceMid = 1.0         -- seconds; the middle sample
+CFG.threatSliceLate = 2.6        -- seconds; the late sample
 CFG.threatEnclosureWeight = 0.55
 CFG.threatEnclosureRange = 6.0   -- studs out to sample for a way through
 
@@ -942,6 +959,9 @@ CL.progressPos = nil
 CL.progressAt = 0
 CL.escapeDir = nil
 CL.escapeAt = 0
+CL.coverCache = {}
+CL.coverCursor = 1
+CL.coverOrigin = nil
 -- Indices of the cells inside the circle. The array stays square because the
 -- indexing is arithmetic; the corners are simply never active.
 CL.activeCells = {}
@@ -980,6 +1000,7 @@ PC.failed = false
 PC.total = 0
 
 TH.enemyPositions = {}
+TH.origin = nil
 TH.projectiles = {}
 TH.LETHAL = 100
 PC.received = 0                  -- payloads seen on the bridge, parsed or not
