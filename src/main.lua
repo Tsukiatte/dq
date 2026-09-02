@@ -498,7 +498,7 @@ local function startAutofarm()
     -- farming is paused: it is bounded and cheap, and it keeps the catalog warm
     -- for when the loop is switched back on.
     local lastScanClock = 0
-    RT.enemyScanConnection = RunService.Heartbeat:Connect(function()
+    RT.enemyScanConnection = RunService.Heartbeat:Connect(function(delta)
         if RT.destroyed then return end
 
         local indexOk, indexErr = xpcall(worldIndexStep, debug.traceback)
@@ -560,7 +560,10 @@ local function startAutofarm()
     end)
 
     -- Unconditional Main Combat Loop
-    RT.mainConnection = RunService.Heartbeat:Connect(function()
+    RT.mainConnection = RunService.Heartbeat:Connect(function(delta)
+        -- Real frame time, for movers that step the character by hand rather
+        -- than handing a destination to the humanoid.
+        RT.frameDelta = delta or (1 / 60)
         if RT.destroyed or not RT.farmEnabled then return end
 
         -- xpcall, not pcall: a silent pcall here hid every downstream fault and

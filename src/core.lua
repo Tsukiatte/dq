@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 3.5.2
+    VERSION : 3.6.0
     BUILD   : 2026-09-01
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "3.5.2"
+local SCRIPT_VERSION = "3.6.0"
 local SCRIPT_BUILD_DATE = "2026-09-01"
-local SCRIPT_CODENAME = "Space-time"
+local SCRIPT_CODENAME = "Actuator"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "3.6.0", date = "2026-09-02", notes = "Every dodge was issued as Humanoid:MoveTo, and that is most of why the dodging looked broken however good the decision was. MoveTo accelerates for about a quarter of a second, arrives only within roughly two studs, and re-plans on every call - so in a three-stud gap between two beams it arrives late and off the mark. Standing in the middle of attacks, stopping at the edge of one instead of going around, and scraping along walls are all descriptions of an actuator failing rather than a chooser failing. Movement is now selectable: walk is the old MoveTo, steer uses Humanoid:Move, velocity writes the horizontal assembly velocity directly for instant direction changes and exact arrival while physics still applies, and tween steps the root CFrame for stud-exact movement that ignores collision. Velocity is the default. Also added Simple mode: the clone system has sixty-eight settings and they have repeatedly been caught fighting each other, so Simple turns off every heuristic that has done so and leaves exact geometry, exact timing and precise movement." },
     { version = "3.5.2", date = "2026-09-02", notes = "The shuffling on the spot with clear ground in sight had three causes and they compounded. Goal choice took the plain argmin, so two near-equal cells traded places as the field updated and the bot took a step toward each in turn; a new goal must now beat the held one by a margin. A full A* ran EVERY FRAME - sixty times a second - against a goal that changes a few times a second, so the route wobbled and MoveTo was re-issued at a slightly different first step each time; the path is reused between plans now and only rebuilt when the goal moves, the window slides, the next step goes lethal, or a short interval elapses. And since 3.2.0 only a slice of the grid is re-measured per pass, so cells carry answers of different ages - a stale cell that looks wonderful wins, gets refreshed, turns out terrible, and another stale cell wins instead. Measurement age is now a cost in the score." },
     { version = "3.5.1", date = "2026-09-02", notes = "Two things in the new cover code were wrong, found by watching a clip of the Midgardian Champion. The cover ray was cast from the soonest announced zone rather than the enemy, and a fan of beams is a dozen separate zones - a ray from the middle of one beam to a cell says nothing about whether anything is shielding you. The boss is where the beams converge, so the nearest enemy is the origin outright and a zone is only a fallback when there is no enemy. And enclosure was fighting cover: pressing against the thing shielding you is the entire point, but enclosure counts any solid neighbour as heat, so it shoved the bot back out from behind the pillar into the open where the beams are. Covered cells are now largely exempt from it." },
     { version = "3.5.0", date = "2026-09-02", notes = "Space-time A*. Each cell stores its heat at three fixed moments and the search interpolates for the time it would ACTUALLY arrive, having gone round whatever was in the way - so a telegraph that goes live while we are still crossing now costs us, where sampling at the straight-line ETA said the cell was fine. Arrival time is carried alongside cost through the search, which makes the space (x, z, t) rather than (x, z). Cover: one ray from the dominant threat origin to a cell says whether something solid is in the way, and cover discounts that danger rather than inventing safety - when a radial burst fills the arena there is no open safe ground and a pillar is the answer, where the grid used to see pillars only as obstacles to route around. And being enveloped no longer stops it: every branch that used to give up - no goal, no route, or a best cell that is the one you are already standing in - now runs on a bearing anyway, because nowhere better existing is not a reason to stand in an attack." },
@@ -550,6 +551,14 @@ CFG.escapeMargin = 12            -- heat it must beat the local best by to bothe
 -- off while dodging.
 -- Anti-dither (3.5.2). Three separate things were making it shuffle on the
 -- spot with clear ground in sight, and they compounded.
+-- How the character is driven (3.6.0). MoveTo accelerates for a quarter of a
+-- second, arrives within about two studs, and re-plans every call - which in a
+-- three-stud gap between beams means arriving late and off the mark. Most of
+-- what looks like bad decisions is that.
+--   walk | steer | velocity | tween
+CFG.moveMode = "velocity"
+CFG.moveArriveRadius = 1.2       -- studs; MoveTo's own tolerance is nearer 2
+
 CFG.cloneGoalHysteresis = 45     -- a new goal must beat the held one by this
 CFG.clonePathInterval = 0.12     -- seconds between full re-plans
 CFG.cloneFreshnessBias = 18      -- score penalty for a cell measured long ago
@@ -896,6 +905,8 @@ RT.macroData = {}
 -- the working config stays one small readable thing.
 RT.configs = {}
 RT.blurEffect = nil
+-- Seconds since the last frame, for movers that step by hand.
+RT.frameDelta = 1 / 60
 -- Which windows are pinned, by name. Pinned windows stay on screen after the
 -- interface is closed, so a readout you want while playing does not cost you
 -- the whole GUI.

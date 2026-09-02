@@ -1125,6 +1125,25 @@ local function createControlUI()
         "The field of positions Clone mode dodges across. Green means your whole body fits there untouched, red means something would hit you, and the blue trail is the way out it has found.")
     table.insert(cloneSections, cloneSection)
     local recommendRow = K.buttonRow(cloneSection.content, 0.5)
+    track(K.dropdown(cloneSection.content, "Movement", {
+        { value = "velocity", label = "Velocity - instant, precise" },
+        { value = "walk", label = "Walk - Humanoid:MoveTo" },
+        { value = "steer", label = "Steer - Humanoid:Move" },
+        { value = "tween", label = "Tween - exact, ignores collision" },
+    }, function() return CFG.moveMode end, function(v) CFG.moveMode = v end, 0.2,
+        "How the character is actually driven, which turns out to be most of why dodging looks bad. MoveTo accelerates for a quarter of a second and arrives within about two studs - in a three-stud gap between beams that means late and off the mark, however good the decision was. Velocity changes direction the same frame and arrives exactly. Tween is exact to the stud and ignores collision entirely, which is why it is precise and why it is conspicuous."))
+    track(K.slider(cloneSection.content, "Arrive within", "Studs that count as there",
+        0.3, 4, true,
+        function() return CFG.moveArriveRadius end, function(v) CFG.moveArriveRadius = v end, 0.3,
+        "How close counts as arrived. MoveTo's own tolerance is nearer two studs, which is wider than some of the gaps you need to stand in."))
+
+    local recommendRow2 = K.buttonRow(cloneSection.content, 0.4)
+    recommendRow2.add("Simple mode", "accent", function()
+        S.applySimpleClone()
+        refreshAllWidgets()
+        setMovementState("clone set to simple mode")
+    end, "Exact geometry, exact timing, precise movement, and none of the heuristics that have been caught fighting each other. This is the configuration to judge the dodging by: when it fails there are few enough moving parts left to say why.")
+
     recommendRow.add("Recommended settings", "accent", function()
         S.applyRecommendedClone()
         refreshAllWidgets()

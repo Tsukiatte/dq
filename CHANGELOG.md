@@ -11,6 +11,50 @@ file and that table in sync on every edit.
 
 ---
 
+## 3.6.0 - 2026-09-02 - "Actuator"
+
+### The dodging was never the problem
+Every dodge in this script was issued as `Humanoid:MoveTo`. That is pathing-and-
+walking built for getting somewhere *eventually*, and it:
+
+- **accelerates from a standstill**, taking roughly a quarter of a second to
+  reach WalkSpeed — in a fight where telegraphs land in 0.7s, a third of the
+  budget is gone before the character is really moving;
+- **arrives only within about two studs**, which in a three-stud gap between two
+  beams means standing on the edge of one;
+- **re-plans on every call**, so re-issuing it each frame restarts the
+  acceleration;
+- **slides along geometry**, so a wall turns a dodge into a scrape.
+
+"Stands in the middle of attacks", "goes to the edge of an attack instead of
+around it", "barely keeps its distance from walls" are all descriptions of an
+**actuator** failing, not a chooser failing. The grid can pick the perfect cell
+and MoveTo will still put you two studs off it, a quarter of a second late.
+
+**Movement is now selectable:**
+
+| mode | behaviour |
+|---|---|
+| `walk` | `Humanoid:MoveTo`. What it always did. |
+| `steer` | `Humanoid:Move` each frame — no arrival tolerance, still accelerates. |
+| **`velocity`** | **Writes horizontal assembly velocity directly. Instant direction changes, exact speed, physics still applies so walls and floors behave. Default.** |
+| `tween` | Steps the root CFrame. Stud-exact and instantaneous, ignores collision — which is both why it is precise and why it is conspicuous. |
+
+### Simple mode
+The clone system has **sixty-eight settings**. Each was a fair response to a
+specific failure, but together they interact in ways nobody can hold in their
+head — enclosure fought cover, freshness fought hysteresis, the wall pass fought
+the slicing. Three of the last six bug fixes were one heuristic undoing another.
+
+**Simple mode** keeps exact geometry, exact timing and precise movement, and
+turns off every heuristic that has been caught fighting another one. It also
+disables slicing so the field is one consistent snapshot rather than a mosaic of
+different ages.
+
+That is roughly what a script doing this well in a few hundred lines actually
+contains, and it is the configuration to judge the dodging by: when it fails,
+there are few enough moving parts left to say why.
+
 ## 3.5.2 - 2026-09-02
 
 ### Shuffling on the spot with clear ground in sight
