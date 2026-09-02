@@ -1869,6 +1869,8 @@ local function saveAttackLog()
     local body = table.concat(header, "\n") .. "\n"
         .. "WHAT WAS NEXT TO YOU EACH TIME YOU TOOK DAMAGE\n"
         .. table.concat(HZ.hitLog, "\n") .. "\n" .. string.rep("-", 150) .. "\n"
+        .. "ATTACK LIFECYCLES (when each attack was seen, armed, marked over and removed; never done + removed late = it lingered)\n"
+        .. table.concat(HZ.lifeLog, "\n") .. "\n" .. string.rep("-", 150) .. "\n"
         .. table.concat(HZ.diagnoseLines, "\n")
     local ok, err = pcall(function() writefile(CFG.diagnoseFile, body) end)
     if ok then
@@ -2562,6 +2564,31 @@ local function updateArming(now)
         end
         HZ.armState[part] = st
     end
+    -- Lifecycles (4.8.0): one line per attack Model once it is gone or a
+    -- second past done - first seen, armed, over, removed, and how far its
+    -- precast and its visuals ever faded. This is what says why something
+    -- stayed red, instead of a guess from a screenshot.
+    for model, st in pairs(HZ.arming) do
+        if not st.logged and ((not model.Parent) or now - st.seen > 1.0 or (st.doneAt and now - st.doneAt > 1.0)) then
+            st.logged = true
+            local vm = visualMin(st)
+            HZ.lifeLog[#HZ.lifeLog + 1] = string.format(
+                "%-28s seen@%6.1f  armed %s  done %s  %s  pcMin %.2f pcNow %s  visMinEver %.2f visNow %s  hb=%s pc=%s vis=%d%s",
+                st.name, st.spawn,
+                st.armedAt and string.format("+%.1fs", st.armedAt - st.spawn) or "never",
+                st.doneAt and string.format("+%.1fs", st.doneAt - st.spawn) or "never",
+                model.Parent and "still present" or string.format("removed +%.1fs", now - st.spawn),
+                st.minT < math.huge and st.minT or 1,
+                (st.precast and st.precast.Parent) and string.format("%.2f", st.precast.Transparency) or "gone",
+                st.visMinEver < math.huge and st.visMinEver or 1,
+                vm < math.huge and string.format("%.2f", vm) or "none",
+                st.hitBox and (st.hitBox.Parent and "yes" or "GONE") or "no",
+                st.precast and "yes" or "no", #st.visuals,
+                st.byInvisible and "  (armed by invisibility)" or "")
+            while #HZ.lifeLog > 400 do table.remove(HZ.lifeLog, 1) end
+        end
+    end
+
     -- What leaves the detected set: played-out attacks entirely, anchor parts
     -- always (a 4x1x2 PrimaryPart at the centre of every attack is not a
     -- hazard, and it was a five-stud hot spot), and decoration inside a Model
