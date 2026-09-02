@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 2.7.1
+    VERSION : 2.7.2
     BUILD   : 2026-09-01
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "2.7.1"
+local SCRIPT_VERSION = "2.7.2"
 local SCRIPT_BUILD_DATE = "2026-09-01"
 local SCRIPT_CODENAME = "Kitbuilt"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "2.7.2", date = "2026-09-01", notes = "flexFill no longer reads the instance size back to rebuild it - every caller wants full height, so the height is a parameter. Tooling: build.py now runs the smoke test itself and fails on it. smoke.py always did exit non-zero; the 2.7.1 push slipped through because the command piped it to grep, which matched the error text and returned success. Folding it into build.py removes the chance to invoke it wrongly." },
     { version = "2.7.1", date = "2026-09-01", notes = "Fixed the 2.7.0 interface: every row label rendered blank because UIFlexItem Fill was applied to labels whose base width was already 100%, so the flex pass had negative slack and collapsed them to nothing (the buttons were fine, their base width was 0). Flex is gone; widths are explicit arithmetic. Also fixed the HUD title chip collapsing to a bare accent line (nested automatic sizing inside a clipping frame) and the Status row reading 'Movement: Movement: ...'." },
     { version = "2.7.0", date = "2026-09-01", notes = "The interface is rebuilt from the Figma kit: two accordion windows plus an always-on HUD in the bottom-left, hover tooltips on everything after a second, and a Legacy/Macro island at the top that hides whichever system is not in charge. Every overlay is now switchable and recolourable, targeting gained lowest/highest HP modes and dodging a master switch. Macros record your FACING as well as your position, save to any map you pick from a dropdown into their own DungeonAutofarm_macros.json, and can be played back per map. Fixed: the record keybind stopped working after the first recording because starting one disconnected the listener it shared." },
     { version = "2.6.0", date = "2026-09-01", notes = "Macros are a top-level mode with their own panel and their own button, no longer nested inside the waypoint editor. Recording now switches the free-fly editor OFF: a macro is recorded from your ordinary first-person camera, and a detached camera would capture a route the character never walked. Switching the idle mode to Macros disables the editor for the same reason." },
