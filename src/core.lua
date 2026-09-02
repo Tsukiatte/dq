@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 3.2.2
+    VERSION : 3.2.3
     BUILD   : 2026-09-01
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "3.2.2"
+local SCRIPT_VERSION = "3.2.3"
 local SCRIPT_BUILD_DATE = "2026-09-01"
 local SCRIPT_CODENAME = "Thrift"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "3.2.3", date = "2026-09-02", notes = "The basic attack no longer needs the mouse. The weapon is a Tool whose Activated event the server handles, and Tool:Activate() raises that same event straight from the client - no cursor involved, so there is nothing to press by accident and nothing to fight the player over. Auto uses it whenever a weapon is equipped and falls back to a click otherwise; Tool only never touches the mouse at all. And when a click IS used it goes to the middle of the viewport rather than wherever the cursor happens to be resting, which is what made the bot press buttons. Allow auto-clicking is the off switch." },
     { version = "3.2.2", date = "2026-09-02", notes = "Terrain is a threat now, not just a floor check. The grid only ever asked whether a cell had a floor within reach, which says nothing about whether you can get there: a wall has a floor, and so does a ledge you would have to jump onto. Both read as open ground and the bot found out by walking into them. Cells are probed upward through the space the character would occupy, so anything solid standing there is out; a rise above Step height is reachable but charged Wall threat in proportion, because a jump mid-fight is a moment spent not dodging. Ground beside anything impassable is warmed too, so the cheapest route stops hugging walls, which is where you get cornered. Wall threat, Step height and the edge warming are all adjustable." },
     { version = "3.2.1", date = "2026-09-02", notes = "Projectiles were using the ground-attack urgency ramp, which got the timing wrong in both directions: a corridor a shot reached in two seconds read as 12 out of 100 so the bot strolled into it, and the ground BEHIND a projectile stayed at 100, so it fled the safest place on the map. A projectile is dangerous in a WINDOW around the moment it passes, not on a ramp. The core of that window is geometric - the projectile width plus yours, over its speed - so a fast shot is lethal for a fraction of a second while a wide slow tornado owns the ground for seconds either side, from one formula. Around it sit a generous lead, because being early is how you get hit, and a short wake, because gone is gone. Also added a Recommended settings button that resets the whole Clone section to the tuning arrived at so far." },
     { version = "3.2.0", date = "2026-09-02", notes = "Performance. getPlayerHitboxMetrics was being called inside the per-cell threat query, which at 900 cells and two time samples was 3,600 Instance lookups per evaluation, twelve times a second, re-deriving numbers that had not changed - it is computed once per pass now. The two time samples walk the threat sources once instead of twice, halving the dominant cost. The grid is evaluated in SLICES with verdicts persisting between passes, so a large radius no longer has to judge every cell inside one frame. A* stopped clearing four arrays of 900 entries on every call (a quarter of a million pointless writes a second while dodging) in favour of a generation stamp, and its open set is a real binary heap over parallel numeric arrays rather than a linear scan. Painting writes only the properties that actually changed. Separately: the safety probe is now its own setting rather than the drawn disc - probing with the whole body including limbs made the grid blind to any pocket narrower than your shoulders, which is why small safe zones went unseen." },
@@ -142,6 +143,21 @@ CFG.faceTarget = true
 CFG.attackRange = 10
 CFG.safeDistance = 8
 CFG.wallPadding = 2.0
+-- How the basic attack is delivered (3.2.3).
+--   "auto"  - Tool:Activate() when a tool is equipped, click if not
+--   "tool"  - Tool:Activate() only; never touches the mouse
+--   "click" - the old synthetic click, for anything Activate does not drive
+--
+-- Activate is the right answer here. The weapon is a Tool whose Activated is
+-- handled on the server, and Tool:Activate() raises that same event from the
+-- client - no cursor, no GUI to hit, nothing for the player to fight over.
+CFG.attackMethod = "auto"
+-- Clicking at the cursor meant clicking whatever the cursor happened to be
+-- over, which was regularly a button. When a click is used at all it goes to a
+-- fixed point instead.
+CFG.clickAtCursor = false
+-- The off switch: with this off the script never synthesises a mouse click.
+CFG.autoClickEnabled = true
 CFG.clickInterval = 0.1
 CFG.clickHoldDuration = 0.02
 CFG.abilityInterval = 0.1

@@ -5,6 +5,7 @@
 return function(S)
 local RT = S.RT
 local Workspace = S.Workspace
+local camera = Workspace.CurrentCamera
 local heavyDebugOnChange = S.heavyDebugOnChange
 local LocalPlayer = S.LocalPlayer
 local updatePursuitMovement = S.updatePursuitMovement
@@ -398,20 +399,52 @@ local function detectGameAndInitialize()
             faceTowards(root, humanoid, enemyRoot.Position)
         end
 
-        -- Always the click. The detected remote is deliberately NOT fired: its
-        -- argument signature is unknown, so replaying it with guessed arguments
-        -- either did nothing or risked a malformed-remote kick - and once one
-        -- was detected the click path was skipped entirely, which is a bot that
-        -- silently stops attacking.
-        local mousePosition = UserInputService:GetMouseLocation()
-        pcall(function()
-            VirtualInputManager:SendMouseButtonEvent(mousePosition.X, mousePosition.Y, 0, true, game, 0)
-        end)
-        task.delay(CFG.clickHoldDuration, function()
+        -- Tool:Activate() first. The weapon is a Tool whose Activated event is
+        -- handled server-side, and Activate raises that event from the client
+        -- directly: no cursor involved, so nothing to accidentally press, and
+        -- no fight with the player over where the mouse is pointing.
+        --
+        -- The detected remote is still deliberately NOT fired. Its argument
+        -- signature is unknown, and replaying it with guessed arguments either
+        -- does nothing or risks a malformed-remote kick.
+        local method = CFG.attackMethod
+        local swung = false
+        if method == "auto" or method == "tool" then
+            local tool = character:FindFirstChildOfClass("Tool")
+            if tool then
+                swung = pcall(function() tool:Activate() end)
+            end
+        end
+
+        if not swung and method ~= "tool" and CFG.autoClickEnabled then
+            -- Falling back to a synthetic click. Aimed at the middle of the
+            -- viewport rather than wherever the cursor is: clicking at the
+            -- cursor meant clicking whatever it happened to be resting on,
+            -- which was regularly one of our own buttons.
+            local x, y
+            if CFG.clickAtCursor then
+                local mousePosition = UserInputService:GetMouseLocation()
+                x, y = mousePosition.X, mousePosition.Y
+            else
+                local viewport = camera and camera.ViewportSize
+                x = viewport and viewport.X * 0.5 or 400
+                y = viewport and viewport.Y * 0.5 or 300
+            end
             pcall(function()
-                VirtualInputManager:SendMouseButtonEvent(mousePosition.X, mousePosition.Y, 0, false, game, 0)
+                VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
             end)
-        end)
+            task.delay(CFG.clickHoldDuration, function()
+                pcall(function()
+                    VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
+                end)
+            end)
+            swung = true
+        end
+
+        if not swung then
+            heavyDebugThrottled("attack_none", 3.0, "Combat",
+                "No tool equipped and clicking is off, so there is nothing to attack with.")
+        end
 
         RT.lastClickTime = now
     end
