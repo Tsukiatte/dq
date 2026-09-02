@@ -2437,12 +2437,22 @@ local function updateArming(now)
                     if pc and pc.Parent then
                         local tr = pc.Transparency
                         if tr < st.minT then st.minT = tr end
-                        if tr >= 0.97 or tr > st.minT + CFG.armFadeStep then st.armedAt = now end
+                        if tr >= 0.97 and st.minT >= 0.97 then
+                            -- Never been visible. Some precasts rest at 1 and
+                            -- are faded IN by the server when the attack is
+                            -- announced (secondBossLines, the sweeping
+                            -- flames): live for now, and pending again the
+                            -- moment it shows.
+                            st.armedAt = now
+                            st.byInvisible = true
+                        elseif tr > st.minT + CFG.armFadeStep then
+                            st.armedAt = now
+                        end
                     else
                         st.armedAt = now
                     end
                     if not st.armedAt and getHazardMotion(part) then st.armedAt = now end
-                    if st.armedAt then
+                    if st.armedAt and not st.byInvisible then
                         local age = st.armedAt - st.spawn
                         local known = RT.armDelays[st.name]
                         if known ~= 0 then
@@ -2452,6 +2462,17 @@ local function updateArming(now)
                                 RT.armDelays[st.name] = 0
                             end
                         end
+                    end
+                elseif st.byInvisible then
+                    -- Armed only because it had never shown. Now it shows:
+                    -- the telegraph has begun.
+                    local pc = st.precast
+                    if pc and pc.Parent and pc.Transparency < 0.9 then
+                        st.byInvisible = nil
+                        st.armedAt = nil
+                        st.minT = pc.Transparency
+                        local delay = RT.armDelays[st.name]
+                        if delay and delay > 0 then st.impactAt = st.spawn + delay end
                     end
                 elseif not st.doneAt then
                     -- Armed, and now played out: a precast that was visible

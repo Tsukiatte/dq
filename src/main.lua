@@ -502,6 +502,7 @@ local function startAutofarm()
     -- The game's own attack broadcast, and its own idea of which dungeon this
     -- is. Both are cheap and both beat anything we can infer.
     if CFG.usePrecast then startPrecastListener() end
+    if S.startNorthernListener then S.startNorthernListener() end
     if S.watchDungeonName then S.watchDungeonName() end
     if S.watchOwnAbilityRemotes then S.watchOwnAbilityRemotes() end
     detectGameAndInitialize()

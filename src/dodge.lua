@@ -182,7 +182,7 @@ local function dangerAt(px, py, pz, t)
     for i = 1, #PC.zones do
         local zone = PC.zones[i]
         local eta = zone.impactAt - now
-        if t >= eta - CFG.dodgeLead and t <= eta + CFG.dodgeLinger then
+        if t >= eta - CFG.dodgeLead and t <= eta + CFG.dodgeLinger + (zone.holdFor or 0) then
             local depth, vertical
             if zone.shape == "Circle" then
                 local c = zone.position
@@ -208,6 +208,34 @@ local function dangerAt(px, py, pz, t)
                 if depth <= reach + shoulder then
                     worst = max(worst, 0.6 * (1 - (depth - reach) / shoulder))
                 end
+            end
+        end
+    end
+
+    -- 1b. Scripted projectiles (Northern Lands): where each one WILL be at
+    -- time t, from the numbers the game sent - no extrapolation. A box in the
+    -- projectile's own frame: halfLength along its travel, halfWidth across.
+    for i = 1, #PC.paths do
+        local p = PC.paths[i]
+        local at = now + t
+        if at >= p.t0 - 0.1 and at <= p.t1 + 0.1 and abs(py - p.oy) < halfHeight + p.halfHeight then
+            local k = (at - p.t0) / p.dur
+            if k < 0 then k = 0 elseif k > 1 then k = 1 end
+            local s = k * p.dist + p.offset
+            local cx, cz = p.ox + p.dx * s, p.oz + p.dz * s
+            local qx, qz = px - cx, pz - cz
+            local along = abs(qx * p.dx + qz * p.dz) - p.halfLength
+            local side = abs(-qx * p.dz + qz * p.dx) - p.halfWidth
+            local depth
+            if along <= 0 and side <= 0 then
+                depth = max(along, side)
+            else
+                along, side = max(along, 0), max(side, 0)
+                depth = sqrt(along * along + side * side)
+            end
+            if depth <= reach then return 1 end
+            if depth <= reach + shoulder then
+                worst = max(worst, 1 - (depth - reach) / shoulder)
             end
         end
     end
@@ -261,6 +289,27 @@ local function dangerAt(px, py, pz, t)
             if depth <= shoulder then
                 worst = max(worst, 1 - depth / shoulder)
             end
+        end
+    end
+
+    -- 5a. Timed safe windows (Northern Lands bonus boss): around the
+    -- explosion, outside the colour spot is the danger; before and after,
+    -- the floor is floor.
+    for i = 1, #PC.safeWindows do
+        local w = PC.safeWindows[i]
+        local at = now + t
+        if at >= w.from and at <= w.untilAt then
+            local inside = false
+            for j = 1, #w.parts do
+                local part = w.parts[j]
+                if part.Parent then
+                    local size = part.Size
+                    local r = max(size.X, size.Z) * 0.5
+                    local dx, dz = px - part.Position.X, pz - part.Position.Z
+                    if dx * dx + dz * dz < r * r then inside = true break end
+                end
+            end
+            if not inside then return 1 end
         end
     end
 
