@@ -434,16 +434,60 @@ local function applyConfigData(data)
         end
     end
 
+    -- Learned timing saved by builds before 4.9.1 is poisoned and is not
+    -- loaded. 4.5.1 through 4.8.0 learned "the Model was deleted at 7.0s" as
+    -- if it were the precast fading: every mage shot and line strike in
+    -- Northern Lands was then floor for its first 5.7 seconds, which is the
+    -- run that died in the first area. The version the save was written by
+    -- is in the file.
+    local savedVersion = tostring(data.version or "0")
+    local function versionAtLeast(v, want)
+        local function parts(x)
+            local a, b, c = string.match(x, "^(%d+)%.(%d+)%.?(%d*)")
+            return tonumber(a) or 0, tonumber(b) or 0, tonumber(c) or 0
+        end
+        local a1, b1, c1 = parts(v)
+        local a2, b2, c2 = parts(want)
+        if a1 ~= a2 then return a1 > a2 end
+        if b1 ~= b2 then return b1 > b2 end
+        return c1 >= c2
+    end
+    local trustLearned = versionAtLeast(savedVersion, "4.9.1")
+    if not trustLearned then
+        heavyDebug("Config", string.format(
+            "Save is from %s: learned attack timing and auto-learned names are discarded (they were wrong); hand picks and the attack book are kept.",
+            savedVersion))
+        data.armDelays = nil
+        data.armSpans = nil
+    end
     if type(data.learnedTelegraphNames) == "table" then
-        for _, name in ipairs(data.learnedTelegraphNames) do
-            -- A player's name is a status marker that got learned, never an
-            -- attack. Dropped here so an old save cannot bring it back.
-            local isPlayer = false
-            for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
-                if string.lower(player.Name) == name then isPlayer = true break end
+        -- Names that are hand picks live in the attack book with source
+        -- "picked"; only those are trusted from a pre-4.9.1 save. Names
+        -- learned from hits before then include a player's own stun marker
+        -- and a map part called FirstPart.
+        local picked = {}
+        if type(data.attackBook) == "table" then
+            for _, record in ipairs(data.attackBook) do
+                if type(record) == "table" and record.source == "picked" and type(record.partName) == "string" then
+                    picked[record.partName] = true
+                end
             end
-            if type(name) == "string" and not isPlayer then
-                HZ.learnedNames[name] = true
+        end
+        for _, name in ipairs(data.learnedTelegraphNames) do
+            if type(name) == "string" then
+                local isPlayer = false
+                for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
+                    if string.lower(player.Name) == name then isPlayer = true break end
+                end
+                -- A static part of the world by this name means the name is
+                -- scenery, whatever taught it.
+                local static = false
+                for _, inst in ipairs(Workspace:GetChildren()) do
+                    if inst:IsA("BasePart") and inst.Anchored and string.lower(inst.Name) == name then static = true break end
+                end
+                if not isPlayer and not static and (trustLearned or picked[name]) then
+                    HZ.learnedNames[name] = true
+                end
             end
         end
     end
