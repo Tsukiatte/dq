@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 2.14.0
+    VERSION : 2.15.0
     BUILD   : 2026-09-01
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "2.14.0"
+local SCRIPT_VERSION = "2.15.0"
 local SCRIPT_BUILD_DATE = "2026-09-01"
-local SCRIPT_CODENAME = "Second opinion"
+local SCRIPT_CODENAME = "Grid"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "2.15.0", date = "2026-09-02", notes = "Clone mode moved from a ring to a dense grid anchored to the world, and the dodge became a search across it. Discs the size of your hitbox every 1.5 studs, overlapping, so a safe pocket a few studs wide between two boss attacks still shows up; green means your whole body fits there. The way out is found cell by cell: red cells cost twenty-five green ones to cross so they are crossed only when there is no way around, pits and walls are never crossed, and a depth pass lets it prefer the interior of a safe area over a single green cell about to close. The old ring checked the straight line for walls only and would run through a red strip to a green node behind it. Floor heights are cached per cell; walls are learned by trying. Also: the menu key is rebindable at the top of Modules, and a pinned window no longer stops the key from reopening the interface." },
     { version = "2.14.0", date = "2026-09-02", notes = "Recommendations replace freeze-and-pick as the way to fill the Attack Book. The scorer puts forward what it currently believes is an attack, nearest first, one at a time at a rate you set, each held in the world in its own colour with a number on it and listed in the Attacks panel. Tick writes a book entry from the signature captured when it was put forward, so it works after the part is gone; cross is remembered per map and vetoes the name as a hazard, so the bot stops dodging it as well as stops asking. Entries outlive their part on purpose - that was the whole reason freeze existed. Freeze and the pickers remain underneath as the manual route." },
     { version = "2.13.0", date = "2026-09-02", notes = "Two testing switches at the top of Navigation: Pathfinding and Dodging. Off stops the bot driving your character with what it finds - it still finds it. Dodging moved here from Telegraphs so one setting has one control, and both are saved now (Dodging never was). Clone ring geometry fixed: the innermost ring sat at 55% of the radius, so widening the ring opened a hole around the character, and every ring got the same number of volumes, so the outer ring had gaps nearly twice as wide as the inner one. Now the first ring sits at a fixed inner radius, rings are added automatically so the gap between them stays about Ring spacing, and volumes are shared out by circumference." },
     { version = "2.12.0", date = "2026-09-02", notes = "Every window header has a pin beside the info circle. Grey when it is not pinned, accent when it is; a pinned window stays on screen after RightShift closes the rest, and is still draggable. Click it again and it goes back to hiding with everything else. Pins are remembered between sessions. The blur and dim stay tied to the interface rather than to any pinned window - dimming the whole game for one pinned readout would be absurd." },
@@ -416,6 +417,8 @@ CFG.guiDim = 0.35                -- 0 disables it
 -- Which panels appear when you open the interface (2.10.0). The Modules panel
 -- itself is deliberately not in this list: hiding the thing that unhides
 -- everything else is a door that locks behind you.
+-- The key that opens and closes the whole interface. A KeyCode name.
+CFG.menuKey = "RightShift"
 CFG.panelAutofarm = true
 CFG.panelRoutes = true
 CFG.panelAccount = true
@@ -452,6 +455,18 @@ CFG.cloneMaxRings = 10
 -- hunting, no pursuit, no waypoints - you drive, it pulls you out of attacks.
 CFG.cloneManual = false
 CFG.showClones = true
+-- The grid (2.15.0). Dense by default: boss fights have safe pockets a few
+-- studs wide, and a disc the size of your hitbox every 1.5 studs is what it
+-- takes to find one. The cell budget caps the cost; the radius is a request.
+CFG.cloneGridSpacing = 1.5
+CFG.cloneMaxCells = 900
+CFG.cloneDangerCost = 25         -- a red cell costs this many green ones to cross
+CFG.cloneDepthBonus = 1.0        -- studs of extra travel one cell of depth is worth
+CFG.clonePenaltyWeight = 0.05
+CFG.cloneFloorRefresh = 3.0      -- seconds a cached floor height is trusted
+CFG.cloneFloorBudget = 150       -- floor raycasts per evaluation
+CFG.showClonePrisms = false      -- hundreds of prisms at boss density; off unless asked
+CFG.colorClonePath = Color3.fromRGB(80, 170, 255)
 CFG.colorCloneSafe = Color3.fromRGB(60, 220, 120)
 CFG.colorCloneDanger = Color3.fromRGB(255, 70, 70)
 
@@ -706,6 +721,7 @@ RT.blurEffect = nil
 -- interface is closed, so a readout you want while playing does not cost you
 -- the whole GUI.
 RT.pinnedWindows = {}
+RT.menuBindCapture = false
 -- Per-map attack books, and per-map hand-drawn zones. Both are properties of a
 -- dungeon, so they are keyed by map like the waypoints and the macros.
 RT.attackData = {}
@@ -751,6 +767,18 @@ CL.lastEvalTime = -math.huge
 CL.chosen = nil                  -- the node currently being run to
 CL.chosenAt = 0
 CL.safeCount = 0
+-- The grid (2.15.0): cells in window order, the floor cache by world key, the
+-- current path as cell indices, and the committed goal.
+CL.cells = {}
+CL.floorCache = {}
+CL.path = {}
+CL.goal = nil
+CL.goalAt = 0
+CL.centerI = nil
+CL.centerJ = nil
+CL.reach = 1
+CL.side = 3
+CL.signature = ""
 
 -- Hand-drawn zones. `defs` is what gets saved (a signature plus a shape);
 -- `live` is [decoration part] = the volume currently following it.

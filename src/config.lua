@@ -260,6 +260,11 @@ local function buildConfigTable()
             cloneSafetyMargin = CFG.cloneSafetyMargin,
             cloneCommitTime = CFG.cloneCommitTime,
             cloneManual = CFG.cloneManual,
+            cloneGridSpacing = CFG.cloneGridSpacing,
+            cloneMaxCells = CFG.cloneMaxCells,
+            cloneDangerCost = CFG.cloneDangerCost,
+            cloneDepthBonus = CFG.cloneDepthBonus,
+            showClonePrisms = CFG.showClonePrisms,
             showClones = CFG.showClones,
             macroLoop = CFG.macroLoop,
             macroShowRoute = CFG.macroShowRoute,
@@ -286,6 +291,7 @@ local function buildConfigTable()
             end)(),
             guiBlur = CFG.guiBlur,
             guiDim = CFG.guiDim,
+            menuKey = CFG.menuKey,
             debugLevel = RT.debugLevel,
         },
         streamer = {
@@ -386,6 +392,11 @@ local function applyConfigData(data)
         CFG.cloneCommitTime = tonumber(combat.cloneCommitTime) or CFG.cloneCommitTime
         if combat.showClones ~= nil then CFG.showClones = combat.showClones == true end
         if combat.cloneManual ~= nil then CFG.cloneManual = combat.cloneManual == true end
+        CFG.cloneGridSpacing = tonumber(combat.cloneGridSpacing) or CFG.cloneGridSpacing
+        CFG.cloneMaxCells = tonumber(combat.cloneMaxCells) or CFG.cloneMaxCells
+        CFG.cloneDangerCost = tonumber(combat.cloneDangerCost) or CFG.cloneDangerCost
+        CFG.cloneDepthBonus = tonumber(combat.cloneDepthBonus) or CFG.cloneDepthBonus
+        if combat.showClonePrisms ~= nil then CFG.showClonePrisms = combat.showClonePrisms == true end
         if combat.macroLoop ~= nil then CFG.macroLoop = combat.macroLoop == true end
         if combat.macroShowRoute ~= nil then CFG.macroShowRoute = combat.macroShowRoute == true end
         if type(combat.macroRecordBind) == "string" then
@@ -414,6 +425,12 @@ local function applyConfigData(data)
         end
         CFG.guiBlur = tonumber(visuals.guiBlur) or CFG.guiBlur
         CFG.guiDim = tonumber(visuals.guiDim) or CFG.guiDim
+        -- Only a name Enum.KeyCode actually has: a typo here would lock the
+        -- interface behind a key that does not exist.
+        if type(visuals.menuKey) == "string" then
+            local ok, code = pcall(function() return Enum.KeyCode[visuals.menuKey] end)
+            if ok and code then CFG.menuKey = visuals.menuKey end
+        end
         RT.debugLevel = tonumber(visuals.debugLevel) or RT.debugLevel
     end
     -- Enemy attacks are always highlighted since 2.3.0; an older config that
