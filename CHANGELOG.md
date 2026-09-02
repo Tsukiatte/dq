@@ -11,6 +11,23 @@ file and that table in sync on every edit.
 
 ---
 
+## 2.8.0 - 2026-09-02 - "Account"
+- **Account panel**, built from Window E of the kit: your Roblox headshot
+  (`GetUserThumbnailAsync`, fetched off-thread since it yields), your in-game
+  name, a rank, and **Logout** / **Detach**. It is a third window and opens and
+  closes with the other two on **RightShift**.
+- **It masks under Streamer Mode.** A panel showing your username and your face
+  would put both straight back on screen the moment you opened the GUI on
+  stream, which would defeat the one thing Streamer Mode is for. It follows the
+  same masking as the HUD, avatar included, and updates the instant the mode is
+  toggled rather than on the next refresh.
+- **Rank is `CFG.accountRank`**, a plain string, currently `DEVELOPER`. There is
+  no account system behind it yet, so **Logout closes the interface** rather
+  than pretending to sign anything out - its tooltip says exactly that.
+  **Detach** unloads the script completely.
+- Danger buttons take dark text rather than white, matching the design.
+  `#ff6060` is light enough that dark type has more contrast on it anyway.
+
 ## 2.7.4 - 2026-09-02
 Macro rotation. It *was* being recorded - it just never survived to the screen.
 

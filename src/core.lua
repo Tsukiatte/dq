@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 2.7.4
+    VERSION : 2.8.0
     BUILD   : 2026-09-01
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "2.7.4"
+local SCRIPT_VERSION = "2.8.0"
 local SCRIPT_BUILD_DATE = "2026-09-01"
-local SCRIPT_CODENAME = "Kitbuilt"
+local SCRIPT_CODENAME = "Account"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "2.8.0", date = "2026-09-02", notes = "Account panel: your Roblox headshot, your name and a rank, with Logout and Detach. It opens and closes with the other windows on RightShift. It masks under Streamer Mode - a panel showing your name and your face would otherwise put both back on screen the moment you opened the GUI on stream. Rank is CFG.accountRank, a plain string for now; Logout is a placeholder that closes the interface, since there is no account system behind it yet." },
     { version = "2.7.4", date = "2026-09-02", notes = "Macro rotation actually works now. It was being recorded and stored correctly, then thrown away: the main loop fell through to releaseFacing() every frame during playback, switching the alignment rig off a microsecond after the macro switched it on. Playback now owns facing. The direction was also reconstructed with the wrong sign, which would have pointed the replay 180 degrees away - facing is stored as a look vector instead of an angle, so there is no sign convention to get wrong. Pitch is recorded too, from the torso and from the camera; only yaw is applied to the body, because a humanoid keeps its torso upright." },
     { version = "2.7.3", date = "2026-09-01", notes = "Found the real cause of the blank row labels: hoverable() parented a full-width invisible TextButton into the row to catch clicks, and a row has a horizontal UIListLayout - so the layout laid the hit button out as a list item, at full width and sorting first, pushing the label and the control off the edge where the window clipped them. A clickable row now raises InputBegan on itself, so nothing extra joins the layout. The HUD is rebuilt with explicit geometry: nested AutomaticSize inside a bottom-anchored auto-sizing frame never resolved and the stat values were being drawn at the top-left of the screen." },
     { version = "2.7.2", date = "2026-09-01", notes = "flexFill no longer reads the instance size back to rebuild it - every caller wants full height, so the height is a parameter. Tooling: build.py now runs the smoke test itself and fails on it. smoke.py always did exit non-zero; the 2.7.1 push slipped through because the command piped it to grep, which matched the error text and returned success. Folding it into build.py removes the chance to invoke it wrongly." },
@@ -369,6 +370,10 @@ CFG.targetHpRange = 150.0
 
 -- Dodging can be switched off wholesale (the Telegraphs section header).
 CFG.dodgeEnabled = true
+
+-- Account panel (2.8.0). Rank is a plain string for now; there is no account
+-- system behind it yet.
+CFG.accountRank = "DEVELOPER"
 
 -- Overlay colours (2.7.0). Everything this script draws in the world reads its
 -- colour from here, so the Overlays section can recolour any of it. accentColor
