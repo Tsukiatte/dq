@@ -148,9 +148,9 @@ end
 
 -- Drops zones whose attack has resolved, and recolours the rest by urgency.
 local function precastStep()
-    -- Northern Lands housekeeping rides on the same clock. Late-bound: that
+    -- Boss-event housekeeping rides on the same clock. Late-bound: that
     -- module loads after this one.
-    if S.northernStep then S.northernStep() end
+    if S.bossEventsStep then S.bossEventsStep() end
     -- Keep the Attacks panel honest. It used to be rendered once at build and
     -- never again, so it read zero however many attacks had gone past.
     if #PC.zones ~= PC.lastShown or PC.total ~= PC.lastTotal then
