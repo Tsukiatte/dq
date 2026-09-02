@@ -346,10 +346,40 @@ S.ATTACK_PARTS = ATTACK_PARTS
 local DEFAULT_ARM_DELAYS = {
     beam = 4.5,
     secondbossrandompulse = 0,
+    -- Northern Lands, from the captures of 2026-09-02: the mage shot's
+    -- precast appears and the hit lands 0.9s after the Model does; the
+    -- spearman and warrior strikes land at 0.88s.
+    northernmageshot = 0.9,
+    spearmanstrikehitbox = 0.85,
+    northernwarriorlinestrike = 0.85,
+    northernwarriorcirclestrike = 0.85,
+}
+-- Windows: first and last age at which an attack has been seen to hurt. A
+-- window makes the attack floor before its lead and floor again after
+-- `last` plus the linger, whatever its visuals are doing.
+local DEFAULT_ARM_SPANS = {
+    northernmageshot = { first = 0.9, last = 1.2 },
+    spearmanstrikehitbox = { first = 0.85, last = 1.2 },
+    northernwarriorlinestrike = { first = 0.85, last = 1.2 },
+    northernwarriorcirclestrike = { first = 0.85, last = 1.2 },
+}
+-- Attacks that keep hurting after their warning fades: the fade does not
+-- end them. The Midgardian Champion's passive beams burn for seconds after
+-- their precast goes (Studio recreation, 2026-09-02).
+local DEFAULT_LONG_LIVED = {
+    firstbosspassivebeam = true,
 }
 S.DEFAULT_ARM_DELAYS = DEFAULT_ARM_DELAYS
+S.DEFAULT_ARM_SPANS = DEFAULT_ARM_SPANS
+S.DEFAULT_LONG_LIVED = DEFAULT_LONG_LIVED
 for name, delay in pairs(DEFAULT_ARM_DELAYS) do
     if S.RT.armDelays[name] == nil then S.RT.armDelays[name] = delay end
+end
+for name, span in pairs(DEFAULT_ARM_SPANS) do
+    if S.RT.armSpans[name] == nil then S.RT.armSpans[name] = { first = span.first, last = span.last } end
+end
+for name in pairs(DEFAULT_LONG_LIVED) do
+    if S.RT.armLongLived[name] == nil then S.RT.armLongLived[name] = true end
 end
 S.isKnownEnemyAttack = isKnownEnemyAttack
 S.isKnownOwnEffect = isKnownOwnEffect

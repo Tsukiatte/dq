@@ -1926,17 +1926,33 @@ local function recordHit(damage)
     -- nearest. Late-bound; defined further down.
     if S.noteAttackHit then
         local _, playerRadius = getPlayerHitboxMetrics()
+        -- If any known attack encloses us, only enclosing ones may be blamed:
+        -- a mage line five studs away with a matching window was outscoring
+        -- the beam we were standing in.
+        local anyEnclosing = false
+        for i = 1, math.min(#ranked, 12) do
+            local r = ranked[i]
+            if r.known and r.distance <= playerRadius + 0.5 then
+                local st0 = HZ.armState[r.part]
+                if not (st0 and (st0.dormant or (st0.onMax == 0 and not st0.hit and now - st0.spawn > 30))) then
+                    anyEnclosing = true
+                    break
+                end
+            end
+        end
         local best, bestScore = nil, -1
         for i = 1, math.min(#ranked, 12) do
             local r = ranked[i]
             local st = HZ.armState[r.part]
+            local encloses = r.distance <= playerRadius + 0.5
+            if anyEnclosing and not encloses then r = nil end
             -- A parked Model (dormant, or silent for half a minute) does not
             -- get the blame: the pool of beams at the arena centre kept
             -- being credited with hits from the live ones passing through,
             -- which woke the pool and stretched every beam's window to the
             -- length of the fight.
             local parked = st and (st.dormant or (st.onMax == 0 and not st.hit and now - st.spawn > 30))
-            if r.known and r.distance <= CFG.hitAttributeRadius and not parked then
+            if r and r.known and r.distance <= CFG.hitAttributeRadius and not parked then
                 local age = st and (now - st.spawn) or 99
                 local score = 0
                 if r.distance <= playerRadius + 0.5 then score = score + 2 end

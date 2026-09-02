@@ -506,6 +506,12 @@ local function applyConfigData(data)
     for name, delay in pairs(S.DEFAULT_ARM_DELAYS or {}) do
         if RT.armDelays[name] == nil then RT.armDelays[name] = delay end
     end
+    for name, span in pairs(S.DEFAULT_ARM_SPANS or {}) do
+        if RT.armSpans[name] == nil then RT.armSpans[name] = { first = span.first, last = span.last } end
+    end
+    for name in pairs(S.DEFAULT_LONG_LIVED or {}) do
+        if RT.armLongLived[name] == nil then RT.armLongLived[name] = true end
+    end
     table.clear(RT.armLongLived)
     if trustLearned and type(data.armLongLived) == "table" then
         for name, v in pairs(data.armLongLived) do
