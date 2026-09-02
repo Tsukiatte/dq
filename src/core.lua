@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 2.12.0
+    VERSION : 2.13.0
     BUILD   : 2026-09-01
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "2.12.0"
+local SCRIPT_VERSION = "2.13.0"
 local SCRIPT_BUILD_DATE = "2026-09-01"
-local SCRIPT_CODENAME = "Pinned"
+local SCRIPT_CODENAME = "Floor"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "2.13.0", date = "2026-09-02", notes = "Two testing switches at the top of Navigation: Pathfinding and Dodging. Off stops the bot driving your character with what it finds - it still finds it. Dodging moved here from Telegraphs so one setting has one control, and both are saved now (Dodging never was). Clone ring geometry fixed: the innermost ring sat at 55% of the radius, so widening the ring opened a hole around the character, and every ring got the same number of volumes, so the outer ring had gaps nearly twice as wide as the inner one. Now the first ring sits at a fixed inner radius, rings are added automatically so the gap between them stays about Ring spacing, and volumes are shared out by circumference." },
     { version = "2.12.0", date = "2026-09-02", notes = "Every window header has a pin beside the info circle. Grey when it is not pinned, accent when it is; a pinned window stays on screen after RightShift closes the rest, and is still draggable. Click it again and it goes back to hiding with everything else. Pins are remembered between sessions. The blur and dim stay tied to the interface rather than to any pinned window - dimming the whole game for one pinned readout would be absurd." },
     { version = "2.11.0", date = "2026-09-02", notes = "New Attacks panel: pick the map, freeze the attacks so a half-second telegraph can be pointed at, select one into the Attack Book, and draw a hazard around a decoration that only ANNOUNCES an attack - press on it, drag outwards, release, and every copy of that decoration carries one from then on. The Attack Book and the drawn zones are now stored PER MAP and survive between executions; a pre-2.11 global book is adopted into the current map. Clone gained a manual mode - the ring dodges for you and nothing else runs. Rings cap at 10 and volumes at 100. Opening the interface blurs and darkens the game behind it, both adjustable. List entries are laid out explicitly now; nested auto-layout had mangled them." },
     { version = "2.10.0", date = "2026-09-02", notes = "Two new panels. Configs saves the whole setup under a name, as many as you like, into its own file: type a name and press the tick, click a row to load it, pencil renames, bin deletes, each showing when it was saved. Modules turns each panel on and off with a square toggle - accent gradient on, greyed out off - and the Modules panel is deliberately not in its own list, because hiding the thing that unhides everything else is a door that locks behind you. Window positions are clamped into the viewport, so a default laid out for a wide screen cannot land off the edge of a small one where it could not be dragged back." },
@@ -378,7 +379,9 @@ CFG.macroFile = "DungeonAutofarm_macros.json"
 CFG.targetMode = "closest"       -- closest | lowest HP | highest HP
 CFG.targetHpRange = 150.0
 
--- Dodging can be switched off wholesale (the Telegraphs section header).
+-- Testing switches, at the top of Navigation. Off means the bot still finds
+-- and reports things, it just stops driving your character with them.
+CFG.pathfindingEnabled = true
 CFG.dodgeEnabled = true
 
 -- Hand-drawn hazard zones (2.11.0). Some attacks are announced by a
@@ -424,6 +427,14 @@ CFG.cloneSafetyMargin = 0.5      -- extra clearance a clone must have to count a
 CFG.cloneMaxDrop = 12.0          -- a clone whose floor is further below this is off a ledge
 CFG.cloneMaxClimb = 6.0
 CFG.cloneCommitTime = 0.35       -- hold a chosen clone this long before reconsidering
+-- Where the innermost ring sits. Not a fraction of the radius: a fraction
+-- means the hole around the character grows every time you widen the ring,
+-- which is the one place you most need somewhere to step.
+CFG.cloneInnerRadius = 4.0
+-- Rings are added automatically so the gap between them stays about this, no
+-- matter how wide the ring is. The Rings slider is the floor, not the answer.
+CFG.cloneAutoRings = true
+CFG.cloneRingSpacing = 6.0
 CFG.cloneMaxVolumes = 100        -- slider ceilings
 CFG.cloneMaxRings = 10
 -- Manual mode: the ring dodges for you, but nothing else runs. No target

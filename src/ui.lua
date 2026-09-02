@@ -898,6 +898,14 @@ local function createControlUI()
     local navigation = K.section(autofarm.body, "Navigation", nextOrder(),
         "How it gets to things, and what it does when it cannot.")
     table.insert(legacySections, navigation)
+    -- Testing switches. Negative orders put them above everything else in the
+    -- section without renumbering it.
+    track(K.toggle(navigation.content, "Pathfinding",
+        function() return CFG.pathfindingEnabled end, function(v) CFG.pathfindingEnabled = v end, -2,
+        "Off stops the bot driving your character: no pursuit, no waypoints, no recovery. It still picks targets and swings if one is in reach. For testing."))
+    track(K.toggle(navigation.content, "Dodging",
+        function() return CFG.dodgeEnabled end, function(v) CFG.dodgeEnabled = v end, -1,
+        "Off means it still finds and highlights attacks but stands in them. For testing."))
     track(K.slider(navigation.content, "Wall padding", "Above 2.0 blocks doorways",
         CFG.minimumWallPadding, CFG.maximumWallPadding, true,
         function() return CFG.wallPadding end, function(v) CFG.wallPadding = v end, 1,
@@ -939,9 +947,6 @@ local function createControlUI()
     local telegraphs = K.section(autofarm.body, "Telegraphs", nextOrder(),
         "Enemy attack markers: spotting them, dodging them, and teaching the script new ones.")
     table.insert(legacySections, telegraphs)
-    track(K.toggle(telegraphs.content, "Dodge attacks",
-        function() return CFG.dodgeEnabled end, function(v) CFG.dodgeEnabled = v end, 1,
-        "Step out of attack markers. Off means it still finds and highlights them but stands in them."))
     track(K.slider(telegraphs.content, "Detection range", "Studs",
         CFG.minimumDamageBrickRange, CFG.maximumDamageBrickRange, false,
         function() return CFG.damageBrickDetectionRange end,
@@ -1057,27 +1062,38 @@ local function createControlUI()
     track(K.slider(cloneSection.content, "Rings", "Spread over this many circles",
         1, CFG.cloneMaxRings, false,
         function() return CFG.cloneRings end, function(v) CFG.cloneRings = v end, 3,
-        "Two rings give a near option and a far one, and interleave so there are no spokes with gaps between them."))
+        "The fewest rings to use. With Auto rings on, more are added as the radius grows so the gap between rings never opens up."))
     track(K.slider(cloneSection.content, "Radius", "How far out the outer ring sits",
         4, 40, false,
         function() return CFG.cloneRadius end, function(v) CFG.cloneRadius = v end, 4,
         "If an attack is wider than this, every volume goes red and there is nowhere in the ring to go. Widen it for big AOEs."))
+    track(K.slider(cloneSection.content, "Inner radius", "Where the first ring sits",
+        2, 12, true,
+        function() return CFG.cloneInnerRadius end, function(v) CFG.cloneInnerRadius = v end, 5,
+        "The nearest volumes stay this close no matter how wide the ring is. It used to be a fraction of the radius, so widening the ring opened a hole around you."))
+    track(K.toggle(cloneSection.content, "Auto rings",
+        function() return CFG.cloneAutoRings end, function(v) CFG.cloneAutoRings = v end, 6,
+        "Add rings as the radius grows so the gap between them stays about Ring spacing. Rings becomes the minimum rather than the answer."))
+    track(K.slider(cloneSection.content, "Ring spacing", "Studs between rings with Auto rings on",
+        3, 12, true,
+        function() return CFG.cloneRingSpacing end, function(v) CFG.cloneRingSpacing = v end, 7,
+        "Smaller means denser coverage and more raycasts."))
     track(K.slider(cloneSection.content, "Safety margin", "Extra clearance a volume needs",
         0, 6, true,
-        function() return CFG.cloneSafetyMargin end, function(v) CFG.cloneSafetyMargin = v end, 5,
+        function() return CFG.cloneSafetyMargin end, function(v) CFG.cloneSafetyMargin = v end, 8,
         "How much room beyond the hazard's edge a volume must have before it counts as green."))
     track(K.slider(cloneSection.content, "Commit time", "Seconds before it reconsiders",
         0.1, 1.5, true,
-        function() return CFG.cloneCommitTime end, function(v) CFG.cloneCommitTime = v end, 6,
+        function() return CFG.cloneCommitTime end, function(v) CFG.cloneCommitTime = v end, 9,
         "Holding a chosen volume briefly stops the character stuttering between two equally good ones under a moving hazard."))
     track(K.toggle(cloneSection.content, "Show the ring",
-        function() return CFG.showClones end, function(v) CFG.showClones = v end, 7,
+        function() return CFG.showClones end, function(v) CFG.showClones = v end, 10,
         "Draw the volumes. Turning them off keeps the dodging - only the drawing stops."))
     track(K.colorRow(cloneSection.content, "Safe colour",
-        function() return CFG.colorCloneSafe end, function(c) CFG.colorCloneSafe = c end, 8,
+        function() return CFG.colorCloneSafe end, function(c) CFG.colorCloneSafe = c end, 11,
         "The pad colour when nothing would be hitting you there."))
     track(K.colorRow(cloneSection.content, "Danger colour",
-        function() return CFG.colorCloneDanger end, function(c) CFG.colorCloneDanger = c end, 9,
+        function() return CFG.colorCloneDanger end, function(c) CFG.colorCloneDanger = c end, 12,
         "The pad colour when something would."))
 
     -- ------------------------------------------------------------------

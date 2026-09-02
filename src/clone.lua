@@ -47,21 +47,43 @@ local releaseFacing = S.releaseFacing
 -- the count, ring or radius settings change.
 local function buildOffsets()
     local offsets = {}
-    local rings = math.clamp(math.floor(CFG.cloneRings), 1, CFG.cloneMaxRings)
+    local outer = CFG.cloneRadius
+    local inner = math.min(CFG.cloneInnerRadius, outer)
     local total = math.clamp(math.floor(CFG.cloneCount), 4, CFG.cloneMaxVolumes)
-    local perRing = math.max(3, math.floor(total / rings))
+    local rings = math.clamp(math.floor(CFG.cloneRings), 1, CFG.cloneMaxRings)
 
-    for ring = 1, rings do
-        -- Inner rings sit proportionally closer; a single ring sits at the
-        -- full radius.
-        local scale = rings == 1 and 1 or (0.55 + 0.45 * ((ring - 1) / (rings - 1)))
-        local radius = CFG.cloneRadius * scale
-        -- Offset alternate rings by half a step so they interleave rather than
-        -- lining up into spokes with gaps between them.
-        local phase = (ring % 2 == 0) and (math.pi / perRing) or 0
-        for i = 1, perRing do
-            local angle = phase + (i - 1) * (2 * math.pi / perRing)
+    -- Enough rings that the gap between them stays about cloneRingSpacing.
+    -- Widening the radius used to push every ring outwards and leave a hole
+    -- around the character - the one place you most need somewhere to step.
+    if CFG.cloneAutoRings then
+        local needed = math.ceil((outer - inner) / math.max(CFG.cloneRingSpacing, 1)) + 1
+        rings = math.clamp(math.max(rings, needed), 1, CFG.cloneMaxRings)
+    end
+
+    -- Radii run from just outside the character out to the full radius, evenly.
+    local radii, totalCircumference = {}, 0
+    for i = 1, rings do
+        local t = rings == 1 and 1 or ((i - 1) / (rings - 1))
+        local radius = inner + (outer - inner) * t
+        radii[i] = radius
+        totalCircumference = totalCircumference + radius
+    end
+
+    -- Volumes are shared out by circumference rather than evenly per ring. An
+    -- outer ring is longer, so an equal share left its volumes nearly twice as
+    -- far apart as the inner ring's - gaps wide enough to be hit in.
+    for i, radius in ipairs(radii) do
+        local share = totalCircumference > 0 and (radius / totalCircumference) or (1 / rings)
+        local count = math.max(3, math.floor(total * share + 0.5))
+        -- Half a step of offset on alternate rings, so they interleave instead
+        -- of lining up into spokes with gaps between them.
+        local phase = (i % 2 == 0) and (math.pi / count) or 0
+        for k = 1, count do
+            local angle = phase + (k - 1) * (2 * math.pi / count)
             table.insert(offsets, Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius))
+            -- The per-ring minimum of three can push the total over the cap on
+            -- many rings; the cap is the promise, so it wins.
+            if #offsets >= CFG.cloneMaxVolumes then return offsets end
         end
     end
     return offsets
@@ -122,9 +144,11 @@ local function buildClones()
         })
     end
 
-    CL.signature = string.format("%d/%d/%.1f", CFG.cloneCount, CFG.cloneRings, CFG.cloneRadius)
-    heavyDebug("Clone", string.format("Ring built: %d volumes across %d ring(s) at %.0f studs.",
-        #CL.nodes, CFG.cloneRings, CFG.cloneRadius))
+    CL.signature = string.format("%d/%d/%.1f/%.1f/%.1f/%s", CFG.cloneCount, CFG.cloneRings,
+        CFG.cloneRadius, CFG.cloneInnerRadius, CFG.cloneRingSpacing, tostring(CFG.cloneAutoRings))
+    heavyDebug("Clone", string.format(
+        "Ring built: %d volumes, %.0f to %.0f studs out.",
+        #CL.nodes, CFG.cloneInnerRadius, CFG.cloneRadius))
 end
 
 local function setCloneActive(active)
@@ -274,7 +298,8 @@ local function cloneStep(root)
     if not CL.active then return end
     -- A settings change (count, rings, radius) rebuilds the pool rather than
     -- trying to reshape it in place.
-    local signature = string.format("%d/%d/%.1f", CFG.cloneCount, CFG.cloneRings, CFG.cloneRadius)
+    local signature = string.format("%d/%d/%.1f/%.1f/%.1f/%s", CFG.cloneCount, CFG.cloneRings,
+        CFG.cloneRadius, CFG.cloneInnerRadius, CFG.cloneRingSpacing, tostring(CFG.cloneAutoRings))
     if signature ~= CL.signature then buildClones() end
     positionClones(root)
     evaluateClones(root)
