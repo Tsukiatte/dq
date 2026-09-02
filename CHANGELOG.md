@@ -11,6 +11,53 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.0.0 - 2026-09-02 - "The box"
+
+The dodge is rebuilt from scratch around the shape of the thing that actually
+works in a few hundred lines: **a box that is never in danger, and a character
+that follows it.**
+
+### Removed
+`clone.lua` and `threat.lua`, and with them the 900-cell grid, the heat field,
+the space-time A\*, the enclosure, cover, depth, freshness, hysteresis and
+slicing passes, and **seventy-nine settings**. Three of the last six fixes had
+been one of those heuristics undoing another. What remains of the dodge is
+**1009 lines** across `dodge.lua`, `mover.lua` and `precast.lua`.
+
+### What it does now
+1. **Know where danger is, now and in the next second or two.** Exact geometry
+   and exact timing for announced attacks; the footprint for physical ones; a
+   short swept segment for anything moving, so the square in front of a shot is
+   hot and the square behind it is not; a circle for every enemy; safe-spot
+   markers inverted.
+2. **Look at a few dozen points around the character**, twenty times a second.
+   For each: what would hit you *on the way there*, sampled at three points
+   along the line at the times you would be on them — and what would hit you
+   *once you stopped*, at arrival and after `Stay clear for`. Cheapest first,
+   and raycasts (floor, wall) are paid only until one passes.
+3. **Put a box on the best one. Move the character straight at the box.** Do
+   it again next frame.
+
+There is no path. A path is what you need when you decide rarely and move
+imprecisely. Deciding every frame and moving exactly, the straight line to the
+current best point *is* the path, and the on-the-way check in step 2 is what
+keeps that line off anything that lands while you are on it.
+
+The box only ever sits on ground that will be clear when you get there and
+stays clear once you have. When here is fine, the box comes home and the
+character gets on with fighting.
+
+### Kept unchanged
+Ground-truth detection (structural `hitBox`/`precast` matching, the name
+tables), the `precastHitbox` listener, `Workspace.dungeonName` map detection,
+and the collision-checked, walking-pace **tween** mover from 3.6.2. Those are
+the parts that were verified against the game rather than inferred.
+
+### Settings
+Fourteen, in one section, with a **Recommended settings** button beside them.
+The saved `macroMode` value stays `"clone"` so existing configs load; the island
+just says **Dodge**.
+
 ## 3.6.2 - 2026-09-02
 
 ### Why it stood still

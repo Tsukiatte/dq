@@ -653,8 +653,8 @@ local function getStandOffPosition(root, enemyRoot)
     -- through it into melee range - the dodge kept its distance and the
     -- pursuit gave it back. Chasing now stops at the same circle.
     local standoff = math.max(CFG.safeDistance, 2)
-    if CFG.cloneKeepDistance and S.CL and S.CL.active then
-        standoff = math.max(standoff, CFG.cloneEnemyRadius)
+    if S.DG and S.DG.active then
+        standoff = math.max(standoff, CFG.dodgeEnemyRadius)
     end
     return enemyPosition + (directionAway * standoff)
 end

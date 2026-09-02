@@ -561,7 +561,7 @@ end
 -- differ only in how they dodge; Macro replays a recording instead.
 local function setMacroMode(mode)
     MC.mode = (mode == "macro" or mode == "clone") and mode or "legacy"
-    S.setCloneActive(MC.mode == "clone")
+    S.setDodgeActive(MC.mode == "clone")
     if MC.mode ~= "macro" then
         if MC.playing then stopPlayback("switched to legacy waypoints") end
         if MC.recording then stopRecording() end
