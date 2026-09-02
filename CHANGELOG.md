@@ -11,6 +11,43 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.1.1 - 2026-09-02
+
+### Noticed once, never again
+The capture made it plain. From one Cog Shooter shot, `steampunkRangeMobShot`:
+
+```
+HAZ | Union   | tr 1.00 | anc cog2(Model) < cogModel(Model) < steampunkRangeMobShot
+-   | precast | tr 0.80 | anc steampunkRangeMobShot(Model)
+```
+
+Same model, opposite verdicts. The cogs spawn **at the enemy**; the purple
+precast spawns **on the player** — a moment after we swung, because we swing
+constantly. That is precisely the window `markOwnIfRecent` reads as "one of
+ours". The first cast of any attack aimed at you survived because no swing
+preceded it; every one after was claimed as our own effect and waved through.
+It also explains why Select attack would not take it.
+
+Ground truth now beats timing: a structural or named enemy attack, or anything
+inside a creature, is never marked as ours, whatever the clock says.
+
+### Backing into walls
+Two changes, because the screenshot showed them compounding.
+
+- **Enemies are judged where they will be.** Each enemy carries a velocity
+  from its last position, and the danger test uses `position + velocity * t`.
+  A spot thirteen studs from an advancing mob is eight studs a second later;
+  scoring it where it *is* made the character sidestep into whatever was
+  beside it instead of backing away from the advance. Big bosses widen their
+  circle by their body, so a stomping leg counts — the log showed the Cyclops
+  landing hits with its legs at 2 studs while its root sat well outside the
+  circle.
+- **Walls are pockets, not just obstacles.** Reachability was already checked;
+  now three rays from each candidate — ahead and to both sides — price how
+  little room lies past it. A dead end costs; a pocket costs more. The loop
+  still stops as soon as no remaining base cost can beat the best adjusted
+  one, so it is a handful of extra rays per decision.
+
 ## 4.1.0 - 2026-09-02 - "Ground truth, all the way down"
 
 ### Most attacks were dropped one line after being detected

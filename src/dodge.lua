@@ -66,11 +66,46 @@ local function refreshSources()
 
     table.clear(DG.enemies)
     local character = LocalPlayer.Character
+    local clock = os.clock()
     for model in pairs(HZ.enemyModels) do
         if model ~= character and model.Parent and not Players:GetPlayerFromCharacter(model) then
             local part = model.PrimaryPart or model:FindFirstChild("HumanoidRootPart")
                 or model:FindFirstChildWhichIsA("BasePart")
-            if part then DG.enemies[#DG.enemies + 1] = part.Position end
+            if part then
+                local pos = part.Position
+
+                -- Velocity from where it was last decision. Enemies close on
+                -- you: a spot thirteen studs from one now is eight a second
+                -- later. Judging them where they WILL be is what makes the
+                -- character back away from an advance instead of sidestepping
+                -- into whatever happens to be beside it.
+                local prev = DG.enemyPrev[model]
+                local vx, vz = 0, 0
+                if prev then
+                    local dt = clock - prev.t
+                    if dt > 0.01 and dt < 1 then
+                        vx, vz = (pos.X - prev.x) / dt, (pos.Z - prev.z) / dt
+                        -- A jump this large is a teleport or a respawn, not motion.
+                        if vx * vx + vz * vz > 60 * 60 then vx, vz = 0, 0 end
+                    end
+                end
+                DG.enemyPrev[model] = { x = pos.X, z = pos.Z, t = clock }
+
+                -- Big bosses reach well past their root. The circle grows with
+                -- the body so a stomping leg counts; ordinary mobs add nothing.
+                local ext = DG.enemyExt[model]
+                if not ext or clock - ext.t > 0.5 then
+                    local extra = 0
+                    local ok, size = pcall(function() return model:GetExtentsSize() end)
+                    if ok and size then extra = min(max(max(size.X, size.Z) * 0.5 - 3, 0), 20) end
+                    ext = { r = extra, t = clock }
+                    DG.enemyExt[model] = ext
+                end
+
+                DG.enemies[#DG.enemies + 1] = {
+                    x = pos.X, y = pos.Y, z = pos.Z, vx = vx, vz = vz, extra = ext.r,
+                }
+            end
         end
     end
 
@@ -190,11 +225,14 @@ local function dangerAt(px, py, pz, t)
         end
     end
 
-    -- 4. Enemies. Melee never telegraphs: being next to one is the attack.
-    local hard, soft = CFG.dodgeEnemyRadius, max(CFG.dodgeEnemySoft, CFG.dodgeEnemyRadius + 0.1)
+    -- 4. Enemies, at time t - where an advancing one will be, not where it is.
+    -- Melee never telegraphs: being next to one is the attack.
+    local hard0, soft0 = CFG.dodgeEnemyRadius, CFG.dodgeEnemySoft
     for i = 1, #DG.enemies do
         local e = DG.enemies[i]
-        local dx, dz = px - e.X, pz - e.Z
+        local hard = hard0 + e.extra
+        local soft = max(soft0 + e.extra, hard + 0.1)
+        local dx, dz = px - (e.x + e.vx * t), pz - (e.z + e.vz * t)
         local d2 = dx * dx + dz * dz
         if d2 < soft * soft then
             local d = sqrt(d2)
@@ -337,12 +375,25 @@ local function decide(root, humanoid)
                 local len = sqrt(dx * dx + dz * dz)
                 local adjusted = c.cost
                 if len > 0.01 and CFG.dodgeCornerCost > 0 then
-                    local dir = Vector3.new(dx / len, 0, dz / len)
-                    local hit = Workspace:Raycast(Vector3.new(c.x, y + 1.5, c.z), dir * CFG.dodgeReach, params)
-                    if hit then
-                        local room = (hit.Position - Vector3.new(c.x, y + 1.5, c.z)).Magnitude
-                        adjusted = adjusted + CFG.dodgeCornerCost * (1 - room / CFG.dodgeReach)
+                    -- How much room is there PAST this spot - ahead, and to
+                    -- each side? A spot with a wall behind it is a dead end;
+                    -- one with walls beside it too is a pocket. Either is a
+                    -- place the next dodge cannot start from, and the character
+                    -- was sliding into exactly those and dying against them.
+                    local ux, uz = dx / len, dz / len
+                    local from = Vector3.new(c.x, y + 1.5, c.z)
+                    local reach = CFG.dodgeReach
+                    local pocket = 0
+                    for _, probe in ipairs(DG.pocketProbes) do
+                        local px2, pz2, weight = probe[1], probe[2], probe[3]
+                        local dir = Vector3.new(ux * px2 - uz * pz2, 0, uz * px2 + ux * pz2)
+                        local hit = Workspace:Raycast(from, dir * reach, params)
+                        if hit then
+                            local room = (hit.Position - from).Magnitude
+                            pocket = pocket + weight * (1 - room / reach)
+                        end
                     end
+                    adjusted = adjusted + CFG.dodgeCornerCost * pocket
                 end
                 c.adjusted = adjusted
                 if adjusted < bestCost then best, bestCost = c, adjusted end

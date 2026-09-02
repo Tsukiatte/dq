@@ -1346,6 +1346,16 @@ local function markOwnIfRecent(part, now)
     if Vector3.new(offset.X, 0, offset.Z).Magnitude > CFG.ownAttackRadius then return false end
 
     local lname = string.lower(part.Name)
+    -- Ground truth beats timing. An attack aimed AT the player spawns at the
+    -- player, a moment after we swung - which is precisely the window this
+    -- function reads as "one of ours". It was claiming the second cast of every
+    -- attack targeted at us as our own effect, so each was noticed once and
+    -- never again: the cogs of a shot spawned at the enemy and were dodged, the
+    -- precast of the same shot spawned on us and was waved through.
+    if not isKnownOwnEffect(part)
+        and (ATTACK_PARTS[lname] or isKnownEnemyAttack(part) or insideCreature(part)) then
+        return false
+    end
     -- The instance is ours; the NAME may be shared with the whole game.
     if NEVER_OWN[lname] then
         HZ.ownParts[part] = true

@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 4.1.0
+    VERSION : 4.1.1
     BUILD   : 2026-09-01
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "4.1.0"
+local SCRIPT_VERSION = "4.1.1"
 local SCRIPT_BUILD_DATE = "2026-09-01"
 local SCRIPT_CODENAME = "Ground truth, all the way down"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "4.1.1", date = "2026-09-02", notes = "Why the same attack was noticed once and never again: an attack aimed at the player spawns at the player, a moment after we swung, and the own-attack timing heuristic claimed it as one of our own effects. The capture showed it plainly - the cogs of a Cog Shooter shot spawned at the enemy and were dodged, the precast of the same shot spawned on us and was waved through. Ground truth now beats timing: a structural or named enemy attack, or anything inside a creature, is never marked as ours. Enemies are judged where they will be, not where they are, from their own velocity, so the character backs away from an advance instead of sidestepping into whatever is beside it; big bosses widen their circle by their body so a stomping leg counts. And walls are pockets now, not just obstacles: three rays from each candidate - ahead and to both sides - price how little room lies past it." },
     { version = "4.1.0", date = "2026-09-02", notes = "Most attacks were being dropped one line after being detected. 3.4.0 made classification structural so the invisible hitBox that actually damages you became a candidate - and the per-frame scan had its own transparency gate that threw it out again every frame. The precast showed, the precast faded, and the damage volume underneath was never dodged. Parts the game says are attacks are stamped as ground truth at classification and exempt from that gate. Creature body parts were reaching the appearance scorer whenever they sat inside a nested gear Model, because the creature check looked only at the nearest Model; it walks every ancestor now. Every hit names what was next to you, writes it into the capture, and learns an unknown culprit by its model name, so damage teaches detection again. The dodge charges extra for a spot with a wall right behind it - a pocket you cannot keep fleeing from - which is what stops the character reversing into a corner or a prop. And the search range is drawn as a ring." },
     { version = "4.0.0", date = "2026-09-02", notes = "The dodge is rebuilt from scratch around the thing that actually works in a few hundred lines: a box that is never in danger, and a character that follows it. clone.lua and threat.lua are gone - the 900-cell grid, the heat field, the space-time A*, the enclosure, cover, depth, freshness, hysteresis and slicing passes, and seventy-nine settings with them. What remains is 1009 lines across dodge, mover and precast. A few dozen points around the character are checked twenty times a second for what lands on the way there and what lands once you stop, at the moments those things happen, using exact geometry and timing for announced attacks, the footprint for physical ones, a swept segment for anything moving and a circle for every enemy. The box goes on the best point; the character goes to the box. There is no path: deciding every frame and moving exactly, the straight line is the path, and the on-the-way check is what keeps that line off anything that lands while you are on it. Ground truth detection, the precast listener and the collision-checked tween mover are kept unchanged." },
     { version = "3.6.2", date = "2026-09-02", notes = "Why steer and velocity both stood still: nothing was disabling Roblox's default control module. It calls Humanoid:Move every frame from input - with no keys held that is Move(zero) - on RenderStepped, BEFORE physics, while ours lands on Heartbeat after. Its stop is what physics sees. MoveTo survived only because it is a separate persistent mechanism. Tween is the default now, because writing the CFrame is the one path the control module cannot argue with, and it is what a script that tweens to a marker is doing. It is capped to the distance the character could actually have walked this frame, so the speed a server sees is ordinary walking speed, and each step is raycast so it never passes through anything - clipping through a wall is the one genuinely conspicuous thing about moving this way and it is now impossible. The Move-based modes take the player controls while they run and hand them straight back." },
@@ -856,7 +857,15 @@ DG.offsetsKey = ""
 DG.cands = {}                    -- scratch: one record per offset
 DG.order = {}                    -- scratch: candidate indices sorted by cost
 DG.pathFractions = { 0.34, 0.67, 1.0 }
+-- Directions probed for room beyond a candidate, in the candidate's own frame:
+-- (forward, sideways, weight). Ahead matters most; the sides are what turn a
+-- dead end into a pocket.
+DG.pocketProbes = { { 1, 0, 0.5 }, { 0, 1, 0.25 }, { 0, -1, 0.25 } }
 DG.enemies = {}
+-- Last seen position per enemy model, for velocity; body half-extent per
+-- model, refreshed occasionally. Both weak-keyed so dead enemies fall out.
+DG.enemyPrev = setmetatable({}, { __mode = "k" })
+DG.enemyExt = setmetatable({}, { __mode = "k" })
 DG.movers = {}
 DG.moverSet = {}
 DG.floorCache = {}
