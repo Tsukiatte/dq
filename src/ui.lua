@@ -41,17 +41,13 @@ local updateHazardHighlights = S.updateHazardHighlights
 local updateWallHighlights = S.updateWallHighlights
 local updateHitboxVisualizer = S.updateHitboxVisualizer
 local setTelegraphPickerEnabled = S.setTelegraphPickerEnabled
-local setTrialEnabled = S.setTrialEnabled
-local setFreezeEnabled = S.setFreezeEnabled
-local clearFrozenParts = S.clearFrozenParts
 local setLowDetailEnabled = S.setLowDetailEnabled
 local refreshLowDetail = S.refreshLowDetail
 local clearKeepList = S.clearKeepList
 local removeAttackRecord = S.removeAttackRecord
 local addZoneDef = S.addZoneDef
-local acceptRecommendation = S.acceptRecommendation
-local rejectRecommendation = S.rejectRecommendation
-local clearRecommendations = S.clearRecommendations
+local PC = S.PC
+local clearPrecastZones = S.clearPrecastZones
 local removeZoneDef = S.removeZoneDef
 local clearZonePreview = S.clearZonePreview
 local clearAttackBook = S.clearAttackBook
@@ -183,11 +179,10 @@ local function destructScript()
     setPathEditEnabled(false)
     stopMacroSubsystem()
     S.setCloneActive(false)
-    clearRecommendations()
+    clearPrecastZones()
     -- Through setLowDetailEnabled, so the mode flag is cleared first and the
     -- effect restore is not immediately undone.
     setLowDetailEnabled(false)
-    clearFrozenParts()
     destroyFacingRig()
     setPendingBindField(nil)
     setStreamerEnabled(false)
@@ -621,84 +616,58 @@ local function createControlUI()
         end, 1,
         "The attack book and the drawn zones below belong to this dungeon. Switching here switches everything else too."))
 
-    -- Recommendations: the scorer puts its candidates forward, you answer.
+    -- The game announces its own ground attacks; we listen rather than guess.
     K.caption(attacks.body,
-        "It puts forward what it thinks is an attack, held in the world in its own colour with a number on it. Tick if it is one, cross if it only looks like one. The entry stays after the attack is gone.", 2)
-    track(K.toggle(attacks.body, "Recommend candidates",
-        function() return CFG.recommendEnabled end, function(v) CFG.recommendEnabled = v end, 3,
-        "Off stops new ones being put forward. The list keeps what is already in it."))
-    track(K.slider(attacks.body, "Rate", "Recommendations per second",
-        0.2, 5, true,
-        function() return CFG.recommendRate end, function(v) CFG.recommendRate = v end, 4,
-        "How fast new candidates arrive. Nearest first, one at a time, never one already in the book or already answered."))
-    track(K.slider(attacks.body, "List size", "Entries kept at once",
-        3, 12, false,
-        function() return CFG.recommendMax end, function(v) CFG.recommendMax = v end, 5,
-        "Once the list is full nothing new arrives until you answer something or an old entry expires."))
-    local recommendList = K.list(attacks.body, 210, 6)
-    local recommendButtons = K.buttonRow(attacks.body, 7)
-    recommendButtons.add("Clear list", "ghost", function() clearRecommendations() end,
-        "Drop every entry without answering. Nothing is learned or rejected.")
+        "The game tells the client where every ground attack will land and exactly when. That is read directly - shape, position and time to impact - so these need no learning and no picking.", 2)
+    track(K.toggle(attacks.body, "Read announced attacks",
+        function() return CFG.usePrecast end,
+        function(v)
+            CFG.usePrecast = v
+            if v then S.startPrecastListener() else clearPrecastZones() end
+        end, 3,
+        "Listen to the game's own precastHitbox broadcast. Off falls back to judging attacks by how they look, which is much worse: the game's own telegraph part is invisible for its first fraction of a second."))
+    track(K.toggle(attacks.body, "Draw announced attacks",
+        function() return CFG.showPrecast end, function(v) CFG.showPrecast = v end, 4,
+        "Draw each announced attack, warming from yellow to red as its impact approaches. Ours, not the game's - the game's own marker is invisible at first."))
+    track(K.toggle(attacks.body, "Stand in safe spots",
+        function() return CFG.safeZoneEnabled end, function(v) CFG.safeZoneEnabled = v end, 5,
+        "Some bosses mark the one circle you must stand IN. With this off the dodge treats the floor as uniformly safe and calmly walks you out of it."))
 
-    S.refreshRecommendPanel = function()
-        if not recommendList.Parent then return end
-        for _, child in ipairs(recommendList:GetChildren()) do
-            if child:IsA("GuiObject") then child:Destroy() end
-        end
-        if #HZ.recommendations == 0 then
-            local l = K.label(recommendList,
-                CFG.recommendEnabled and "Waiting for something that looks like an attack."
-                    or "Recommendations are off.", "captionSub", 1)
-            l.Size = UDim2.new(1, 0, 0, 32)
-            l.TextWrapped = true
-            return
-        end
-        local now = os.clock()
-        for i, entry in ipairs(HZ.recommendations) do
-            local state = entry.gone and string.format("gone %.0fs ago", now - entry.gone)
-                or string.format("live, %.0f studs", entry.distance or 0)
-            local meta = string.format("%s%s%s", state,
-                entry.parentName ~= "" and ("  -  in " .. entry.parentName) or "",
-                entry.moving and "  -  moving" or "")
-            local row = K.listEntry(recommendList, string.format("#%d  %s", entry.index, entry.name),
-                meta, i, 2, 46, entry.color)
-            K.tip(row.frame, entry.melee
-                and "Inside a creature model: this is its swing hitbox. Ticking it adds it OFF, so the bot does not run from every enemy."
-                or "Tick: it is an attack, add it to this map's book. Cross: it only looks like one, never dodge or ask again.")
-            K.iconButton(row.actions, "check", function() acceptRecommendation(i) end, 1,
-                "Yes - this is an attack.")
-            K.iconButton(row.actions, "cross", function() rejectRecommendation(i) end, 2,
-                "No - it only looks like one.")
+    local precastLabel = K.label(attacks.body, "", "captionSub", 6)
+    precastLabel.Size = UDim2.new(1, 0, 0, 30)
+    precastLabel.TextWrapped = true
+    S.refreshPrecastPanel = function()
+        if not precastLabel.Parent then return end
+        if not CFG.usePrecast then
+            precastLabel.Text = "Not listening."
+        elseif PC.failed then
+            precastLabel.Text = "Could not attach to the game's broadcast; falling back to appearance scoring."
+        else
+            precastLabel.Text = string.format("Listening. %d attack(s) announced and pending, %d seen this run.",
+                #PC.zones, PC.total)
         end
     end
-    S.refreshRecommendPanel()
+    S.refreshPrecastPanel()
 
     K.caption(attacks.body,
-        "Or by hand: Freeze holds a copy of every attack that appears, so one that lasts half a second can be pointed at.", 8)
+        "By hand, for anything the broadcast does not cover: click an attack to add it to this map's book, or draw a hazard around a decoration that only announces one.", 8)
 
     local attackPickers = K.buttonRow(attacks.body, 9)
-    local freezeButton2, pickButton2, zoneButton
+    local pickButton2, zoneButton
     syncAttackButtons = function()
         local pickOn = HZ.pickerEnabled and not HZ.ownPickerEnabled and not LD.pickerEnabled and not ZN.pickerEnabled
         local zoneOn = HZ.pickerEnabled and ZN.pickerEnabled
-        freezeButton2.BackgroundColor3 = HZ.freezeEnabled and Color3.fromRGB(90, 190, 255) or T.SurfaceElement
-        freezeButton2.TextColor3 = HZ.freezeEnabled and T.TextOnAccent or T.TextPrimary
         pickButton2.BackgroundColor3 = pickOn and T.AccentMid or T.SurfaceElement
         pickButton2.TextColor3 = pickOn and T.TextOnAccent or T.TextPrimary
         zoneButton.BackgroundColor3 = zoneOn and T.AccentMid or T.SurfaceElement
         zoneButton.TextColor3 = zoneOn and T.TextOnAccent or T.TextPrimary
     end
-    freezeButton2 = attackPickers.add("Freeze", "ghost", function()
-        setFreezeEnabled(not HZ.freezeEnabled)
-        syncAttackButtons()
-        syncPickerButtons()
-    end, "Hold a still copy of every attack that appears, so a telegraph that lasts half a second can be pointed at.")
     pickButton2 = attackPickers.add("Select attack", "ghost", function()
         local on = not (HZ.pickerEnabled and not HZ.ownPickerEnabled and not LD.pickerEnabled and not ZN.pickerEnabled)
         setTelegraphPickerEnabled(on, "telegraph")
         syncAttackButtons()
         syncPickerButtons()
-    end, "Click an attack - or a frozen copy of one - to add it to this map's Attack Book.")
+    end, "Click an attack to add it to this map's Attack Book.")
     zoneButton = attackPickers.add("Draw zone", "ghost", function()
         local on = not (HZ.pickerEnabled and ZN.pickerEnabled)
         setTelegraphPickerEnabled(on, "zone")
@@ -971,6 +940,9 @@ local function createControlUI()
     table.insert(legacySections, navigation)
     -- Testing switches. Negative orders put them above everything else in the
     -- section without renumbering it.
+    track(K.toggle(navigation.content, "Follow the game's map",
+        function() return CFG.autoDetectMap end, function(v) CFG.autoDetectMap = v end, -3,
+        "The game publishes the dungeon name in Workspace.dungeonName. With this on the map picker follows it, so waypoints, macros and the attack book all switch themselves when you enter a dungeon."))
     track(K.toggle(navigation.content, "Pathfinding",
         function() return CFG.pathfindingEnabled end, function(v) CFG.pathfindingEnabled = v end, -2,
         "Off stops the bot driving your character: no pursuit, no waypoints, no recovery. It still picks targets and swings if one is in reach. For testing."))
@@ -1037,7 +1009,7 @@ local function createControlUI()
         "A moving attack is treated as filling the strip it will cross in this long, so it steps out of the line rather than away from where the projectile is now."))
 
     local pickers = K.buttonRow(telegraphs.content, 6)
-    local pickTelegraphButton, pickOwnButton, freezeButton
+    local pickTelegraphButton, pickOwnButton
     syncPickerButtons = function()
         local telegraphOn = HZ.pickerEnabled and not HZ.ownPickerEnabled and not LD.pickerEnabled
         local ownOn = HZ.pickerEnabled and HZ.ownPickerEnabled
@@ -1046,8 +1018,6 @@ local function createControlUI()
         pickTelegraphButton.TextColor3 = telegraphOn and T.TextOnAccent or T.TextPrimary
         pickOwnButton.BackgroundColor3 = ownOn and T.AccentMid or T.SurfaceElement
         pickOwnButton.TextColor3 = ownOn and T.TextOnAccent or T.TextPrimary
-        freezeButton.BackgroundColor3 = HZ.freezeEnabled and Color3.fromRGB(90, 190, 255) or T.SurfaceElement
-        freezeButton.TextColor3 = HZ.freezeEnabled and T.TextOnAccent or T.TextPrimary
         if UI.keepPickerButton then
             UI.keepPickerButton.BackgroundColor3 = keepOn and T.AccentMid or T.SurfaceElement
             UI.keepPickerButton.TextColor3 = keepOn and T.TextOnAccent or T.TextPrimary
@@ -1056,21 +1026,13 @@ local function createControlUI()
     pickTelegraphButton = pickers.add("Pick attack", "ghost", function()
         setTelegraphPickerEnabled(not (HZ.pickerEnabled and not HZ.ownPickerEnabled and not LD.pickerEnabled), "telegraph")
         syncPickerButtons()
-    end, "Click an attack in the world - or a frozen copy of one - to add it to the Attack Book.")
+    end, "Click an attack in the world to add it to the Attack Book.")
     pickOwnButton = pickers.add("Pick own FX", "ghost", function()
         setTelegraphPickerEnabled(not (HZ.pickerEnabled and HZ.ownPickerEnabled), "own")
         syncPickerButtons()
     end, "Click one of your OWN ability effects to mark it as yours, so the bot stops dodging its own attacks.")
-    freezeButton = pickers.add("Freeze", "ghost", function()
-        setFreezeEnabled(not HZ.freezeEnabled)
-        syncPickerButtons()
-    end, "Hold a copy of every attack that appears. A telegraph only exists for half a second, which is not long enough to point at - this keeps one still so you can.")
     UI.pickerButton = pickTelegraphButton
 
-    track(K.toggle(telegraphs.content, "Trial run (learn from damage)",
-        function() return HZ.trialEnabled end,
-        function(v) setTrialEnabled(v) end, 7,
-        "Every hit you take is matched to whatever appeared around you just before it, and written into the Attack Book. Works with the loop off - stand still and let things hit you."))
 
     K.caption(telegraphs.content, "Learned attack names", 8)
     local learnedList = K.list(telegraphs.content, 120, 9)

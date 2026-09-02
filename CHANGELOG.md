@@ -11,6 +11,70 @@ file and that table in sync on every edit.
 
 ---
 
+## 3.0.0 - 2026-09-02 - "Ground truth"
+
+The script stops guessing what an attack is and listens to the game tell it.
+Everything here comes from reading the place file; see `game/GAME_NOTES.md`.
+
+### It listens now
+- `ReplicatedStorage.modules.PrecastHitbox` broadcasts **every ground attack**
+  on a BridgeNet2 bridge, carrying the shape (Cube or Circle), the exact
+  geometry, `startTime`, and **`delayUntilAttack`**. We require the same module
+  the game does and connect to the same bridge.
+- **Time to impact is arithmetic**, not something learned from being hit:
+  `delayUntilAttack - (GetServerTimeNow() - startTime)`.
+- This matters more than it sounds. The part the game builds starts at
+  `Transparency = 1` — **fully invisible** — with `CanQuery` false, parented
+  straight to `workspace`, and only fades in over 0.15 s. It is close to the
+  worst case for an appearance scorer and trivial for a listener.
+- Announced attacks are drawn in our own colours, warming from yellow to red as
+  impact approaches.
+- If the bridge is ever missing the listener says so and the appearance scorer
+  carries on underneath.
+
+### Cells are judged at the time you would arrive
+`isPositionSafeFromDamageBricks` takes an `atTime`, and the clone grid passes
+each cell's walking distance over WalkSpeed. So the bot can **cross a marker
+that fires in a second and a half** to reach real safety, instead of treating
+every marker as a wall and being cornered by the third one.
+
+### It knows whose attack it is
+- **238 enemy attack names** from `ReplicatedStorage.enemyProjectiles` and
+  **293 of ours** from `.projectiles` / `.abilities`, as lookup tables. That is
+  precisely the mine-or-theirs question the scorer used to guess at, and it is
+  now answered before any heuristic runs.
+- Gear and mob templates are deliberately excluded: an Accessory named
+  `bossRifle` is a weapon an enemy is holding, and fleeing from it would mean
+  fleeing from every enemy in the room.
+
+### Safe-spot bosses
+Some bosses mark the one circle you **must stand in** — `safeSpotCircle`,
+`thirdBossSafeSpots`, `cyanSafeZoneMarker` and friends. These are attractors
+now, not hazards. Before this, dodging was **actively worse than no dodging**
+on those fights: the grid saw uniform safety and calmly walked you out of the
+only survivable place on the floor.
+
+### Smaller things it can now just read
+- **The map follows `Workspace.dungeonName`**, so waypoints, macros, the attack
+  book and the drawn zones all switch themselves on entering a dungeon.
+- **Enemies are scanned from `Workspace.enemies`** rather than all of Workspace.
+- **Our own casts come from the `abilityCast` / `abilityUsed` remotes** — exact,
+  fired before the effect spawns, and impossible to confuse with an enemy
+  playing a similar animation.
+
+### Removed
+All three existed to work around not knowing what an attack was:
+- **Freeze.** Its whole purpose was holding a copy of a telegraph that lasts
+  half a second so you could point at it. Those arrive as data now, before they
+  are visible.
+- **Trial runs / damage correlation.** The plan was to learn `hitDelay` from
+  being hit. The number is transmitted.
+- **The recommendation queue.** Built to correct the scorer; the scorer now has
+  ground truth for the things it used to get wrong.
+
+Manual picking and hand-drawn zones stay, for anything the broadcast does not
+cover.
+
 ## 2.15.1 - 2026-09-02
 - **Clone discs are sized from your real footprint.** They were sized from the
   HumanoidRootPart, which is two studs wide; the body with its limbs is wider.
