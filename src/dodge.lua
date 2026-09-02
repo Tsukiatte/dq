@@ -8,6 +8,7 @@ local CFG = S.CFG
 local HZ = S.HZ
 local PC = S.PC
 local DG = S.DG
+local NAV = S.NAV
 local Workspace = S.Workspace
 local LocalPlayer = S.LocalPlayer
 local Players = S.Players
@@ -237,7 +238,7 @@ local function dangerAt(px, py, pz, t)
         if d2 < soft * soft then
             local d = sqrt(d2)
             if d < hard then return 1 end
-            worst = max(worst, 0.5 * (1 - (d - hard) / (soft - hard)))
+            worst = max(worst, CFG.dodgeEnemySoftWeight * (1 - (d - hard) / (soft - hard)))
         end
     end
 
@@ -318,26 +319,55 @@ local function decide(root, humanoid)
     -- Here: now, and a moment from now. Standing still is a decision too.
     DG.dangerHere = max(dangerAt(rx, ry, rz, 0), dangerAt(rx, ry, rz, dwell * 0.5), dangerAt(rx, ry, rz, dwell))
 
+    -- Who we are trying to get to, if anyone. The box drifts toward them
+    -- through safe ground and holds still when there is none: that is the
+    -- whole of "approach" now, and pursuit no longer moves the character in
+    -- this mode.
+    local approach = nil
+    if RT.farmEnabled and not CFG.dodgeManual and NAV.cachedEnemy and NAV.cachedEnemy.Parent then
+        local er = NAV.cachedEnemy:FindFirstChild("HumanoidRootPart") or NAV.cachedEnemy.PrimaryPart
+        if er then approach = er.Position end
+    end
+    local preferred = max(CFG.attackRange, CFG.dodgeEnemyRadius + 1)
+    local approachWeight = CFG.dodgeApproachWeight
+
     -- Score every candidate. Cheap: it is arithmetic, no raycasts yet.
     local cands = DG.cands
     local distCost = CFG.dodgeDistanceCost
+    local fractions = DG.pathFractions
     for i, off in ipairs(DG.offsets) do
         local c = cands[i]
         if not c then c = {} cands[i] = c end
         local cx, cz = rx + off.x, rz + off.z
         local T = off.dist / speed
-        -- On the way: what lands on the line while I am on it.
-        local worst = 0
-        for _, f in ipairs(DG.pathFractions) do
-            worst = max(worst, dangerAt(rx + off.x * f, ry, rz + off.z * f, T * f))
-            if worst >= 1 then break end
+
+        -- Five samples: three on the way, two once there. The score is half
+        -- the worst of them and half the average - a spot that is hit at one
+        -- moment on the way is not as bad as one that is hit at every moment,
+        -- and in a field where everything is hit at SOME moment that
+        -- difference is the only gradient there is. Pure max made every
+        -- candidate in a bullet hell read exactly 1.0 and the nearest won.
+        local worst, total = 0, 0
+        for k = 1, #fractions do
+            local f = fractions[k]
+            local d = dangerAt(rx + off.x * f, ry, rz + off.z * f, T * f)
+            total = total + d
+            if d > worst then worst = d end
         end
-        -- Once there: what lands on the spot while I am standing on it.
-        if worst < 1 then
-            worst = max(worst, dangerAt(cx, ry, cz, T + dwell * 0.5), dangerAt(cx, ry, cz, T + dwell))
-        end
+        local d1 = dangerAt(cx, ry, cz, T + dwell * 0.5)
+        local d2 = dangerAt(cx, ry, cz, T + dwell)
+        total = total + d1 + d2
+        if d1 > worst then worst = d1 end
+        if d2 > worst then worst = d2 end
+        local graded = worst * 0.5 + (total / (#fractions + 2)) * 0.5
+
         c.x, c.z, c.dist, c.danger = cx, cz, off.dist, worst
-        c.cost = worst + off.dist * distCost
+        c.cost = graded + off.dist * distCost
+        if approach then
+            local ax, az = cx - approach.X, cz - approach.Z
+            local toEnemy = sqrt(ax * ax + az * az)
+            c.cost = c.cost + approachWeight * max(0, toEnemy - preferred)
+        end
         c.valid = nil
         c.y = nil
     end
@@ -423,11 +453,31 @@ local function decide(root, humanoid)
     end
 
     if DG.dangerHere < CFG.dodgeMoveAt then
-        -- Here is fine. The box comes home and the character can get on with
-        -- fighting.
-        DG.target = nil
-        DG.targetReason = "safe here"
-        return
+        -- Here is safe. Stay if there is no one to close on, or we are already
+        -- in range of them - otherwise let the box drift toward them, but ONLY
+        -- onto a spot that is itself safe. A pattern with no safe way forward
+        -- means waiting here, which is what a person does in a bullet hell.
+        local inRange = true
+        if approach then
+            local ax, az = rx - approach.X, rz - approach.Z
+            inRange = sqrt(ax * ax + az * az) <= preferred + 1.5
+        end
+        if inRange or not best or best.danger >= CFG.dodgeMoveAt then
+            DG.target = nil
+            DG.targetReason = inRange and "safe here" or "waiting for a gap"
+            return
+        end
+        -- Hysteresis for the approach too, or the box creeps a stud at a time.
+        local hereCost = 0
+        if approach then
+            local ax, az = rx - approach.X, rz - approach.Z
+            hereCost = approachWeight * max(0, sqrt(ax * ax + az * az) - preferred)
+        end
+        if (best.adjusted or best.cost) > hereCost - CFG.dodgeHysteresis then
+            DG.target = nil
+            DG.targetReason = "safe here"
+            return
+        end
     end
 
     if best then

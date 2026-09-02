@@ -2281,7 +2281,15 @@ rebuildHazardVolumes = function()
     local groups, loose = {}, {}
     for _, part in ipairs(HZ.detected) do
         local model = part:FindFirstAncestorOfClass("Model")
-        if model then
+        -- A part the game itself says is an attack is exact geometry and is
+        -- never merged. Clustering exists for a swarm of decorative meshes;
+        -- applied to a boss pattern of forty hitBoxes under one Model it
+        -- produced ONE box the size of the arena, every candidate read as
+        -- lethal, and the pockets between the bullets did not exist as far as
+        -- the dodge could see.
+        if HZ.groundTruth[part] then
+            loose[#loose + 1] = part
+        elseif model then
             local g = groups[model]
             if not g then g = {} groups[model] = g end
             g[#g + 1] = part

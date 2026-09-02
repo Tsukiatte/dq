@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 4.1.1
+    VERSION : 4.2.0
     BUILD   : 2026-09-01
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "4.1.1"
+local SCRIPT_VERSION = "4.2.0"
 local SCRIPT_BUILD_DATE = "2026-09-01"
-local SCRIPT_CODENAME = "Ground truth, all the way down"
+local SCRIPT_CODENAME = "The box is the approach"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "4.2.0", date = "2026-09-02", notes = "Bullet hell. The HUD showed forty-two telegraphs detected and the whole floor red with the box on a lethal spot, so detection was working and the dodge was being handed a field it could not read. Three causes. The mesh-swarm clustering from 3.0.5 merged a boss pattern of forty hitBoxes under one Model into one bounding box the size of the arena, so every candidate read as lethal and the pockets between bullets did not exist as far as the dodge could see - exact attack geometry is never merged now. The candidate score was the worst of its five samples, which in a busy field is 1.0 for every candidate with no gradient left, so the nearest won; it is now half the worst and half the average, and a spot hit at one moment beats one hit at every moment. And pursuit walked straight through the pattern to get in range: the box is the approach now, drifting toward the target only across safe ground and waiting when there is none, which is what a person does in a bullet hell. The field is denser too, four rings of twenty-four, because the pockets are small." },
     { version = "4.1.1", date = "2026-09-02", notes = "Why the same attack was noticed once and never again: an attack aimed at the player spawns at the player, a moment after we swung, and the own-attack timing heuristic claimed it as one of our own effects. The capture showed it plainly - the cogs of a Cog Shooter shot spawned at the enemy and were dodged, the precast of the same shot spawned on us and was waved through. Ground truth now beats timing: a structural or named enemy attack, or anything inside a creature, is never marked as ours. Enemies are judged where they will be, not where they are, from their own velocity, so the character backs away from an advance instead of sidestepping into whatever is beside it; big bosses widen their circle by their body so a stomping leg counts. And walls are pockets now, not just obstacles: three rays from each candidate - ahead and to both sides - price how little room lies past it." },
     { version = "4.1.0", date = "2026-09-02", notes = "Most attacks were being dropped one line after being detected. 3.4.0 made classification structural so the invisible hitBox that actually damages you became a candidate - and the per-frame scan had its own transparency gate that threw it out again every frame. The precast showed, the precast faded, and the damage volume underneath was never dodged. Parts the game says are attacks are stamped as ground truth at classification and exempt from that gate. Creature body parts were reaching the appearance scorer whenever they sat inside a nested gear Model, because the creature check looked only at the nearest Model; it walks every ancestor now. Every hit names what was next to you, writes it into the capture, and learns an unknown culprit by its model name, so damage teaches detection again. The dodge charges extra for a spot with a wall right behind it - a pocket you cannot keep fleeing from - which is what stops the character reversing into a corner or a prop. And the search range is drawn as a ring." },
     { version = "4.0.0", date = "2026-09-02", notes = "The dodge is rebuilt from scratch around the thing that actually works in a few hundred lines: a box that is never in danger, and a character that follows it. clone.lua and threat.lua are gone - the 900-cell grid, the heat field, the space-time A*, the enclosure, cover, depth, freshness, hysteresis and slicing passes, and seventy-nine settings with them. What remains is 1009 lines across dodge, mover and precast. A few dozen points around the character are checked twenty times a second for what lands on the way there and what lands once you stop, at the moments those things happen, using exact geometry and timing for announced attacks, the footprint for physical ones, a swept segment for anything moving and a circle for every enemy. The box goes on the best point; the character goes to the box. There is no path: deciding every frame and moving exactly, the straight line is the path, and the on-the-way check is what keeps that line off anything that lands while you are on it. Ground truth detection, the precast listener and the collision-checked tween mover are kept unchanged." },
@@ -459,8 +460,8 @@ CFG.autoDetectMap = true
 -- were caught fighting each other three times in six versions.
 CFG.dodgeInterval = 0.05         -- seconds between decisions
 CFG.dodgeReach = 18              -- studs to the outer ring of candidates
-CFG.dodgeRings = 3
-CFG.dodgeRays = 16
+CFG.dodgeRings = 4
+CFG.dodgeRays = 24
 CFG.dodgeProbe = 0               -- studs; 0 uses the root part's radius
 CFG.dodgeMargin = 0.5            -- clearance on top of the probe
 CFG.dodgeShoulder = 3.0          -- studs of warm edge outside a hazard
@@ -481,6 +482,14 @@ CFG.dodgeManual = false          -- dodge only; you drive the rest
 CFG.dodgeShowField = true
 CFG.dodgeShowTarget = true
 CFG.dodgeShowRange = true        -- draw the ring the candidates sit inside
+-- The box IS the approach. Among safe spots it prefers ones nearer the
+-- target, so the character closes on the boss only through ground that is
+-- clear and simply waits when there is none. Pursuit no longer drives in
+-- Dodge mode; it was walking straight through the pattern to get in range.
+CFG.dodgeApproachWeight = 0.012  -- danger-equivalent per stud short of the target
+-- Enemy soft ring is a preference, not a danger: it must sit below dodgeMoveAt
+-- or standing at attack range reads as unsafe and the character oscillates.
+CFG.dodgeEnemySoftWeight = 0.12
 -- A spot with a wall right behind it is a pocket. Continuing to flee from
 -- there is impossible, so it costs extra in proportion to how little room
 -- there is beyond it.

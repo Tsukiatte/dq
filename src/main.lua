@@ -205,7 +205,11 @@ local function attackEnemy(enemy)
 
     -- With pathfinding off the bot still picks a target and still swings if it
     -- happens to be in reach; it just stops driving your character there.
-    if CFG.pathfindingEnabled then
+    if DG.active and CFG.dodgeEnabled then
+        -- The box is the approach. Pursuit drove straight through the pattern
+        -- to get in range; the box closes on the target only across safe ground
+        -- and waits when there is none.
+    elseif CFG.pathfindingEnabled then
         updatePursuitMovement(enemy, humanoid, root, enemyRoot)
     else
         setMovementState("pathfinding off (testing)")
@@ -643,8 +647,9 @@ local function startAutofarm()
             -- an en-route box keeps it in charge until it arrives.
             local inHazard
             if DG.active then
-                inHazard = CFG.dodgeEnabled
-                    and (DG.target ~= nil or DG.dangerHere >= CFG.dodgeMoveAt)
+                -- The box is in charge whenever it has somewhere to be, whether
+                -- that is out of danger or nearer the target.
+                inHazard = CFG.dodgeEnabled and DG.target ~= nil
             else
                 inHazard = CFG.dodgeEnabled and not isPositionSafeFromDamageBricks(root.Position, 0.5)
             end
