@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 4.5.0
+    VERSION : 4.5.1
     BUILD   : 2026-09-02
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "4.5.0"
+local SCRIPT_VERSION = "4.5.1"
 local SCRIPT_BUILD_DATE = "2026-09-02"
 local SCRIPT_CODENAME = "Telegraphs are floor"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "4.5.1", date = "2026-09-02", notes = "Two things from two screenshots. A played-out attack is nothing now: a precast that was visible and has faded all the way, plus a short linger, marks its attack as over, and it leaves the detected set - no danger, no highlight, not in the count. The strips of a beam pattern stayed red for seconds after the beams had fired and the dodge kept weaving between attacks that were over. The amber colour and the tag are honest now: amber and floor 2.3s only while the dodge actually treats the part as floor, arms in when its impact is within the lead, announced when its timing is unknown and it is being dodged as live. A hit taken while announced saves that attack as live-from-spawn permanently rather than letting it be re-learned from its fade next session. And the wall: every pursuit probe looked at chest height, and the plinth of a pillar is below that, so the probes said clear, the feet hit the plinth, and the character stood into the wall. Forward, side and segment probes have a shin-height ray now, and a character that has stopped moving on a path for more than a moment sidesteps, alternating sides, hops, and lets the path recompute." },
     { version = "4.5.0", date = "2026-09-02", notes = "Telegraphs are floor. The boss arena was a lattice of red strips for five seconds before a single beam fired, and the dodge treated every strip as live from the moment it appeared, carving its safe ground into slivers to avoid attacks that were not happening - the video showed forty-one telegraphs and the character weaving between strips at 1.5 seconds old that fired at 4.8. The game's own client script says how to tell: every attack is a Model with an invisible hitBox and a visible precast, and the precast is faded OUT at the instant the hit lands. So a visible precast is a telegraph, the fade is the hit, and a hitBox that moves is live regardless. Each attack's arming age is learned by its Model name and saved, so the next cast is time-aware from the moment it appears: floor until its lead, then danger. The first cast of anything is still dodged as if live, and a hit taken while an attack reads as a telegraph makes that attack live from spawn from then on. Announced-but-not-live parts are drawn amber with arms in 2.3s on the tag and turn red the frame they arm. And the floor probe now starts just above the root rather than four studs up: under the pipes of a boss room it was reading a pipe as the floor and rejecting every spot - waiting for a gap with nothing wrong but the ceiling, in the corner the character then died in." },
     { version = "4.4.1", date = "2026-09-02", notes = "Two numbers from 4.4.0 were wrong in the same direction. The enemy circle was body plus swing at 1.5, and enemies were extrapolated by their velocity out to the dwell - so a mob walking at you was predicted onto every spot near you and the only safe ground was always further back: the character kited two idle melee bots backward into a wall two rooms away. The hard circle is the body and nothing more now - the swing is an attack, and the game spawns a hitBox for it that is detected like any other - with a soft ring out to the standoff as a preference, and enemies are extrapolated 0.4 seconds ahead at most. And inside the boss's ball the exit was chosen sideways and slowly: the discount that ended the shuffle zeroed every path sample inside the ball, so nothing said shortest time inside, and the new turn cost then picked the exit by whichever way the character had last walked. Path samples inside the thing already hitting you keep half their cost in the average, so three samples in the ball cost more than one and the nearest edge wins; the turn cost is switched off while something is on you; and the pull toward the boss applies only to spots whose whole line is clean, undiscounted, so the exit nearest the boss cannot beat the exit nearest the edge." },
     { version = "4.4.0", date = "2026-09-02", notes = "Pick a side. The left-right shuffle against a sweeping beam had a cause 4.3.0 made worse: standing inside the beam, every line out starts inside it, so the new line check read every held box as closed the moment it was chosen and the choice re-rolled between two identical sides each decision. Path samples now discount whatever is already on you - what is hitting you is not a reason to prefer one way out over another; how soon the line is clear of it is - and a change of direction costs, a reversal most, so the side picked first is kept until the other is clearly better, which a closed line always is. Enemies outrank attacks at 1.5 against 1.0: a line through a mob loses to a line through an attack and is taken only when everything else is worse, so it no longer strafes out of an attack into a mob, and cornered with the mob as the only way out it goes through the mob. The enemy is the distance: the Safe distance and Enemy space sliders are gone, and the chase and the dodge both stand at the enemy's body plus a swing, capped by your own attack range so it can always reach. The walk into the boss had three causes: the pull toward the target was applied to dangerous spots too and was decisive in a crowded field, so the nearest-to-the-boss won - it applies among safe spots only now; the raycast budget cut off at twelve and a crowded field whose twelve cheapest spots all failed left nothing, so the blind fallback ran - it keeps checking until something safe passes; and the blind fallback itself read fields its entries do not have and fled the first enemy in the table rather than the nearest. Pursuit holds while the dodge is waiting for a gap - five clear studs at a time was how it walked into a pattern one step per tick. Pursuit goals are kept off walls: two hip-height side rays push the goal off any wall closer than the character's clearance, and the dodge's walk check is a body-wide sweep rather than a centre line. Legacy is called Pathfind." },
@@ -159,6 +160,7 @@ CFG.faceTarget = true
 
 CFG.attackRange = 10
 CFG.wallPadding = 2.0
+CFG.wallStallTime = 0.6     -- seconds without moving, on a path, before a sidestep
 -- How the basic attack is delivered (3.2.3).
 --   "auto"  - Tool:Activate() when a tool is equipped, click if not
 --   "tool"  - Tool:Activate() only; never touches the mouse
@@ -467,6 +469,8 @@ CFG.dodgeInsideWeight = 0.5
 -- appears is never treated as a telegraph again.
 CFG.armFadeStep = 0.08
 CFG.armMinDelay = 0.3
+-- Seconds after a precast has fully faded before the attack counts as over.
+CFG.armDoneLinger = 0.3
 CFG.dodgeMoverMinSpeed = 3       -- studs/sec before a hazard counts as moving
 CFG.dodgeMoverWindow = 0.15      -- half-width, seconds, of a mover's swept segment
 CFG.dodgeMaxClimb = 3.0

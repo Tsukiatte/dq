@@ -954,7 +954,12 @@ local function updateHazardHighlights()
             local velocity = getHazardMotion(part)
             local st = HZ.armState[part]
             local pending = st ~= nil and st.armedAt == nil
-            local color = pending and CFG.colorTelegraphPending or CFG.colorTelegraph
+            -- Amber only while the dodge actually treats it as floor: known
+            -- timing, and more than the lead away. Announced with unknown
+            -- timing is dodged as live, and is drawn that way.
+            local eta = pending and st.impactAt and (st.impactAt - now) or nil
+            local floorNow = eta ~= nil and eta > CFG.dodgeLead
+            local color = floorNow and CFG.colorTelegraphPending or CFG.colorTelegraph
 
             -- Name tag.
             if CFG.hazardTagEnabled then
@@ -986,11 +991,12 @@ local function updateHazardHighlights()
                     if velocity then
                         text = string.format("%s  >> %.0f st/s", hazardDisplayName(part),
                             Vector3.new(velocity.X, 0, velocity.Z).Magnitude)
-                    elseif pending and st.impactAt then
-                        text = string.format("%s  arms in %.1fs", hazardDisplayName(part),
-                            math.max(st.impactAt - now, 0))
+                    elseif floorNow then
+                        text = string.format("%s  floor %.1fs", hazardDisplayName(part), eta - CFG.dodgeLead)
+                    elseif eta then
+                        text = string.format("%s  arms in %.1fs", hazardDisplayName(part), math.max(eta, 0))
                     elseif pending then
-                        text = string.format("%s  telegraph %.1fs", hazardDisplayName(part),
+                        text = string.format("%s  announced %.1fs", hazardDisplayName(part),
                             math.max(now - (HZ.spawnTimes[part] or now), 0))
                     else
                         text = string.format("%s  %.1fs", hazardDisplayName(part),
@@ -2414,11 +2420,13 @@ local function updateArming(now)
                 local spawn = HZ.seenAt[part] or HZ.spawnTimes[part] or now
                 st = { name = name, spawn = spawn, precast = pc or false, minT = math.huge,
                        armedAt = nil, impactAt = nil, seen = now }
-                if not pc then
+                local delay = RT.armDelays[name]
+                if not pc or delay == 0 then
+                    -- No precast, or one that has hit us while announced
+                    -- before (saved as 0): live from the start.
                     st.armedAt = now
-                else
-                    local delay = RT.armDelays[name]
-                    if delay then st.impactAt = spawn + delay end
+                elseif delay then
+                    st.impactAt = spawn + delay
                 end
                 HZ.arming[model] = st
             end
@@ -2436,11 +2444,29 @@ local function updateArming(now)
                     if not st.armedAt and getHazardMotion(part) then st.armedAt = now end
                     if st.armedAt then
                         local age = st.armedAt - st.spawn
-                        if age >= CFG.armMinDelay then
-                            local known = RT.armDelays[st.name]
-                            if not known or age < known then RT.armDelays[st.name] = age end
+                        local known = RT.armDelays[st.name]
+                        if known ~= 0 then
+                            if age >= CFG.armMinDelay then
+                                if not known or age < known then RT.armDelays[st.name] = age end
+                            else
+                                RT.armDelays[st.name] = 0
+                            end
+                        end
+                    end
+                elseif not st.doneAt then
+                    -- Armed, and now played out: a precast that was visible
+                    -- and has faded all the way is an attack that has
+                    -- happened. The strips of a beam pattern stayed red for
+                    -- seconds after the beams had fired, and the dodge kept
+                    -- weaving between attacks that were over. A short linger
+                    -- covers a hitBox that outlives its precast by a moment.
+                    local pc = st.precast
+                    if pc and st.minT < 0.9 then
+                        if not pc.Parent or pc.Transparency >= 0.97 then
+                            st.fadedAt = st.fadedAt or now
+                            if now - st.fadedAt >= CFG.armDoneLinger then st.doneAt = now end
                         else
-                            RT.armDelays[st.name] = nil
+                            st.fadedAt = nil
                         end
                     end
                 end
@@ -2448,6 +2474,18 @@ local function updateArming(now)
         end
         HZ.armState[part] = st
     end
+    -- Played-out attacks leave the detected set entirely: no danger, no
+    -- highlight, not in the count.
+    local kept, n = HZ.detected, 0
+    for i = 1, #kept do
+        local part = kept[i]
+        local st = HZ.armState[part]
+        if not (st and st.doneAt) then
+            n = n + 1
+            kept[n] = part
+        end
+    end
+    for i = #kept, n + 1, -1 do kept[i] = nil end
 end
 
 -- A hit taken while the nearest attack was still reading as a telegraph is
@@ -2457,7 +2495,9 @@ local function noteTelegraphHit(part)
     local st = part and HZ.armState[part]
     if st and not st.armedAt then
         st.armedAt = os.clock()
-        RT.armDelays[st.name] = nil
+        -- Saved as 0, so it stays live-from-spawn across sessions rather
+        -- than being re-learned from its fade next time.
+        RT.armDelays[st.name] = 0
         heavyDebug("Attacks", string.format("'%s' hit while announced; it is live from spawn from now on.", st.name))
     end
 end

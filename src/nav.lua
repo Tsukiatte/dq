@@ -180,6 +180,7 @@ end
 
 -- Reused across calls so the clearance test allocates nothing per candidate.
 local SEGMENT_PROBE_HEIGHT = Vector3.new(0, 2.8, 0)
+local SHIN_PROBE_HEIGHT = Vector3.new(0, -1.5, 0)   -- about a stud and a half above the floor
 local SEGMENT_SIDE_OFFSETS = { 0, 0, 0 }
 
 local function isPathSegmentClear(fromPosition, toPosition, enemy)
@@ -209,6 +210,16 @@ local function isPathSegmentClear(fromPosition, toPosition, enemy)
     for i = 1, 3 do
         local origin = fromPosition + SEGMENT_PROBE_HEIGHT + (side * sideOffsets[i])
         local destination = toPosition + SEGMENT_PROBE_HEIGHT + (side * sideOffsets[i])
+        local hit = Workspace:Raycast(origin, destination - origin, params)
+        if hit and hit.Instance and hit.Instance.CanCollide then
+            return false
+        end
+    end
+    -- And one at shin height down the middle. The plinth of a pillar sits
+    -- below the chest ray; the character walked into it and stayed there.
+    do
+        local origin = fromPosition + SHIN_PROBE_HEIGHT
+        local destination = toPosition + SHIN_PROBE_HEIGHT
         local hit = Workspace:Raycast(origin, destination - origin, params)
         if hit and hit.Instance and hit.Instance.CanCollide then
             return false
@@ -1180,15 +1191,20 @@ local function keepOffWalls(root, goal, enemy)
     local side = Vector3.new(-dir.Z, 0, dir.X)
     local _, playerRadius = getPlayerHitboxMetrics()
     local clearance = math.max(CFG.wallPadding, playerRadius + 0.6)
-    local origin = root.Position + Vector3.new(0, 0.5, 0)
     wallParams.FilterDescendantsInstances = getRaycastExclusions(enemy)
     local shift = 0
     for _, s in ipairs({ 1, -1 }) do
-        local hit = Workspace:Raycast(origin, side * (s * clearance), wallParams)
-        if hit and hit.Instance and hit.Instance.CanCollide then
-            local room = (hit.Position - origin).Magnitude
-            shift = shift - s * (clearance - room)
+        -- Hip and shin: a plinth or a step is below the hip ray.
+        local room = clearance
+        for _, h in ipairs({ 0.5, -1.5 }) do
+            local origin = root.Position + Vector3.new(0, h, 0)
+            local hit = Workspace:Raycast(origin, side * (s * clearance), wallParams)
+            if hit and hit.Instance and hit.Instance.CanCollide then
+                local r = (hit.Position - origin).Magnitude
+                if r < room then room = r end
+            end
         end
+        if room < clearance then shift = shift - s * (clearance - room) end
     end
     if shift == 0 then return goal end
     return goal + side * shift
@@ -1349,13 +1365,38 @@ local function updatePursuitMovement(enemy, humanoid, root, enemyRoot)
         local wpDist = toWp.Magnitude
         if wpDist > 1.5 then
             local probe = math.min(wpDist, CFG.wallProbeDistance)
-            if castSolid(root.Position + Vector3.new(0, 1.5, 0),
-                toWp.Unit * probe, getRaycastExclusions(enemy)) then
+            local excl = getRaycastExclusions(enemy)
+            -- Chest and shin. The plinth of a pillar is below the chest ray.
+            if castSolid(root.Position + Vector3.new(0, 1.5, 0), toWp.Unit * probe, excl)
+                or castSolid(root.Position - Vector3.new(0, 1.5, 0), toWp.Unit * probe, excl) then
                 moveGoal = steerTowards(root, waypoint.Position, enemy)
                 NAV.needsRecompute = true
             end
         end
         moveGoal = keepOffWalls(root, moveGoal, enemy)
+
+        -- Pressed against something no probe saw: after a moment without
+        -- moving, sidestep - alternating sides - and hop, then let the path
+        -- recompute from the new spot. This is the wall the character was
+        -- found standing into.
+        if not NAV.wpStallAnchor or (root.Position - NAV.wpStallAnchor).Magnitude >= 1.0 then
+            NAV.wpStallAnchor = root.Position
+            NAV.wpStallTime = now
+        elseif now - NAV.wpStallTime >= CFG.wallStallTime then
+            local dir = Vector3.new(moveGoal.X - root.Position.X, 0, moveGoal.Z - root.Position.Z)
+            if dir.Magnitude > 0.1 then
+                dir = dir.Unit
+                local side = Vector3.new(-dir.Z, 0, dir.X)
+                NAV.wpStallSide = -(NAV.wpStallSide or -1)
+                moveGoal = root.Position + side * (4 * NAV.wpStallSide) + dir * 1.5
+                humanoid.Jump = true
+                NAV.lastIssuedMove = nil
+                NAV.needsRecompute = true
+                heavyDebugThrottled("wp_stall", 1.0, "Pathfinding", "Stopped against something; sidestepping.")
+            end
+            NAV.wpStallAnchor = root.Position
+            NAV.wpStallTime = now
+        end
 
         if not NAV.lastIssuedMove
             or (NAV.lastIssuedMove - moveGoal).Magnitude > CFG.moveReissueThreshold then

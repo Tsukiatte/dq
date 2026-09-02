@@ -444,7 +444,7 @@ local function applyConfigData(data)
     table.clear(RT.armDelays)
     if type(data.armDelays) == "table" then
         for name, delay in pairs(data.armDelays) do
-            if type(name) == "string" and type(delay) == "number" and delay > 0 then RT.armDelays[name] = delay end
+            if type(name) == "string" and type(delay) == "number" and delay >= 0 then RT.armDelays[name] = delay end
         end
     end
     table.clear(RT.attackData)

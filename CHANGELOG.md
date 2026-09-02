@@ -11,6 +11,30 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.5.1 - 2026-09-02
+
+### Played-out attacks
+A precast that was visible and has faded all the way (plus `armDoneLinger`,
+0.3 s) marks its attack as **over**. It leaves the detected set: no danger,
+no highlight, not in the count. The strips of a beam pattern stayed red for
+seconds after the beams had fired and the dodge kept weaving between attacks
+that were over.
+
+The colours are honest now: **amber** with `floor 2.3s` only while the dodge
+actually treats the part as floor; `arms in 0.8s` in red once its impact is
+within the lead; `announced` in red when its timing is unknown and it is
+being dodged as live. A hit taken while announced saves that attack as
+live-from-spawn (`armDelays[name] = 0`) so it is never re-learned from its
+fade.
+
+### Standing into the pillar
+Every pursuit probe looked at chest height, and the plinth of a pillar is
+below that: the probes said clear, the feet hit the plinth, and the character
+stood into the wall. The forward probe, the side-clearance rays and the
+segment check all have a **shin-height** ray now. A character that has
+stopped moving on a path for `wallStallTime` (0.6 s) sidesteps, alternating
+sides, hops, and lets the path recompute from the new spot.
+
 ## 4.5.0 - 2026-09-02 - "Telegraphs are floor"
 
 ### Dodging attacks that were not happening
