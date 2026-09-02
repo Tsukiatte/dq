@@ -686,6 +686,7 @@ HZ.groundTruth = setmetatable({}, { __mode = "k" })
 -- armed. Keyed weakly so dead attacks fall out.
 HZ.arming = setmetatable({}, { __mode = "k" })
 HZ.armState = setmetatable({}, { __mode = "k" })   -- [part] = its Model's arming record
+HZ.lifeLog = {}                  -- one line per attack Model's lifecycle, for the capture file
 -- What was next to you each time you took damage. Newest last, capped.
 HZ.hitLog = {}
 HZ.lastHitAt = -math.huge
