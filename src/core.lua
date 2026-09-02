@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 2.2.0
+    VERSION : 2.3.0
     BUILD   : 2026-09-01
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "2.2.0"
+local SCRIPT_VERSION = "2.3.0"
 local SCRIPT_BUILD_DATE = "2026-09-01"
-local SCRIPT_CODENAME = "Lifeline"
+local SCRIPT_CODENAME = "Fieldnotes"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "2.3.0", date = "2026-09-01", notes = "Trial runs: with Trial Run on, every hit taken is matched to the parts that appeared around the player just before it, and those are written into a named Attack Book (what the attack and its warning look like) that drives detection from then on; panel to rename / disable / delete entries, Save writes it to the config. Projectile prediction: moving hazards are dodged along the strip they will sweep, not where they are, and escape candidates are added sideways out of their path. Enemy attacks are always highlighted now, with a billboard name tag and a predicted-path line on moving ones." },
     { version = "2.2.0", date = "2026-09-01", notes = "Recovery: when the character loiters in a 10-stud area for 2.5s while trying to move, it walks the nearest stretch of the manual path (routed through the navmesh, jumping allowed) and then returns to pursuit; re-sticking soon after walks further. Path waypoints are now reached by navmesh route, not a straight steer, and an unreachable one is skipped. Terrain: the shin-height steering probe no longer treats ramps and steps as walls (that is what pinned the bot at the foot of every incline), drops are allowed while climbs are capped at a jump, and a stall on a navmesh route hops too. Q/E can be limited to an enemy radius (button + slider + drawn radius). Own ability effects are recognised by timing against our own casts and learned by name (saved), with a Pick Own FX picker; the bot no longer dodges its own slashes. Attacks always click; the guessed remote is never fired." },
     { version = "2.1.0", date = "2026-09-01", notes = "Lag spike fix. The scanner walked Workspace:GetDescendants() and classified every part three times a second, with a full cache flush every 4s: a spike every 0.35s from startup. Replaced by a world index built once in slices and kept current by DescendantAdded/Removing, with a bounded round-robin re-check per frame. The __namecall hook allocated a table on every method call in the client (GC pressure); rewritten allocation-free, auto-removed after 3 minutes, restored on Destruct. Telegraph feed rows pooled, path node writes diffed, RespectCanCollide tested once instead of per cast, all visuals under one folder, marker clearing incremental, hitbox adornee survives respawn." },
     { version = "2.0.0", date = "2026-09-01", notes = "Split into src/ modules (core, hazards, nav, path, streamer, config, ui, main) wired through one shared table; loose runtime flags moved into RT; loader main.lua and single-file bundle DungeonAutofarm.lua built by tools/build.py. tools/check.py parses every module with a real Lua parser and audits every name, import and export; tools/smoke.py runs startup under a stub Roblox. No behaviour change." },
@@ -292,6 +293,26 @@ CFG.ownAttackWindow = 0.45
 CFG.ownAttackRadius = 14.0
 CFG.hookRemotes = true           -- watch this client's FireServer calls for cast timing
 
+-- Trial runs / attack book (2.3.0). While a trial run is on, every hit we take
+-- is correlated with the parts that appeared around us just before it, and the
+-- winners go into the attack book: a named record of what the attack (or its
+-- warning telegraph) looks like. The book drives detection from then on and is
+-- saved with the config.
+CFG.damageCorrelationWindow = 1.5   -- a part that appeared this long before the hit is a suspect
+CFG.damageCorrelationRadius = 25.0  -- ...if it is within this of us (planar)
+CFG.damageSuspectLimit = 2          -- at most this many parts learned per hit
+CFG.attackColorTolerance = 0.18     -- RGB distance that still counts as "same colour"
+CFG.attackSizeTolerance = 0.45      -- +/- fraction per axis that still counts as "same size"
+
+-- Projectiles (2.3.0). A hazard that is moving is treated as occupying the strip
+-- it will sweep over the next projectileLookahead seconds, so the dodge steps
+-- out of its path rather than away from where it happens to be right now.
+CFG.projectileMinSpeed = 8.0        -- studs/s; slower than this is not "moving"
+CFG.projectileLookahead = 1.2
+CFG.projectileTrackWindow = 6.0     -- newly added parts are motion-tracked this long
+CFG.projectileMaxSize = 14.0        -- longer than this on its longest axis is not a projectile
+CFG.hazardTagEnabled = true         -- billboard name tag on every highlighted attack
+
 -- Runtime Variables
 RT.gameSpecificAttackMethod = nil
 RT.detectedAttackRemote = nil
@@ -452,6 +473,16 @@ NAV.recovery = nil               -- { index, remaining, deadline, startedAt, stu
 NAV.lastRecoveryEnd = -math.huge
 NAV.lastRecoveryIndex = nil
 NAV.pathMarkers = {}             -- [waypoint index] = { orb, link, sphere } drawn in the world
+
+-- Trial runs, attack book, projectiles (2.3.0).
+HZ.trialEnabled = false          -- damage taken is being correlated and learned
+HZ.attackBook = {}               -- array of learned attack records (plain data, saved)
+HZ.recentParts = {}              -- [part] = os.clock() it was added; motion-tracked while young
+HZ.motion = {}                   -- [part] = { position, time, velocity, moving }
+HZ.predictionOwner = {}          -- [prediction line Part] = the hazard it belongs to
+HZ.damageEvents = 0
+RT.lastHealth = nil
+RT.healthConnection = nil
 
 -- Smallest deviation first, so steering hugs the intended heading.
 local STEER_FAN_ANGLES = { 0, 20, -20, 40, -40, 65, -65, 90, -90, 120, -120 }

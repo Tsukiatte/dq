@@ -50,6 +50,33 @@ local noteOwnAction = S.noteOwnAction
 local runRecovery = S.runRecovery
 local enterRecovery = S.enterRecovery
 local updateStuckDetector = S.updateStuckDetector
+local recordDamageEvent = S.recordDamageEvent
+
+-- Trial runs (2.3.0): every drop in health is handed to the correlator while a
+-- trial run is on. The connection is per character and rebuilt on respawn.
+local function watchHealth(character)
+    if RT.healthConnection then
+        RT.healthConnection:Disconnect()
+        RT.healthConnection = nil
+    end
+    local humanoid = character and character:FindFirstChildWhichIsA("Humanoid")
+    if not humanoid then return end
+    RT.lastHealth = humanoid.Health
+    RT.healthConnection = humanoid.HealthChanged:Connect(function(health)
+        local last = RT.lastHealth
+        RT.lastHealth = health
+        if not last or health >= last then return end
+        local damage = last - health
+        if HZ.trialEnabled and damage > 0 then
+            local ok, err = xpcall(function()
+                recordDamageEvent(damage, os.clock())
+            end, debug.traceback)
+            if not ok then
+                heavyDebugThrottled("trial_error", 1.0, "FATAL", "Damage correlator threw:\n" .. tostring(err))
+            end
+        end
+    end)
+end
 
 -- =========================================================================
 -- Remote hook (2.1.0 rewrite).
@@ -374,12 +401,14 @@ local function startAutofarm()
     startWorldIndex()
     detectGameAndInitialize()
     watchOwnAnimations(character)
+    watchHealth(character)
 
     LocalPlayer.CharacterAdded:Connect(function(newChar)
         character = newChar
         humanoid = newChar:WaitForChild("Humanoid")
         root = newChar:WaitForChild("HumanoidRootPart")
         watchOwnAnimations(newChar)
+        watchHealth(newChar)
     end)
 
     -- Index maintenance + throttled enemy scan. The index step runs even while

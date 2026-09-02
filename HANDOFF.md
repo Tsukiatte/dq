@@ -1,6 +1,6 @@
 # Dungeon Autofarm — Handoff
 
-Context for whoever picks this up next. Updated at **v2.2.0 "Lifeline"**.
+Context for whoever picks this up next. Updated at **v2.3.0 "Fieldnotes"**.
 
 - **Repo:** `Tsukiatte/dq`. Source is `src/*.lua` (eight modules, Roblox Luau,
   run through an executor). `DungeonAutofarm.lua` at the root is a **built
@@ -201,8 +201,36 @@ manual picker with name learning. Two additions in 2.2.0:
   telegraph pick → own → ownership → humanoid ancestor → learned telegraph name →
   CanCollide → heuristics.
 
+**Attack Book + trial runs (2.3.0).** The evidence-based layer. With `Trial
+Run` on, every drop in health calls `recordDamageEvent` (hazards.lua): suspects
+are the hazards already detected in range plus every part in `HZ.recentParts`
+that appeared within `CFG.damageCorrelationWindow` and
+`CFG.damageCorrelationRadius`; the closest `CFG.damageSuspectLimit` become or
+confirm records in `HZ.attackBook`. A record is plain data (`partSignature`:
+name, parent, class, material, shape, colour, size + name/hits/damage/flags),
+matched by name when specific, by look when generic (`matchesAttackRecord`),
+memoised in `attackMatchCache`. `isDamageBrick` consults it right after the
+ownership veto and **before** the creature-part veto - records learned from a
+part inside a creature are swing hitboxes and start `enabled = false`. The panel
+(`S.refreshAttackBookPanel`, late-bound from ui) renames / toggles / deletes;
+`invalidateAttackBook` after any change. Saved as `attackBook` in the config.
+
+**Projectiles (2.3.0).** `HZ.recentParts` (young parts) and every candidate get
+`updateMotion` each frame; `getHazardMotion(part)` returns the flat velocity
+when it exceeds `CFG.projectileMinSpeed`. **All danger tests go through
+`hazardClosestPoint`**, which sweeps the closest point along the next
+`CFG.projectileLookahead` seconds of travel - that is the whole prediction.
+`looksLikeProjectile` (young + moving + small) sits before the CanCollide rule
+in `isDamageBrick`; `buildEscapeCandidates` (nav.lua) adds two candidates
+perpendicular to each moving hazard.
+
+**Highlights are always on** with a name tag (`Tag_<id>` BillboardGui) and, for
+moving hazards, a predicted-path line (`Pred_<id>` Part, owner tracked in
+`HZ.predictionOwner`), all pooled in `HZ.highlightsFolder`.
+
 `Dump GUI candidates to console` (Streamer panel) still exists for GUI structure.
-For telegraph problems, ask for the `[Picker]` and `[OwnAttack]` log lines.
+For telegraph problems, ask for the `[Picker]`, `[OwnAttack]` and `[Trial]` log
+lines.
 
 ---
 
@@ -290,12 +318,21 @@ it while deliberately holding still or it will fire spuriously).
 
 ## Known open items
 
-- **Not yet run in-game after 2.0–2.2.** Everything above passed the parser, the
+- **Not yet run in-game after 2.0–2.3.** Everything above passed the parser, the
   name audit and the stub smoke run; the first live session should watch for:
   the `[Index]` "World index ready" line and its counts, `[OwnAttack]` learning
-  lines during a fight (and whether they are the right effects), `RECOVERY`
-  entries in the movement readout and whether they end sensibly, and the frame
-  time. Streamer Mode was not exercised at all.
+  lines during a fight (and whether they are the right effects), `[Trial]` lines
+  during a trial run (are the learned parts the actual attacks, and are the
+  auto-names sensible), name tags on the right parts, predicted-path lines on
+  real projectiles, `RECOVERY` entries in the movement readout and whether they
+  end sensibly, and the frame time. Streamer Mode was not exercised at all.
+- **Trial-run blind spots.** A hit from a melee swing with no spawned part
+  learns nothing (by design). A hit while a *harmless* fresh part happens to be
+  nearby (loot drop, a spell of another player that is not ownership-tagged)
+  can learn that part as an attack; X it in the panel. Two suspects per hit is
+  the cap.
+- **Projectile prediction is linear.** Homing or arcing projectiles are
+  predicted along their current velocity only.
 - **Navmesh often returns `NoPath` map-wide** in this game. Unresolved. Direct
   walking and now the routed path cover it.
 - **Own-attack timing has one known blind spot:** an enemy telegraph landing at

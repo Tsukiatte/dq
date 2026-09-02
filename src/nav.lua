@@ -22,6 +22,7 @@ local STEER_PROBE_HEIGHTS = S.STEER_PROBE_HEIGHTS
 local STEER_FAN_ANGLES = S.STEER_FAN_ANGLES
 local DEBUG_NORMAL = S.DEBUG_NORMAL
 local getVisualRoot = S.getVisualRoot
+local getHazardMotion = S.getHazardMotion
 
 local function clearRenderedPath()
     if NAV.nodesFolder then
@@ -304,6 +305,33 @@ local function buildEscapeCandidates(rootPos, targetPos, enemy)
                     Penalty = penalty,
                     IsSafe = isSafe
                 })
+            end
+        end
+    end
+
+    -- Moving hazards (2.3.0): the best dodge from a projectile is sideways out
+    -- of its line, so each one contributes two candidates perpendicular to its
+    -- travel. The penalty and safety tests already see the swept strip, so these
+    -- rank themselves.
+    for _, part in ipairs(HZ.detected) do
+        local velocity = part.Parent and getHazardMotion(part)
+        if velocity then
+            local flat = Vector3.new(velocity.X, 0, velocity.Z)
+            if flat.Magnitude > 0.1 then
+                local side = Vector3.new(-flat.Unit.Z, 0, flat.Unit.X)
+                local reach = CFG.preemptiveClearance + playerRadius + 4.0
+                for sign = -1, 1, 2 do
+                    local candidate = projectToGround(rootPos + side * (sign * reach), enemy)
+                    if isPathSegmentClear(rootPos, candidate, enemy) then
+                        table.insert(candidates, {
+                            Position = candidate,
+                            Distance = (candidate - rootPos).Magnitude,
+                            DistToTarget = Vector2.new(candidate.X - targetPos.X, candidate.Z - targetPos.Z).Magnitude,
+                            Penalty = evaluateHazardPenaltyAtPoint(candidate),
+                            IsSafe = isPositionSafeFromDamageBricks(candidate, 0.5),
+                        })
+                    end
+                end
             end
         end
     end

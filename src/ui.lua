@@ -57,6 +57,11 @@ local debugLastValues = S.debugLastValues
 local debugThrottleClocks = S.debugThrottleClocks
 local stopWorldIndex = S.stopWorldIndex
 local resetWallCatalog = S.resetWallCatalog
+local setTrialEnabled = S.setTrialEnabled
+local removeAttackRecord = S.removeAttackRecord
+local clearAttackBook = S.clearAttackBook
+local invalidateAttackBook = S.invalidateAttackBook
+local describeRecord = S.describeRecord
 
 local function addCorner(instance, radius)
     local corner = Instance.new("UICorner")
@@ -563,6 +568,10 @@ local function destructScript()
         RT.animatorConnection:Disconnect()
         RT.animatorConnection = nil
     end
+    if RT.healthConnection then
+        RT.healthConnection:Disconnect()
+        RT.healthConnection = nil
+    end
     -- Defined by the main module, which loads after this one: late-bound.
     if S.unhookAttackRemotes then S.unhookAttackRemotes() end
 
@@ -600,6 +609,7 @@ end
 _G.DungeonAutofarmDestruct = destructScript
 
 local function createControlUI()
+    local bookPanel  -- Attack Book panel; built below, referenced by the buttons above it
     local playerGui = LocalPlayer:WaitForChild("PlayerGui")
     local oldGui = playerGui:FindFirstChild("DungeonAutofarmUI")
     if oldGui then oldGui:Destroy() end
@@ -933,17 +943,13 @@ local function createControlUI()
     createSlider("Wall padding clearance", 486, CFG.minimumWallPadding, CFG.maximumWallPadding, CFG.wallPadding, true, function(v) CFG.wallPadding = v end)
     createSlider("Telegraph buffer range", 536, CFG.minimumDamageBrickRange, CFG.maximumDamageBrickRange, CFG.damageBrickDetectionRange, false, function(v) CFG.damageBrickDetectionRange = v end)
 
-    UI.renderHazardsButton = Instance.new("TextButton")
-    UI.renderHazardsButton.Size = UDim2.new(1, -24, 0, 32)
-    UI.renderHazardsButton.Position = UDim2.fromOffset(12, 591)
-    UI.renderHazardsButton.BackgroundColor3 = Color3.fromRGB(52, 168, 83)
-    UI.renderHazardsButton.BorderSizePixel = 0
-    UI.renderHazardsButton.Font = Enum.Font.GothamBold
-    UI.renderHazardsButton.Text = "Highlight Telegraphs (Red): ON"
-    UI.renderHazardsButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    UI.renderHazardsButton.TextSize = 13
-    UI.renderHazardsButton.Parent = mainFrame
-    addCorner(UI.renderHazardsButton, 7)
+    -- Enemy attacks are always highlighted since 2.3.0; the slot the toggle used
+    -- holds the trial-run switch and the Attack Book panel button instead.
+    UI.trialButton = makeHalfButton(12, 591)
+    UI.trialButton.Text = "Trial Run: OFF"
+    UI.attackBookButton = makeHalfButton(156, 591)
+    UI.attackBookButton.BackgroundColor3 = Color3.fromRGB(148, 92, 232)
+    UI.attackBookButton.Text = "Attack Book (0)"
 
     UI.renderPathButton = Instance.new("TextButton")
     UI.renderPathButton.Size = UDim2.new(1, -24, 0, 32)
@@ -1276,6 +1282,186 @@ local function createControlUI()
     end
     S.refreshPathPanel()
 
+    -- Attack Book panel (2.3.0): what the trial runs have learned. Rename a row
+    -- by typing in its name box, ON/OFF decides whether it is dodged, X forgets
+    -- it, Save writes the book (with everything else) to the config.
+    bookPanel = Instance.new("Frame")
+    bookPanel.Name = "AttackBookPanel"
+    bookPanel.Size = UDim2.fromOffset(300, 452)
+    bookPanel.Position = UDim2.new(0, 300, 0, 20)
+    bookPanel.BackgroundColor3 = Color3.fromRGB(25, 27, 34)
+    bookPanel.BorderSizePixel = 0
+    bookPanel.Active = true
+    bookPanel.Visible = false
+    bookPanel.Parent = RT.scriptGui
+    addCorner(bookPanel, 10)
+
+    local bookTitle = Instance.new("TextLabel")
+    bookTitle.Size = UDim2.new(1, -20, 0, 26)
+    bookTitle.Position = UDim2.fromOffset(12, 8)
+    bookTitle.BackgroundTransparency = 1
+    bookTitle.Font = Enum.Font.GothamBold
+    bookTitle.Text = "Attack Book"
+    bookTitle.TextColor3 = Color3.fromRGB(255, 120, 120)
+    bookTitle.TextSize = 15
+    bookTitle.TextXAlignment = Enum.TextXAlignment.Left
+    bookTitle.Parent = bookPanel
+    makeDraggable(bookTitle, bookPanel)
+
+    local bookHint = Instance.new("TextLabel")
+    bookHint.Size = UDim2.new(1, -20, 0, 44)
+    bookHint.Position = UDim2.fromOffset(12, 34)
+    bookHint.BackgroundTransparency = 1
+    bookHint.Font = Enum.Font.Gotham
+    bookHint.Text = "Trial Run ON: every hit you take is matched to what appeared around you and named here. Type to rename. OFF = not dodged. X = forget. Save writes the book to the config."
+    bookHint.TextColor3 = Color3.fromRGB(160, 165, 180)
+    bookHint.TextSize = 11
+    bookHint.TextWrapped = true
+    bookHint.TextXAlignment = Enum.TextXAlignment.Left
+    bookHint.TextYAlignment = Enum.TextYAlignment.Top
+    bookHint.Parent = bookPanel
+
+    local bookList = Instance.new("ScrollingFrame")
+    bookList.Size = UDim2.new(1, -20, 1, -132)
+    bookList.Position = UDim2.fromOffset(10, 84)
+    bookList.BackgroundTransparency = 1
+    bookList.BorderSizePixel = 0
+    bookList.ScrollBarThickness = 4
+    bookList.ScrollBarImageColor3 = Color3.fromRGB(80, 85, 100)
+    bookList.CanvasSize = UDim2.new(0, 0, 0, 0)
+    bookList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    bookList.Parent = bookPanel
+    local bookLayout = Instance.new("UIListLayout")
+    bookLayout.Padding = UDim.new(0, 4)
+    bookLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    bookLayout.Parent = bookList
+
+    local function bookButton(text, x, color, onClick)
+        local b = Instance.new("TextButton")
+        b.Size = UDim2.fromOffset(86, 30)
+        b.Position = UDim2.new(0, x, 1, -38)
+        b.BackgroundColor3 = color
+        b.BorderSizePixel = 0
+        b.Font = Enum.Font.GothamBold
+        b.Text = text
+        b.TextColor3 = Color3.fromRGB(255, 255, 255)
+        b.TextSize = 12
+        b.Parent = bookPanel
+        addCorner(b, 6)
+        b.MouseButton1Click:Connect(onClick)
+        return b
+    end
+    bookButton("Save", 10, Color3.fromRGB(52, 168, 83), function()
+        local ok, err = saveConfig()
+        setMovementState(ok and "attack book + config saved" or ("save failed: " .. tostring(err)))
+    end)
+    bookButton("Clear", 106, Color3.fromRGB(180, 64, 64), function()
+        clearAttackBook()
+    end)
+    bookButton("Close", 202, Color3.fromRGB(70, 75, 90), function()
+        bookPanel.Visible = false
+    end)
+
+    S.refreshAttackBookPanel = function()
+        if UI.attackBookButton then
+            UI.attackBookButton.Text = string.format("Attack Book (%d)", #HZ.attackBook)
+        end
+        if not bookList.Parent then return end
+        for _, child in ipairs(bookList:GetChildren()) do
+            if child:IsA("GuiObject") then child:Destroy() end
+        end
+        if #HZ.attackBook == 0 then
+            local empty = Instance.new("TextLabel")
+            empty.Size = UDim2.new(1, 0, 0, 24)
+            empty.BackgroundTransparency = 1
+            empty.Font = Enum.Font.Gotham
+            empty.Text = "Nothing learned yet. Turn Trial Run on and take a hit."
+            empty.TextColor3 = Color3.fromRGB(150, 153, 165)
+            empty.TextSize = 12
+            empty.Parent = bookList
+            return
+        end
+        for i, record in ipairs(HZ.attackBook) do
+            local row = Instance.new("Frame")
+            row.Size = UDim2.new(1, 0, 0, 46)
+            row.BackgroundColor3 = Color3.fromRGB(35, 38, 47)
+            row.BorderSizePixel = 0
+            row.LayoutOrder = i
+            row.Parent = bookList
+            addCorner(row, 5)
+
+            local nameBox = Instance.new("TextBox")
+            nameBox.Size = UDim2.new(1, -104, 0, 20)
+            nameBox.Position = UDim2.fromOffset(8, 3)
+            nameBox.BackgroundColor3 = Color3.fromRGB(45, 48, 58)
+            nameBox.BorderSizePixel = 0
+            nameBox.Font = Enum.Font.GothamBold
+            nameBox.Text = record.name
+            nameBox.TextColor3 = record.enabled ~= false and Color3.fromRGB(255, 140, 140) or Color3.fromRGB(150, 153, 165)
+            nameBox.TextSize = 12
+            nameBox.TextXAlignment = Enum.TextXAlignment.Left
+            nameBox.ClearTextOnFocus = false
+            nameBox.Parent = row
+            addCorner(nameBox, 4)
+            nameBox.FocusLost:Connect(function()
+                local text = nameBox.Text:gsub("^%s+", ""):gsub("%s+$", "")
+                if text == "" then
+                    nameBox.Text = record.name
+                else
+                    record.name = text
+                end
+            end)
+
+            local info = Instance.new("TextLabel")
+            info.Size = UDim2.new(1, -104, 0, 18)
+            info.Position = UDim2.fromOffset(8, 25)
+            info.BackgroundTransparency = 1
+            info.Font = Enum.Font.Gotham
+            info.Text = string.format("%d hit%s, %.0f dmg - %s%s%s",
+                record.hits or 0, (record.hits or 0) == 1 and "" or "s", record.damage or 0,
+                describeRecord(record),
+                record.moving and ", moving" or "",
+                record.melee and ", in creature" or "")
+            info.TextColor3 = Color3.fromRGB(170, 175, 190)
+            info.TextSize = 10
+            info.TextXAlignment = Enum.TextXAlignment.Left
+            info.TextTruncate = Enum.TextTruncate.AtEnd
+            info.Parent = row
+
+            local onOff = Instance.new("TextButton")
+            onOff.Size = UDim2.fromOffset(40, 24)
+            onOff.Position = UDim2.new(1, -90, 0.5, -12)
+            onOff.BackgroundColor3 = record.enabled ~= false and Color3.fromRGB(52, 168, 83) or Color3.fromRGB(90, 95, 110)
+            onOff.BorderSizePixel = 0
+            onOff.Font = Enum.Font.GothamBold
+            onOff.Text = record.enabled ~= false and "ON" or "OFF"
+            onOff.TextColor3 = Color3.fromRGB(255, 255, 255)
+            onOff.TextSize = 11
+            onOff.Parent = row
+            addCorner(onOff, 5)
+            onOff.MouseButton1Click:Connect(function()
+                record.enabled = not (record.enabled ~= false)
+                invalidateAttackBook()
+            end)
+
+            local del = Instance.new("TextButton")
+            del.Size = UDim2.fromOffset(26, 24)
+            del.Position = UDim2.new(1, -36, 0.5, -12)
+            del.BackgroundColor3 = Color3.fromRGB(180, 64, 64)
+            del.BorderSizePixel = 0
+            del.Font = Enum.Font.GothamBold
+            del.Text = "X"
+            del.TextColor3 = Color3.fromRGB(255, 255, 255)
+            del.TextSize = 14
+            del.Parent = row
+            addCorner(del, 5)
+            del.MouseButton1Click:Connect(function()
+                removeAttackRecord(i)
+            end)
+        end
+    end
+    S.refreshAttackBookPanel()
+
     UI.pathEditButton.MouseButton1Click:Connect(function()
         local turnOn = not NAV.pathEditEnabled
         if turnOn then
@@ -1321,11 +1507,20 @@ local function createControlUI()
         setAbilityButtonState(UI.eAbilityButton, "E", RT.autoEEnabled)
     end)
 
-    UI.renderHazardsButton.MouseButton1Click:Connect(function()
-        RT.renderHazardsEnabled = not RT.renderHazardsEnabled
-        UI.renderHazardsButton.Text = "Highlight Telegraphs (Red): " .. (RT.renderHazardsEnabled and "ON" or "OFF")
-        UI.renderHazardsButton.BackgroundColor3 = RT.renderHazardsEnabled and Color3.fromRGB(52, 168, 83) or Color3.fromRGB(180, 64, 64)
-        updateHazardHighlights()
+    UI.trialButton.MouseButton1Click:Connect(function()
+        setTrialEnabled(not HZ.trialEnabled)
+        UI.trialButton.Text = "Trial Run: " .. (HZ.trialEnabled and "ON" or "OFF")
+        UI.trialButton.BackgroundColor3 = HZ.trialEnabled
+            and Color3.fromRGB(232, 142, 78) or Color3.fromRGB(180, 64, 64)
+        if HZ.trialEnabled then
+            bookPanel.Visible = true
+            S.refreshAttackBookPanel()
+        end
+    end)
+
+    UI.attackBookButton.MouseButton1Click:Connect(function()
+        bookPanel.Visible = not bookPanel.Visible
+        if bookPanel.Visible then S.refreshAttackBookPanel() end
     end)
 
     UI.renderPathButton.MouseButton1Click:Connect(function()
