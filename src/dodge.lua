@@ -226,8 +226,12 @@ local function dangerAt(px, py, pz, t)
             -- within the lead. Unknown timing stays live - the first cast of
             -- anything is dodged as if it were, and the second is not.
             local st = HZ.armState[part]
-            if st and not st.armedAt and st.impactAt then
-                live = t >= (st.impactAt - DG.clock) - lead
+            if st then
+                if st.doneAt then
+                    live = false
+                elseif not st.armedAt and st.impactAt then
+                    live = t >= (st.impactAt - DG.clock) - lead
+                end
             end
         end
         if live and (not part or part.Parent) and not (part and DG.moverSet[part]) then
