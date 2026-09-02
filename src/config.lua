@@ -265,6 +265,7 @@ local function buildConfigTable()
             cloneDangerCost = CFG.cloneDangerCost,
             cloneDepthBonus = CFG.cloneDepthBonus,
             showClonePrisms = CFG.showClonePrisms,
+            cloneDiscScale = CFG.cloneDiscScale,
             showClones = CFG.showClones,
             macroLoop = CFG.macroLoop,
             macroShowRoute = CFG.macroShowRoute,
@@ -397,6 +398,7 @@ local function applyConfigData(data)
         CFG.cloneDangerCost = tonumber(combat.cloneDangerCost) or CFG.cloneDangerCost
         CFG.cloneDepthBonus = tonumber(combat.cloneDepthBonus) or CFG.cloneDepthBonus
         if combat.showClonePrisms ~= nil then CFG.showClonePrisms = combat.showClonePrisms == true end
+        CFG.cloneDiscScale = tonumber(combat.cloneDiscScale) or CFG.cloneDiscScale
         if combat.macroLoop ~= nil then CFG.macroLoop = combat.macroLoop == true end
         if combat.macroShowRoute ~= nil then CFG.macroShowRoute = combat.macroShowRoute == true end
         if type(combat.macroRecordBind) == "string" then

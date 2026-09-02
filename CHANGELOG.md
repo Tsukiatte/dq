@@ -11,6 +11,15 @@ file and that table in sync on every edit.
 
 ---
 
+## 2.15.1 - 2026-09-02
+- **Clone discs are sized from your real footprint.** They were sized from the
+  HumanoidRootPart, which is two studs wide; the body with its limbs is wider.
+  Now `GetExtentsSize` on the character, with a **Disc size** scale to match by
+  eye.
+- The safety test is given the same radius, so a green disc still means the
+  whole footprint fits. Without that the discs would have grown and the promise
+  would not have.
+
 ## 2.15.0 - 2026-09-02 - "Grid"
 
 ### Clone mode: a grid, and a search across it

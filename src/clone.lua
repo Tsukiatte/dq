@@ -4,6 +4,7 @@
 -- assigned onto S at the bottom. Load order is fixed by main.lua / build.py.
 return function(S)
 local RT = S.RT
+local LocalPlayer = S.LocalPlayer
 local Workspace = S.Workspace
 local CFG = S.CFG
 local CL = S.CL
@@ -64,9 +65,23 @@ local NEIGHBOURS = {
 }
 local DISC_UPRIGHT = CFrame.Angles(0, 0, math.rad(90))
 
+-- The character's real footprint. getPlayerHitboxMetrics measures the root
+-- part, which is two studs wide; the body with its limbs is wider, and a disc
+-- is a promise that the whole body fits, so it has to be the body's width.
+local function footprintRadius()
+    local _, rootRadius = getPlayerHitboxMetrics()
+    local character = LocalPlayer.Character
+    local radius = rootRadius
+    if character then
+        local ok, extents = pcall(function() return character:GetExtentsSize() end)
+        if ok and extents then radius = math.max(extents.X, extents.Z) * 0.5 end
+    end
+    return math.max(radius, rootRadius) * CFG.cloneDiscScale, rootRadius
+end
+
 local function gridSignature()
-    return string.format("%.2f/%.1f/%d/%s", CFG.cloneGridSpacing, CFG.cloneRadius,
-        CFG.cloneMaxCells, tostring(CFG.showClonePrisms))
+    return string.format("%.2f/%.1f/%d/%s/%.2f", CFG.cloneGridSpacing, CFG.cloneRadius,
+        CFG.cloneMaxCells, tostring(CFG.showClonePrisms), CFG.cloneDiscScale)
 end
 
 -- How many cells out from the centre the window reaches, capped by the cell
@@ -101,8 +116,10 @@ local function buildClones()
     folder.Parent = getVisualRoot()
     CL.folder = folder
 
-    local _, radius, totalHeight = getPlayerHitboxMetrics()
-    local diameter = math.max(radius * 2, 2)
+    local _, _, totalHeight = getPlayerHitboxMetrics()
+    local radius = footprintRadius()
+    local diameter = radius * 2
+    CL.footprintRadius = radius
     local spacing = math.max(CFG.cloneGridSpacing, 0.5)
     local n = windowReach()
     CL.reach = n
@@ -264,6 +281,10 @@ local function evaluateCells(root)
     params.FilterDescendantsInstances = getRaycastExclusions(nil)
     local budget = CFG.cloneFloorBudget
     local safeCount = 0
+    -- The test measures from the root radius; add the difference so it is
+    -- measuring the disc, and the disc's promise holds.
+    local footprint, rootRadius = footprintRadius()
+    local extraClearance = math.max(footprint - rootRadius, 0)
 
     for _, cell in ipairs(CL.cells) do
         local y
@@ -276,7 +297,7 @@ local function evaluateCells(root)
             local pos = Vector3.new(cell.x, y, cell.z)
             -- The test takes the hitbox radius plus the margin: green means the
             -- whole body fits, not just the centre point.
-            cell.safe = isPositionSafeFromDamageBricks(pos, CFG.cloneSafetyMargin) and true or false
+            cell.safe = isPositionSafeFromDamageBricks(pos, CFG.cloneSafetyMargin + extraClearance) and true or false
             cell.penalty = cell.safe and evaluateHazardPenaltyAtPoint(pos) or math.huge
             if cell.safe then safeCount = safeCount + 1 end
         else
