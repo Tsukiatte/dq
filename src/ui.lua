@@ -845,7 +845,7 @@ local function createControlUI()
     end
 
     modeIsland = K.segmented(autofarm.body, {
-        { value = "legacy", label = "Legacy",
+        { value = "legacy", label = "Pathfind",
           tip = "Finds enemies, walks to them, fights them, and dodges by searching for a safe point each time something lands near you." },
         { value = "clone", label = "Dodge",
           tip = "The same bot, dodging differently: a box that is never in danger, and a character that follows it. Pursuit still walks the map underneath it; the box outranks pursuit whenever it has somewhere to be." },
@@ -892,11 +892,7 @@ local function createControlUI()
     track(K.slider(combat.content, "Attack range", "How close before it starts swinging",
         CFG.minimumAttackRange, CFG.maximumAttackRange, false,
         function() return CFG.attackRange end, function(v) CFG.attackRange = v end, 2,
-        "Planar distance to the enemy at which the attack fires."))
-    track(K.slider(combat.content, "Safe distance", "Where it stands while fighting",
-        CFG.minimumSafeDistance, CFG.maximumSafeDistance, false,
-        function() return CFG.safeDistance end, function(v) CFG.safeDistance = v end, 3,
-        "The standoff point is this far from the enemy. Too small and it stands inside the model."))
+        "Planar distance to the enemy at which the attack fires. The bot stands at the edge of the enemy's melee - its body plus a swing - but never further than this, so it can always reach."))
     track(K.slider(combat.content, "Click interval", "Seconds between attacks",
         0.05, 1.0, true,
         function() return CFG.clickInterval end, function(v) CFG.clickInterval = v end, 4,
@@ -1149,10 +1145,10 @@ local function createControlUI()
         0.05, 0.6, true,
         function() return CFG.dodgeMoveAt end, function(v) CFG.dodgeMoveAt = v end, 10,
         "Danger runs 0 to 1. Low means it leaves at the first warmth; high means it tolerates the edge of things."))
-    track(K.slider(cloneSection.content, "Enemy space", "Studs kept off melee",
-        4, 25, false,
-        function() return CFG.dodgeEnemyRadius end, function(v) CFG.dodgeEnemyRadius = v end, 11,
-        "Melee never telegraphs; being next to one is the attack. Chasing stops at this distance too."))
+    track(K.slider(cloneSection.content, "Commitment", "Cost of changing direction",
+        0, 0.6, true,
+        function() return CFG.dodgeTurnCost end, function(v) CFG.dodgeTurnCost = v end, 11,
+        "Two safe sides of a beam score the same, and re-picking between them each decision is the left-right shuffle. A change of direction costs this much danger and a reversal all of it, so the side picked first is kept until the other is clearly better - which a closed line always is."))
     track(K.slider(cloneSection.content, "Approach", "Pull toward the target across safe ground",
         0, 0.05, true,
         function() return CFG.dodgeApproachWeight end, function(v) CFG.dodgeApproachWeight = v end, 11.5,

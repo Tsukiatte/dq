@@ -11,6 +11,53 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.4.0 - 2026-09-02 - "Pick a side"
+
+### The left-right shuffle
+Against a sweeping beam it strafed left, then right, then left, with both
+sides safe. Two causes, one of them new in 4.3.0. Standing *inside* the beam,
+every line out starts inside it, so the new line check read every held box
+as closed the moment it was chosen and the choice re-rolled between two
+identical sides each decision. Path samples now **discount whatever is
+already on you** — what is hitting you is not a reason to prefer one way out
+over another; how soon the line is clear of it is. And a change of direction
+costs (**Commitment** slider, default 0.25), a reversal all of it, for 1.5 s
+after the last move, so the side picked first is kept until the other is
+clearly better — which a closed line always is.
+
+### Enemies outrank attacks
+Enemies read 1.5 against an attack's 1.0. A line through a mob loses to a
+line through an attack and is taken only when everything else is worse — so
+it no longer strafes out of an attack into a mob, and cornered with the mob
+as the only way out, it goes through the mob.
+
+### The enemy is the distance
+**Safe distance** and **Enemy space** are gone. The chase and the dodge both
+stand at the enemy's body plus an ordinary swing (`enemyMeleeReach`, 5
+studs), capped at your **Attack range** minus 1.5 so the bot can always
+reach. Big bosses get a bigger circle from their own extents.
+
+### The walk into the boss
+Three causes. The pull toward the target applied to dangerous spots too and
+was decisive in a crowded field where everything read much the same, so the
+nearest-to-the-boss won — it applies among *safe* spots only now. The raycast
+budget cut off at twelve, and a crowded field whose twelve cheapest spots all
+failed the floor or wall check left nothing, so the blind fallback ran — it
+keeps checking until something safe passes (cap 40). And the blind fallback
+read `e.X` on entries that store `x`, so it errored, and fled the *first*
+enemy in the table rather than the nearest. Pursuit also holds while the
+dodge is `waiting for a gap`: five clear studs at a time was how it walked
+into a pattern one step per tick.
+
+### Walls
+Pursuit goals are kept off walls: two hip-height side rays push the goal off
+any wall closer than the character's clearance, so the next MoveTo angles
+away instead of along it. The dodge's walk check is a body-wide `Blockcast`
+rather than a centre-line ray.
+
+### GUI
+Legacy is called **Pathfind**.
+
 ## 4.3.0 - 2026-09-02 - "Nothing is held"
 
 ### The straight line into a new attack

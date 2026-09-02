@@ -181,7 +181,6 @@ local function buildConfigTable()
         version = SCRIPT_VERSION,
         combat = {
             attackRange = CFG.attackRange,
-            safeDistance = CFG.safeDistance,
             wallPadding = CFG.wallPadding,
             damageBrickDetectionRange = CFG.damageBrickDetectionRange,
             autoQ = RT.autoQEnabled,
@@ -205,8 +204,8 @@ local function buildConfigTable()
             dodgeMoveAt = CFG.dodgeMoveAt,
             dodgeHysteresis = CFG.dodgeHysteresis,
             dodgeDistanceCost = CFG.dodgeDistanceCost,
-            dodgeEnemyRadius = CFG.dodgeEnemyRadius,
-            dodgeEnemySoft = CFG.dodgeEnemySoft,
+            dodgeEnemySoftWidth = CFG.dodgeEnemySoftWidth,
+            dodgeTurnCost = CFG.dodgeTurnCost,
             dodgeMaxClimb = CFG.dodgeMaxClimb,
             dodgeMaxDrop = CFG.dodgeMaxDrop,
             dodgeManual = CFG.dodgeManual,
@@ -303,7 +302,6 @@ local function applyConfigData(data)
     local combat = data.combat
     if type(combat) == "table" then
         CFG.attackRange = tonumber(combat.attackRange) or CFG.attackRange
-        CFG.safeDistance = tonumber(combat.safeDistance) or CFG.safeDistance
         CFG.wallPadding = tonumber(combat.wallPadding) or CFG.wallPadding
         CFG.damageBrickDetectionRange = tonumber(combat.damageBrickDetectionRange) or CFG.damageBrickDetectionRange
         RT.autoQEnabled = combat.autoQ == true
@@ -335,7 +333,7 @@ local function applyConfigData(data)
         if combat.pathfindingEnabled ~= nil then CFG.pathfindingEnabled = combat.pathfindingEnabled == true end
         for _, key in ipairs({ "dodgeInterval", "dodgeReach", "dodgeRings", "dodgeRays", "dodgeProbe",
             "dodgeMargin", "dodgeShoulder", "dodgeLead", "dodgeLinger", "dodgeDwell", "dodgeMoveAt",
-            "dodgeHysteresis", "dodgeDistanceCost", "dodgeEnemyRadius", "dodgeEnemySoft",
+            "dodgeHysteresis", "dodgeDistanceCost", "dodgeEnemySoftWidth", "dodgeTurnCost",
             "dodgeMaxClimb", "dodgeMaxDrop", "dodgeCornerCost", "dodgeApproachWeight",
             "dodgeStepProbe" }) do
             CFG[key] = tonumber(combat[key]) or CFG[key]
@@ -702,8 +700,8 @@ local RECOMMENDED_DODGE = {
     dodgeProbe = 0, dodgeMargin = 0.5, dodgeShoulder = 3.0,
     dodgeLead = 1.2, dodgeLinger = 0.35, dodgeDwell = 1.2,
     dodgeMoveAt = 0.15, dodgeHysteresis = 0.12, dodgeDistanceCost = 0.008,
-    dodgeEnemyRadius = 12, dodgeEnemySoft = 20,
-    dodgeMaxClimb = 3.0, dodgeMaxDrop = 10.0, dodgeRayBudget = 12, dodgeCornerCost = 0.35,
+    dodgeEnemySoftWidth = 6, dodgeTurnCost = 0.25,
+    dodgeMaxClimb = 3.0, dodgeMaxDrop = 10.0, dodgeRayBudget = 20, dodgeCornerCost = 0.35,
     moveMode = "tween", moveArriveRadius = 1.2,
 }
 

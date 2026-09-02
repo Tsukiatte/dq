@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 4.3.0
+    VERSION : 4.4.0
     BUILD   : 2026-09-02
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "4.3.0"
+local SCRIPT_VERSION = "4.4.0"
 local SCRIPT_BUILD_DATE = "2026-09-02"
-local SCRIPT_CODENAME = "Nothing is held"
+local SCRIPT_CODENAME = "Pick a side"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "4.4.0", date = "2026-09-02", notes = "Pick a side. The left-right shuffle against a sweeping beam had a cause 4.3.0 made worse: standing inside the beam, every line out starts inside it, so the new line check read every held box as closed the moment it was chosen and the choice re-rolled between two identical sides each decision. Path samples now discount whatever is already on you - what is hitting you is not a reason to prefer one way out over another; how soon the line is clear of it is - and a change of direction costs, a reversal most, so the side picked first is kept until the other is clearly better, which a closed line always is. Enemies outrank attacks at 1.5 against 1.0: a line through a mob loses to a line through an attack and is taken only when everything else is worse, so it no longer strafes out of an attack into a mob, and cornered with the mob as the only way out it goes through the mob. The enemy is the distance: the Safe distance and Enemy space sliders are gone, and the chase and the dodge both stand at the enemy's body plus a swing, capped by your own attack range so it can always reach. The walk into the boss had three causes: the pull toward the target was applied to dangerous spots too and was decisive in a crowded field, so the nearest-to-the-boss won - it applies among safe spots only now; the raycast budget cut off at twelve and a crowded field whose twelve cheapest spots all failed left nothing, so the blind fallback ran - it keeps checking until something safe passes; and the blind fallback itself read fields its entries do not have and fled the first enemy in the table rather than the nearest. Pursuit holds while the dodge is waiting for a gap - five clear studs at a time was how it walked into a pattern one step per tick. Pursuit goals are kept off walls: two hip-height side rays push the goal off any wall closer than the character's clearance, and the dodge's walk check is a body-wide sweep rather than a centre line. Legacy is called Pathfind." },
     { version = "4.3.0", date = "2026-09-02", notes = "Nothing is held. The box had hysteresis, and the hysteresis re-read danger at the box and nowhere else - so an attack placed between the character and the box did not exist as far as the held box was concerned, and the character walked its straight line into it while a step to either side was open. The bots that beat bullet hells commit to nothing: twinject, the Touhou player, re-picks its velocity every frame from scratch. The box now survives a decision only while every sample along the line to it and at it still passes; otherwise it is dropped on the spot, the field is re-read, and the re-read prices the straight line, which is what puts the new box to the left or the right. Pursuit is back underneath the dodge: 4.2.0 had dropped it outright so the bot could no longer cross a room. The loop only reaches pursuit with no box to follow, and even then it gets a step only if the next few studs of its route are clear; when they are not it holds and the box, told pursuit is blocked, picks the way in one safe spot at a time. Near the target the box is the approach as before. Macros are gone - the recorder, the player, the file, the island option, the Routes section and their settings - and the island is Legacy or Dodge. Section headers and the well their rows sit in are darker than the rows now, so a setting and a list of settings no longer look the same." },
     { version = "4.2.1", date = "2026-09-02", notes = "The HUD status names the active mover in brackets - DODGE waiting for a gap [tween] - so whether it is tweening is answered by looking rather than guessed from how it moves. The Movement dropdown at the top of the Dodge section switches between tween, walk, steer and velocity; tween is the default and nothing in a saved config overrides it unless one was saved on an older build." },
     { version = "4.2.0", date = "2026-09-02", notes = "Bullet hell. The HUD showed forty-two telegraphs detected and the whole floor red with the box on a lethal spot, so detection was working and the dodge was being handed a field it could not read. Three causes. The mesh-swarm clustering from 3.0.5 merged a boss pattern of forty hitBoxes under one Model into one bounding box the size of the arena, so every candidate read as lethal and the pockets between bullets did not exist as far as the dodge could see - exact attack geometry is never merged now. The candidate score was the worst of its five samples, which in a busy field is 1.0 for every candidate with no gradient left, so the nearest won; it is now half the worst and half the average, and a spot hit at one moment beats one hit at every moment. And pursuit walked straight through the pattern to get in range: the box is the approach now, drifting toward the target only across safe ground and waiting when there is none, which is what a person does in a bullet hell. The field is denser too, four rings of twenty-four, because the pockets are small." },
@@ -155,7 +156,6 @@ RT.farmEnabled = true
 CFG.faceTarget = true
 
 CFG.attackRange = 10
-CFG.safeDistance = 8
 CFG.wallPadding = 2.0
 -- How the basic attack is delivered (3.2.3).
 --   "auto"  - Tool:Activate() when a tool is equipped, click if not
@@ -199,8 +199,6 @@ CFG.escapeWaypointAdvanceDistance = 3.5
 
 CFG.minimumAttackRange = 3
 CFG.maximumAttackRange = 25
-CFG.minimumSafeDistance = 3
-CFG.maximumSafeDistance = 25
 CFG.minimumDamageBrickRange = 10
 CFG.maximumDamageBrickRange = 150
 CFG.minimumWallPadding = 1.0
@@ -448,13 +446,20 @@ CFG.dodgeDwell = 1.2             -- seconds a spot must stay clear after arrival
 CFG.dodgeMoveAt = 0.15           -- danger here at or above this: relocate
 CFG.dodgeHysteresis = 0.12       -- a new spot must beat the box by this
 CFG.dodgeDistanceCost = 0.008    -- danger-equivalent per stud of travel
-CFG.dodgeEnemyRadius = 12
-CFG.dodgeEnemySoft = 20
+-- The enemy is the distance (4.4.0): its circle is its body plus an ordinary
+-- swing, capped by our own attack range, and the chase stands at the same
+-- number. The soft ring past it is a preference, not a danger.
+CFG.enemyMeleeReach = 5
+CFG.dodgeEnemySoftWidth = 6
+-- Pick a side and keep it: a change of direction costs this much danger, a
+-- reversal all of it, for dodgeHeadingMemory seconds after the last move.
+CFG.dodgeTurnCost = 0.25
+CFG.dodgeHeadingMemory = 1.5
 CFG.dodgeMoverMinSpeed = 3       -- studs/sec before a hazard counts as moving
 CFG.dodgeMoverWindow = 0.15      -- half-width, seconds, of a mover's swept segment
 CFG.dodgeMaxClimb = 3.0
 CFG.dodgeMaxDrop = 10.0
-CFG.dodgeRayBudget = 12          -- candidates raycast per decision, cheapest first
+CFG.dodgeRayBudget = 20          -- candidates raycast per decision, cheapest first
 CFG.dodgeManual = false          -- dodge only; you drive the rest
 CFG.dodgeShowField = true
 CFG.dodgeShowTarget = true
@@ -824,7 +829,6 @@ DG.enemies = {}
 -- Last seen position per enemy model, for velocity; body half-extent per
 -- model, refreshed occasionally. Both weak-keyed so dead enemies fall out.
 DG.enemyPrev = setmetatable({}, { __mode = "k" })
-DG.enemyExt = setmetatable({}, { __mode = "k" })
 DG.movers = {}
 DG.moverSet = {}
 DG.floorCache = {}
@@ -837,7 +841,10 @@ DG.dangerHere = 0
 DG.target = nil                  -- where the box is; nil when here is fine
 DG.targetReason = ""
 DG.lastDecision = -math.huge
-DG.pursuitBlocked = false        -- pursuit's next step was refused; the box takes over the approach
+DG.pursuitBlocked = false
+DG.gapWait = false               -- here is safe and nowhere safe to go: pursuit holds too
+DG.heading = nil                 -- unit direction of the last box, for the turn cost
+DG.headingTime = 0        -- pursuit's next step was refused; the box takes over the approach
 
 -- Hand-drawn zones. `defs` is what gets saved (a signature plus a shape);
 -- `live` is [decoration part] = the volume currently following it.

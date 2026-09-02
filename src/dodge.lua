@@ -17,6 +17,7 @@ local heavyDebugThrottled = S.heavyDebugThrottled
 local setMovementState = S.setMovementState
 local getVisualRoot = S.getVisualRoot
 local getPlayerHitboxMetrics = S.getPlayerHitboxMetrics
+local getEnemyStandoff = S.getEnemyStandoff
 local getHazardMotion = S.getHazardMotion
 local volumeClosestPoint = S.volumeClosestPoint
 local getRaycastExclusions = S.getRaycastExclusions
@@ -92,19 +93,13 @@ local function refreshSources()
                 end
                 DG.enemyPrev[model] = { x = pos.X, z = pos.Z, t = clock }
 
-                -- Big bosses reach well past their root. The circle grows with
-                -- the body so a stomping leg counts; ordinary mobs add nothing.
-                local ext = DG.enemyExt[model]
-                if not ext or clock - ext.t > 0.5 then
-                    local extra = 0
-                    local ok, size = pcall(function() return model:GetExtentsSize() end)
-                    if ok and size then extra = min(max(max(size.X, size.Z) * 0.5 - 3, 0), 20) end
-                    ext = { r = extra, t = clock }
-                    DG.enemyExt[model] = ext
-                end
-
+                -- The enemy is the distance: its circle is its body plus a
+                -- swing, just inside where the chase stands, so standing at
+                -- the standoff is not itself a danger.
+                local hard = getEnemyStandoff(model) - 1
                 DG.enemies[#DG.enemies + 1] = {
-                    x = pos.X, y = pos.Y, z = pos.Z, vx = vx, vz = vz, extra = ext.r,
+                    x = pos.X, y = pos.Y, z = pos.Z, vx = vx, vz = vz,
+                    hard = hard, soft = hard + CFG.dodgeEnemySoftWidth,
                 }
             end
         end
@@ -151,6 +146,23 @@ local function dangerAt(px, py, pz, t)
     local reach, halfHeight = DG.reach, DG.halfHeight
     local shoulder = CFG.dodgeShoulder
     local worst = 0
+
+    -- 0. Enemies, at time t - where an advancing one will be, not where it is.
+    -- Melee never telegraphs: being next to one is the attack. They read 1.5
+    -- against an attack's 1.0, so a line through an enemy loses to a line
+    -- through an attack and is taken only when every other line is worse -
+    -- backed into a corner with the mob as the only way out, it goes through
+    -- the mob, because dying in the corner is the alternative.
+    for i = 1, #DG.enemies do
+        local e = DG.enemies[i]
+        local dx, dz = px - (e.x + e.vx * t), pz - (e.z + e.vz * t)
+        local d2 = dx * dx + dz * dz
+        if d2 < e.soft * e.soft then
+            local d = sqrt(d2)
+            if d < e.hard then return 1.5 end
+            worst = max(worst, CFG.dodgeEnemySoftWeight * (1 - (d - e.hard) / (e.soft - e.hard)))
+        end
+    end
 
     -- 1. Announced ground attacks: exact shape, exact time. A zone hurts from
     -- `lead` seconds before it lands until `linger` after. Before that it is
@@ -226,22 +238,6 @@ local function dangerAt(px, py, pz, t)
         end
     end
 
-    -- 4. Enemies, at time t - where an advancing one will be, not where it is.
-    -- Melee never telegraphs: being next to one is the attack.
-    local hard0, soft0 = CFG.dodgeEnemyRadius, CFG.dodgeEnemySoft
-    for i = 1, #DG.enemies do
-        local e = DG.enemies[i]
-        local hard = hard0 + e.extra
-        local soft = max(soft0 + e.extra, hard + 0.1)
-        local dx, dz = px - (e.x + e.vx * t), pz - (e.z + e.vz * t)
-        local d2 = dx * dx + dz * dz
-        if d2 < soft * soft then
-            local d = sqrt(d2)
-            if d < hard then return 1 end
-            worst = max(worst, CFG.dodgeEnemySoftWeight * (1 - (d - hard) / (soft - hard)))
-        end
-    end
-
     -- 5. Safe-spot bosses invert the rule: outside the marked circle is the
     -- danger.
     if CFG.safeZoneEnabled and #HZ.safeZones > 0 then
@@ -297,10 +293,17 @@ local function floorAt(x, z, rootY, params)
 end
 
 -- Is the straight walk from the character to (x, z) clear of solid geometry?
+-- Swept as a slab the width of the character, not a line through its middle:
+-- a single centre ray passed spots the body could not reach, and the tween
+-- then stopped against the wall it had not seen.
 local function walkable(rootPos, x, y, z, params)
     local from = Vector3.new(rootPos.X, rootPos.Y, rootPos.Z)
-    local to = Vector3.new(x, y + 1.5, z)
-    local hit = Workspace:Raycast(from, to - from, params)
+    local to = Vector3.new(x, y + 2.0, z)
+    local w = DG.reach * 2
+    local ok, hit = pcall(function()
+        return Workspace:Blockcast(CFrame.new(from), Vector3.new(w, 1.5, w), to - from, params)
+    end)
+    if not ok then hit = Workspace:Raycast(from, to - from, params) end
     return hit == nil
 end
 
@@ -317,7 +320,20 @@ local function decide(root, humanoid)
     local dwell = CFG.dodgeDwell
 
     -- Here: now, and a moment from now. Standing still is a decision too.
-    DG.dangerHere = max(dangerAt(rx, ry, rz, 0), dangerAt(rx, ry, rz, dwell * 0.5), dangerAt(rx, ry, rz, dwell))
+    local here0 = dangerAt(rx, ry, rz, 0)
+    DG.dangerHere = max(here0, dangerAt(rx, ry, rz, dwell * 0.5), dangerAt(rx, ry, rz, dwell))
+    DG.gapWait = false
+
+    -- The direction we were last sent, if it was recent. Two safe sides of a
+    -- beam score the same to the last decimal, and re-picking between them
+    -- each decision is the left-right shuffle: a change of direction costs
+    -- something now, a reversal most, so the side picked first is the side
+    -- kept until the other is clearly better - which a closed line always is.
+    local hx, hz = 0, 0
+    if DG.heading and os.clock() - DG.headingTime < CFG.dodgeHeadingMemory then
+        hx, hz = DG.heading.X, DG.heading.Z
+    end
+    local turnCost = CFG.dodgeTurnCost
 
     -- Who we are trying to get to, if anyone. The box drifts toward them
     -- through safe ground and holds still when there is none: that is the
@@ -327,18 +343,21 @@ local function decide(root, humanoid)
     -- pattern is crossed one safe spot at a time. Far from it, pursuit walks
     -- the map and the box fires only for danger - unless pursuit is stopped at
     -- the edge of something, in which case the box picks the way in.
-    local approach = nil
+    local approach, preferred = nil, 0
     if RT.farmEnabled and not CFG.dodgeManual and NAV.cachedEnemy and NAV.cachedEnemy.Parent then
         local er = NAV.cachedEnemy:FindFirstChild("HumanoidRootPart") or NAV.cachedEnemy.PrimaryPart
         if er then
             local p = er.Position
             local ax, az = p.X - rx, p.Z - rz
             local near = CFG.dodgeReach * 1.5
-            if ax * ax + az * az <= near * near or DG.pursuitBlocked then approach = p end
+            if ax * ax + az * az <= near * near or DG.pursuitBlocked then
+                approach = p
+                preferred = getEnemyStandoff(NAV.cachedEnemy) + 0.5
+            end
         end
     end
-    local preferred = max(CFG.attackRange, CFG.dodgeEnemyRadius + 1)
     local approachWeight = CFG.dodgeApproachWeight
+    local moveAt = CFG.dodgeMoveAt
     local fractions = DG.pathFractions
 
     -- Five samples along the line from here to (rx+ox, rz+oz): three on the
@@ -353,7 +372,14 @@ local function decide(root, humanoid)
         local worst, total = 0, 0
         for k = 1, #fractions do
             local f = fractions[k]
-            local d = dangerAt(rx + ox * f, ry, rz + oz * f, T * f)
+            -- Less whatever is on you right now. Standing inside a beam, every
+            -- line out starts inside the beam; counting that made every held
+            -- box read as closed the moment it was chosen, and the choice
+            -- re-rolled between the two sides each decision. What is already
+            -- hitting you is not a reason to prefer one way out over another;
+            -- how soon the line is clear of it is, and that is what remains.
+            local d = dangerAt(rx + ox * f, ry, rz + oz * f, T * f) - here0
+            if d < 0 then d = 0 end
             total = total + d
             if d > worst then worst = d end
         end
@@ -376,12 +402,25 @@ local function decide(root, humanoid)
         local worst, graded = score(off.x, off.z, off.dist)
 
         c.x, c.z, c.dist, c.danger = cx, cz, off.dist, worst
-        c.cost = graded + off.dist * distCost
-        if approach then
-            local ax, az = cx - approach.X, cz - approach.Z
-            local toEnemy = sqrt(ax * ax + az * az)
-            c.cost = c.cost + approachWeight * max(0, toEnemy - preferred)
+        local cost = graded + off.dist * distCost
+        -- A change of direction costs; a reversal costs the most.
+        if turnCost > 0 and (hx ~= 0 or hz ~= 0) then
+            local dot = (off.x * hx + off.z * hz) / off.dist
+            cost = cost + turnCost * (1 - dot) * 0.5
         end
+        -- The pull toward the target applies among SAFE spots only. Applied to
+        -- every spot it was decisive in a crowded field where everything read
+        -- much the same, and the nearest-to-the-boss won: that is the walk
+        -- into the boss and the death at its feet.
+        if approach then
+            if worst < moveAt then
+                local ax, az = cx - approach.X, cz - approach.Z
+                cost = cost + approachWeight * max(0, sqrt(ax * ax + az * az) - preferred)
+            else
+                cost = cost + approachWeight * CFG.dodgeReach * 2
+            end
+        end
+        c.cost = cost
         c.valid = nil
         c.y = nil
     end
@@ -445,7 +484,12 @@ local function decide(root, humanoid)
                 bestFallback = c
             end
         end
-        if checked >= CFG.dodgeRayBudget then break end
+        -- The budget is a floor on effort, not a ceiling on safety: keep
+        -- checking past it until something SAFE has passed, within reason.
+        -- With a hard cut at twelve, a crowded field whose twelve cheapest
+        -- spots all failed the floor or the wall check left nothing, and the
+        -- blind fallback ran - which is the sprint toward the boss.
+        if checked >= CFG.dodgeRayBudget and (best and best.danger < moveAt or checked >= 40) then break end
     end
 
     -- Hysteresis, for a box whose LINE is still clear and only then. The old
@@ -500,6 +544,7 @@ local function decide(root, humanoid)
         if not best or best.danger >= CFG.dodgeMoveAt then
             DG.target = nil
             DG.targetReason = "waiting for a gap"
+            DG.gapWait = true
             return
         end
         -- Hysteresis for the approach too, or the box creeps a stud at a time.
@@ -515,24 +560,38 @@ local function decide(root, humanoid)
         end
     end
 
+    local function commit(x, y, z)
+        DG.target = Vector3.new(x, y, z)
+        local v = Vector3.new(x - rx, 0, z - rz)
+        if v.Magnitude > 0.5 then
+            DG.heading = v.Unit
+            DG.headingTime = os.clock()
+        end
+    end
     if best then
-        DG.target = Vector3.new(best.x, best.y, best.z)
+        commit(best.x, best.y, best.z)
         DG.targetReason = string.format("danger %.2f, %.0f studs", best.danger, best.dist)
     elseif not DG.target then
         if bestFallback then
             -- Every clear line is worse than a walled one. Take the walled one
             -- and let the humanoid slide along the wall rather than stand in it.
-            DG.target = Vector3.new(bestFallback.x, bestFallback.y, bestFallback.z)
+            commit(bestFallback.x, bestFallback.y, bestFallback.z)
             DG.targetReason = "walled, sliding"
         else
-            -- Nothing has a floor. Away from the nearest enemy, blindly.
+            -- Nothing has a floor. Away from the NEAREST enemy, blindly. This
+            -- used to take the first enemy in the table - whichever that was -
+            -- and read fields the entries do not have, so it errored.
             local away = Vector3.new(0, 0, 1)
-            if #DG.enemies > 0 then
-                local e = DG.enemies[1]
-                local v = Vector3.new(rx - e.X, 0, rz - e.Z)
-                if v.Magnitude > 0.1 then away = v.Unit end
+            local nearest, nd = nil, math.huge
+            for i = 1, #DG.enemies do
+                local e = DG.enemies[i]
+                local dx, dz = rx - e.x, rz - e.z
+                local d2 = dx * dx + dz * dz
+                if d2 < nd then nearest, nd = e, d2 end
             end
-            DG.target = rootPos + away * CFG.dodgeReach
+            if nearest and nd > 0.01 then away = Vector3.new(rx - nearest.x, 0, rz - nearest.z).Unit end
+            local t = rootPos + away * CFG.dodgeReach
+            commit(t.X, t.Y, t.Z)
             DG.targetReason = "blind"
             heavyDebugThrottled("dodge_blind", 1.0, "Dodge", "No candidate with a floor; running blind.")
         end
@@ -623,7 +682,7 @@ local function paint(root)
         if not show or not c or not c.y then
             if disc.Transparency ~= 1 then disc.Transparency = 1 end
         else
-            local t = c.danger
+            local t = min(c.danger, 1)
             local color = t < 0.5 and safe:Lerp(Color3.fromRGB(255, 220, 60), t * 2)
                 or Color3.fromRGB(255, 220, 60):Lerp(danger, (t - 0.5) * 2)
             disc.CFrame = CFrame.new(c.x, c.y + 0.15, c.z) * UPRIGHT
@@ -650,7 +709,8 @@ local function stepClear(root, humanoid, to)
     local d = max(
         dangerAt(rp.X + ux * 0.5, rp.Y, rp.Z + uz * 0.5, T * 0.5),
         dangerAt(rp.X + ux, rp.Y, rp.Z + uz, T),
-        dangerAt(rp.X + ux, rp.Y, rp.Z + uz, T + CFG.dodgeDwell * 0.5))
+        dangerAt(rp.X + ux, rp.Y, rp.Z + uz, T + CFG.dodgeDwell * 0.5),
+        dangerAt(rp.X + ux, rp.Y, rp.Z + uz, T + CFG.dodgeDwell))
     return d < CFG.dodgeMoveAt
 end
 

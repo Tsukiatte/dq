@@ -223,13 +223,15 @@ local function attackEnemy(enemy)
         -- character holds, and the box - told pursuit is blocked - picks the
         -- way in one safe spot at a time. (4.2.0 had dropped pursuit outright,
         -- so the bot could no longer cross a room.)
-        if dodgeStepClear(root, humanoid, pursuitAhead(enemyRoot)) then
+        -- And not while the dodge itself is waiting for a gap: five clear
+        -- studs at a time was how it walked into a pattern one step per tick.
+        if not DG.gapWait and dodgeStepClear(root, humanoid, pursuitAhead(enemyRoot)) then
             DG.pursuitBlocked = false
             updatePursuitMovement(enemy, humanoid, root, enemyRoot)
         else
             DG.pursuitBlocked = true
             humanoid:MoveTo(root.Position)
-            setMovementState("holding for a gap")
+            setMovementState(DG.gapWait and "waiting for a gap [hold]" or "holding for a gap")
         end
     else
         updatePursuitMovement(enemy, humanoid, root, enemyRoot)
@@ -238,10 +240,7 @@ local function attackEnemy(enemy)
     local flatOffset = Vector3.new(root.Position.X - enemyRoot.Position.X, 0, root.Position.Z - enemyRoot.Position.Z)
     -- Reach has to cover the stand-off distance, otherwise the bot would walk
     -- back into melee purely so it could swing.
-    local reach = CFG.attackRange
-    if DG.active then
-        reach = math.max(reach, CFG.dodgeEnemyRadius + 2)
-    end
+    local reach = math.max(CFG.attackRange, S.getEnemyStandoff(enemy) + 1.5)
     if flatOffset.Magnitude <= reach and RT.farmEnabled and not RT.destroyed and RT.gameSpecificAttackMethod then
         RT.gameSpecificAttackMethod(enemy)
     end
