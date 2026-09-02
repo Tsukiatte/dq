@@ -11,6 +11,16 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.9.7 - 2026-09-02
+
+- Boss projectile paths failed the dodge's vertical test: a rolling body's
+  centre rides its radius above the floor (the big spike's 20 studs up) and
+  the tolerance reached ~10. The path existed and was ignored; the hit landed
+  with `danger=0.00`. A path's vertical reach is now at least its radius.
+- `FirstPart` kept being learned from a hit taken inside it despite the age
+  guard. A big anchored part (>= 40 on any axis), or any anchored part
+  directly under Workspace, is never learned as an attack.
+
 ## 4.9.6 - 2026-09-02
 
 A hit that lands after an attack's warning has faded (and the fade marked it
