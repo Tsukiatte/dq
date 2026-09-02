@@ -11,6 +11,29 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.9.1 - 2026-09-02
+
+### The seven-second delay
+The second Northern Lands capture: every `northernMageShot`,
+`spearmanStrikeHitbox` and `northernWarriorLineStrike` carried a saved arm
+delay of ~7 s (`armed +6.9s (learned time)`), learned by 4.5.1 from the Model
+being deleted at 7.0 s as if that were the precast fading. Each one was
+therefore **floor for its first 5.7 s**. Learned timing (`armDelays`,
+`armSpans`) and auto-learned names from saves written before 4.9.1 are
+discarded on load; hand picks (attack book `source = "picked"`) are kept.
+
+### What a mage shot actually is
+`0.9:channels 0>2 0.9:HIT`: nothing visible for the first 0.6-0.9 s, then the
+precast appears (0.35) and a second channel switches on at the very moment
+the hit lands. The visible "precast" is the hit, not the warning. The
+hit-window learning from 4.9.0 handles exactly this once the poisoned delay
+is gone.
+
+### Also
+A part that has stood in the world for 20 s is never learned as an attack
+(`Workspace.FirstPart` was). Learned names that match an anchored part
+directly under Workspace are dropped on load.
+
 ## 4.9.0 - 2026-09-02 - "Learn from the hit"
 
 ### What the capture said
