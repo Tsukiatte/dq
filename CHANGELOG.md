@@ -11,6 +11,17 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.9.9 - 2026-09-02
+
+- A parked Model (dormant, or silent for 30 s) never gets the blame for a
+  hit. The 14 beams parked at the arena centre kept being credited with hits
+  from live beams passing through, which woke the pool and stretched every
+  beam's learned window to the length of the fight.
+- A learned window is trusted as it stands (`done: window over` at
+  `last + armAssumedLinger`), without waiting a further 2 s for the visuals
+  to fade. The mage shot's line stays drawn ~7 s after its single hit.
+- Harness: strikes fire at 0.85 s (the capture measured 0.88 s), not 0.4 s.
+
 ## 4.9.8 - 2026-09-02
 
 Candidate lines are sampled every `dodgeSampleSpacing` (2.5) studs, 2-8
