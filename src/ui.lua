@@ -1107,7 +1107,7 @@ local function createControlUI()
     track(K.slider(cloneSection.content, "Safety margin", "Clearance beyond your hitbox",
         0, 4, true,
         function() return CFG.cloneSafetyMargin end, function(v) CFG.cloneSafetyMargin = v end, 6,
-        "How much room past the edge of an attack a disc needs before it counts as green. Raise it if you are being grazed."))
+        "The only padding there is. A disc is green when your body plus this would not touch the attack - 0 means it just fits. Raise it if you are being grazed, but every stud here is taken off the walkable space between two attacks."))
     track(K.slider(cloneSection.content, "Danger cost", "How much it hates crossing red",
         5, 60, false,
         function() return CFG.cloneDangerCost end, function(v) CFG.cloneDangerCost = v end, 7,
@@ -1123,7 +1123,7 @@ local function createControlUI()
     track(K.slider(cloneSection.content, "Disc size", "Times your footprint",
         0.5, 2, true,
         function() return CFG.cloneDiscScale end, function(v) CFG.cloneDiscScale = v end, 15,
-        "1.0 is the width of your character with its limbs. The safety test uses the same radius, so a green disc means all of you fits."))
+        "1.0 is your body's real width, measured from your limbs and re-measured as you play. Accessories and held weapons are excluded, so a big cosmetic does not make the bot think it needs more room than it does."))
     track(K.toggle(cloneSection.content, "Show the grid",
         function() return CFG.showClones end, function(v) CFG.showClones = v end, 10,
         "Draw the discs. Turning them off keeps the dodging - only the drawing stops."))
