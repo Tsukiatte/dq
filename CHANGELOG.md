@@ -11,6 +11,40 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.5.0 - 2026-09-02 - "Telegraphs are floor"
+
+### Dodging attacks that were not happening
+The boss arena was a lattice of red strips for five seconds before a single
+beam fired. The dodge treated every strip as live from the moment it appeared
+and carved its safe ground into slivers around attacks that were not
+happening — the video shows 41 telegraphs and the character weaving between
+strips 1.5 s old that fired at 4.8 s.
+
+The game's own client script (`mapSpecificLocals`) says how to tell. Every
+attack is a Model with an invisible `hitBox` and a visible `precast`, and the
+precast is tweened **out** at the instant the hit lands. So:
+
+- a visible `precast` is a telegraph — floor you may cross;
+- the precast **fading** is the hit, and arms the Model;
+- a `hitBox` that moves is live regardless (a shot in flight).
+
+The age at which each attack arms is learned by its Model name
+(`RT.armDelays`, saved with the config), so the *next* cast is time-aware
+from the moment it appears: floor until `Lead` seconds before its impact,
+then danger. The first cast of anything is still dodged as if live. A hit
+taken while an attack reads as a telegraph makes that attack live from spawn
+from then on (`noteTelegraphHit`).
+
+Announced-but-not-live parts are drawn **amber** with `arms in 2.3s` on the
+tag and turn red the frame they arm.
+
+### Waiting for a gap under the pipes
+The floor probe started four studs above the root. Under the pipes and
+machinery of a boss room it hit the pipe, read its top as the floor, and
+rejected every candidate — `waiting for a gap` with nothing wrong but the
+ceiling, in the corner the character then died in. It starts just above the
+root now.
+
 ## 4.4.1 - 2026-09-02
 
 ### Kiting idle melee bots into a wall

@@ -66,6 +66,7 @@ local function refreshSources()
     DG.reach = (CFG.dodgeProbe > 0 and CFG.dodgeProbe or rootRadius) + CFG.dodgeMargin
     DG.halfHeight = totalHeight * 0.5 + 2.5
     DG.now = Workspace:GetServerTimeNow()
+    DG.clock = os.clock()
 
     table.clear(DG.enemies)
     local character = LocalPlayer.Character
@@ -215,10 +216,21 @@ local function dangerAt(px, py, pz, t)
     -- does not enter into it - except that the moving ones are handled below
     -- as the line they sweep rather than the point they occupy.
     local point = Vector3.new(px, py, pz)
+    local lead = CFG.dodgeLead
     for i = 1, #HZ.volumes do
         local volume = HZ.volumes[i]
         local part = volume.part
-        if (not part or part.Parent) and not (part and DG.moverSet[part]) then
+        local live = true
+        if part then
+            -- Announced and not yet armed: floor, until its learned impact is
+            -- within the lead. Unknown timing stays live - the first cast of
+            -- anything is dodged as if it were, and the second is not.
+            local st = HZ.armState[part]
+            if st and not st.armedAt and st.impactAt then
+                live = t >= (st.impactAt - DG.clock) - lead
+            end
+        end
+        if live and (not part or part.Parent) and not (part and DG.moverSet[part]) then
             local closest = volumeClosestPoint(volume, point)
             if abs(py - closest.Y) < halfHeight then
                 local dx, dz = px - closest.X, pz - closest.Z
@@ -294,7 +306,12 @@ local function floorAt(x, z, rootY, params)
     local hit = DG.floorCache[key]
     local now = os.clock()
     if hit and now - hit.t < 0.5 then return hit.y end
-    local result = Workspace:Raycast(Vector3.new(x, rootY + 4, z), Vector3.new(0, -(4 + CFG.dodgeMaxDrop), 0), params)
+    -- From just above the root, not four studs above it: under the pipes and
+    -- machinery of a boss room the higher origin hit the pipe, read its top as
+    -- the floor, and rejected every spot - "waiting for a gap" with nothing
+    -- wrong but the ceiling, in the corner the character then died in. A
+    -- floor higher than the root is more than a climb anyway.
+    local result = Workspace:Raycast(Vector3.new(x, rootY + 0.5, z), Vector3.new(0, -(3.5 + CFG.dodgeMaxDrop), 0), params)
     local y = result and result.Position.Y or false
     DG.floorCache[key] = { y = y, t = now }
     DG.floorCacheSize = DG.floorCacheSize + 1

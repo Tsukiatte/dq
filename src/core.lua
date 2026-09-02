@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 4.4.1
+    VERSION : 4.5.0
     BUILD   : 2026-09-02
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "4.4.1"
+local SCRIPT_VERSION = "4.5.0"
 local SCRIPT_BUILD_DATE = "2026-09-02"
-local SCRIPT_CODENAME = "Pick a side"
+local SCRIPT_CODENAME = "Telegraphs are floor"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "4.5.0", date = "2026-09-02", notes = "Telegraphs are floor. The boss arena was a lattice of red strips for five seconds before a single beam fired, and the dodge treated every strip as live from the moment it appeared, carving its safe ground into slivers to avoid attacks that were not happening - the video showed forty-one telegraphs and the character weaving between strips at 1.5 seconds old that fired at 4.8. The game's own client script says how to tell: every attack is a Model with an invisible hitBox and a visible precast, and the precast is faded OUT at the instant the hit lands. So a visible precast is a telegraph, the fade is the hit, and a hitBox that moves is live regardless. Each attack's arming age is learned by its Model name and saved, so the next cast is time-aware from the moment it appears: floor until its lead, then danger. The first cast of anything is still dodged as if live, and a hit taken while an attack reads as a telegraph makes that attack live from spawn from then on. Announced-but-not-live parts are drawn amber with arms in 2.3s on the tag and turn red the frame they arm. And the floor probe now starts just above the root rather than four studs up: under the pipes of a boss room it was reading a pipe as the floor and rejecting every spot - waiting for a gap with nothing wrong but the ceiling, in the corner the character then died in." },
     { version = "4.4.1", date = "2026-09-02", notes = "Two numbers from 4.4.0 were wrong in the same direction. The enemy circle was body plus swing at 1.5, and enemies were extrapolated by their velocity out to the dwell - so a mob walking at you was predicted onto every spot near you and the only safe ground was always further back: the character kited two idle melee bots backward into a wall two rooms away. The hard circle is the body and nothing more now - the swing is an attack, and the game spawns a hitBox for it that is detected like any other - with a soft ring out to the standoff as a preference, and enemies are extrapolated 0.4 seconds ahead at most. And inside the boss's ball the exit was chosen sideways and slowly: the discount that ended the shuffle zeroed every path sample inside the ball, so nothing said shortest time inside, and the new turn cost then picked the exit by whichever way the character had last walked. Path samples inside the thing already hitting you keep half their cost in the average, so three samples in the ball cost more than one and the nearest edge wins; the turn cost is switched off while something is on you; and the pull toward the boss applies only to spots whose whole line is clean, undiscounted, so the exit nearest the boss cannot beat the exit nearest the edge." },
     { version = "4.4.0", date = "2026-09-02", notes = "Pick a side. The left-right shuffle against a sweeping beam had a cause 4.3.0 made worse: standing inside the beam, every line out starts inside it, so the new line check read every held box as closed the moment it was chosen and the choice re-rolled between two identical sides each decision. Path samples now discount whatever is already on you - what is hitting you is not a reason to prefer one way out over another; how soon the line is clear of it is - and a change of direction costs, a reversal most, so the side picked first is kept until the other is clearly better, which a closed line always is. Enemies outrank attacks at 1.5 against 1.0: a line through a mob loses to a line through an attack and is taken only when everything else is worse, so it no longer strafes out of an attack into a mob, and cornered with the mob as the only way out it goes through the mob. The enemy is the distance: the Safe distance and Enemy space sliders are gone, and the chase and the dodge both stand at the enemy's body plus a swing, capped by your own attack range so it can always reach. The walk into the boss had three causes: the pull toward the target was applied to dangerous spots too and was decisive in a crowded field, so the nearest-to-the-boss won - it applies among safe spots only now; the raycast budget cut off at twelve and a crowded field whose twelve cheapest spots all failed left nothing, so the blind fallback ran - it keeps checking until something safe passes; and the blind fallback itself read fields its entries do not have and fled the first enemy in the table rather than the nearest. Pursuit holds while the dodge is waiting for a gap - five clear studs at a time was how it walked into a pattern one step per tick. Pursuit goals are kept off walls: two hip-height side rays push the goal off any wall closer than the character's clearance, and the dodge's walk check is a body-wide sweep rather than a centre line. Legacy is called Pathfind." },
     { version = "4.3.0", date = "2026-09-02", notes = "Nothing is held. The box had hysteresis, and the hysteresis re-read danger at the box and nowhere else - so an attack placed between the character and the box did not exist as far as the held box was concerned, and the character walked its straight line into it while a step to either side was open. The bots that beat bullet hells commit to nothing: twinject, the Touhou player, re-picks its velocity every frame from scratch. The box now survives a decision only while every sample along the line to it and at it still passes; otherwise it is dropped on the spot, the field is re-read, and the re-read prices the straight line, which is what puts the new box to the left or the right. Pursuit is back underneath the dodge: 4.2.0 had dropped it outright so the bot could no longer cross a room. The loop only reaches pursuit with no box to follow, and even then it gets a step only if the next few studs of its route are clear; when they are not it holds and the box, told pursuit is blocked, picks the way in one safe spot at a time. Near the target the box is the approach as before. Macros are gone - the recorder, the player, the file, the island option, the Routes section and their settings - and the island is Legacy or Dodge. Section headers and the well their rows sit in are darker than the rows now, so a setting and a list of settings no longer look the same." },
@@ -461,6 +462,11 @@ CFG.dodgeEnemyLookahead = 0.4
 -- What a path sample inside the thing already hitting you still costs, as a
 -- share of full: time spent in it matters, which way out does not.
 CFG.dodgeInsideWeight = 0.5
+-- A precast that has brightened back by this much from its darkest is fading:
+-- the attack has fired. Anything that arms sooner than armMinDelay after it
+-- appears is never treated as a telegraph again.
+CFG.armFadeStep = 0.08
+CFG.armMinDelay = 0.3
 CFG.dodgeMoverMinSpeed = 3       -- studs/sec before a hazard counts as moving
 CFG.dodgeMoverWindow = 0.15      -- half-width, seconds, of a mover's swept segment
 CFG.dodgeMaxClimb = 3.0
@@ -561,6 +567,7 @@ CFG.accountRank = "DEVELOPER"
 -- colour from here, so the Overlays section can recolour any of it. accentColor
 -- drives the whole GUI: the three gradient stops are derived from it.
 CFG.colorTelegraph = Color3.fromRGB(255, 30, 30)
+CFG.colorTelegraphPending = Color3.fromRGB(255, 176, 40)   -- announced, not yet live
 CFG.colorWall = Color3.fromRGB(40, 220, 90)
 CFG.colorHitbox = Color3.fromRGB(0, 220, 255)
 CFG.colorAbilityRadius = Color3.fromRGB(170, 100, 255)
@@ -660,6 +667,14 @@ HZ.diagnoseCount = 0
 -- classification so the per-frame scan can exempt them from appearance
 -- tests. Weak keys: a destroyed part drops out on its own.
 HZ.groundTruth = setmetatable({}, { __mode = "k" })
+-- Arming (4.5.0). Every attack in this game is a Model with an invisible
+-- hitBox and a visible precast, and the client fades the precast OUT at the
+-- moment the hit lands. So a visible precast is a telegraph - floor you may
+-- cross - and the fade is the hit. Per attack Model: when it was first seen,
+-- its precast, the least transparent that precast has been, and when it
+-- armed. Keyed weakly so dead attacks fall out.
+HZ.arming = setmetatable({}, { __mode = "k" })
+HZ.armState = setmetatable({}, { __mode = "k" })   -- [part] = its Model's arming record
 -- What was next to you each time you took damage. Newest last, capped.
 HZ.hitLog = {}
 HZ.lastHitAt = -math.huge
@@ -809,6 +824,9 @@ RT.menuBindCapture = false
 -- Per-map attack books, and per-map hand-drawn zones. Both are properties of a
 -- dungeon, so they are keyed by map like the waypoints.
 RT.attackData = {}
+-- How long after it appears each attack (by Model name) arms, learned from
+-- watching its precast fade. Saved with the config; the earliest seen wins.
+RT.armDelays = {}
 RT.zoneData = {}
 RT.rejectData = nil
 

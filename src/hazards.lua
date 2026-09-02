@@ -952,6 +952,9 @@ local function updateHazardHighlights()
         if part.Parent then
             local debugId = part:GetDebugId()
             local velocity = getHazardMotion(part)
+            local st = HZ.armState[part]
+            local pending = st ~= nil and st.armedAt == nil
+            local color = pending and CFG.colorTelegraphPending or CFG.colorTelegraph
 
             -- Name tag.
             if CFG.hazardTagEnabled then
@@ -983,11 +986,18 @@ local function updateHazardHighlights()
                     if velocity then
                         text = string.format("%s  >> %.0f st/s", hazardDisplayName(part),
                             Vector3.new(velocity.X, 0, velocity.Z).Magnitude)
+                    elseif pending and st.impactAt then
+                        text = string.format("%s  arms in %.1fs", hazardDisplayName(part),
+                            math.max(st.impactAt - now, 0))
+                    elseif pending then
+                        text = string.format("%s  telegraph %.1fs", hazardDisplayName(part),
+                            math.max(now - (HZ.spawnTimes[part] or now), 0))
                     else
                         text = string.format("%s  %.1fs", hazardDisplayName(part),
                             math.max(now - (HZ.spawnTimes[part] or now), 0))
                     end
                     if label.Text ~= text then label.Text = text end
+                    if label.TextColor3 ~= color then label.TextColor3 = color end
                 end
             end
 
@@ -1020,7 +1030,17 @@ local function updateHazardHighlights()
             end
 
             local highlightId = "Highlight_" .. debugId
-            if not folder:FindFirstChild(highlightId) then
+            local existing = folder:FindFirstChild(highlightId)
+            if existing then
+                -- Recoloured in place: a telegraph turns red the frame it arms.
+                if existing:IsA("Highlight") then
+                    if existing.FillColor ~= color then existing.FillColor = color existing.OutlineColor = color end
+                elseif existing:IsA("SelectionBox") then
+                    if existing.Color3 ~= color then existing.Color3 = color existing.SurfaceColor3 = color end
+                elseif existing:IsA("HandleAdornment") then
+                    if existing.Color3 ~= color then existing.Color3 = color end
+                end
+            else
                 local isCylinder = false
                 local isSphere = false
                 if part:IsA("Part") then
@@ -1043,9 +1063,9 @@ local function updateHazardHighlights()
                     local hl = Instance.new("Highlight")
                     hl.Name = highlightId
                     hl.Adornee = part
-                    hl.FillColor = CFG.colorTelegraph
+                    hl.FillColor = color
                     hl.FillTransparency = 0.65
-                    hl.OutlineColor = CFG.colorTelegraph
+                    hl.OutlineColor = color
                     hl.OutlineTransparency = 0.1
                     hl.Parent = HZ.highlightsFolder
                 elseif isCylinder then
@@ -1054,7 +1074,7 @@ local function updateHazardHighlights()
                     adorn.Adornee = part
                     adorn.Height = part.Size.X
                     adorn.Radius = math.min(part.Size.Y, part.Size.Z) * 0.5
-                    adorn.Color3 = CFG.colorTelegraph
+                    adorn.Color3 = color
                     adorn.Transparency = 0.5
                     adorn.ZIndex = 2
                     adorn.AlwaysOnTop = true
@@ -1065,7 +1085,7 @@ local function updateHazardHighlights()
                     adorn.Name = highlightId
                     adorn.Adornee = part
                     adorn.Radius = math.min(part.Size.X, part.Size.Y, part.Size.Z) * 0.5
-                    adorn.Color3 = CFG.colorTelegraph
+                    adorn.Color3 = color
                     adorn.Transparency = 0.5
                     adorn.ZIndex = 2
                     adorn.AlwaysOnTop = true
@@ -1074,9 +1094,9 @@ local function updateHazardHighlights()
                     local box = Instance.new("SelectionBox")
                     box.Name = highlightId
                     box.Adornee = part
-                    box.Color3 = CFG.colorTelegraph
+                    box.Color3 = color
                     box.LineThickness = 0.04
-                    box.SurfaceColor3 = CFG.colorTelegraph
+                    box.SurfaceColor3 = color
                     box.SurfaceTransparency = 0.65
                     box.Parent = HZ.highlightsFolder
                 end
@@ -1809,6 +1829,15 @@ local function recordHit(damage)
     HZ.lastHitAt = now
     HZ.lastHitName = culprit and culprit.part.Name or (ranked[1] and ranked[1].part.Name) or "nothing nearby"
 
+    -- Anything known that was ON us and still reading as a telegraph was not
+    -- one: it is live from spawn from now on. Late-bound; defined further down.
+    if S.noteTelegraphHit then
+        for i = 1, math.min(#ranked, 8) do
+            local r = ranked[i]
+            if r.known and r.distance <= 6 then S.noteTelegraphHit(r.part) end
+        end
+    end
+
     for _, l in ipairs(lines) do HZ.hitLog[#HZ.hitLog + 1] = l end
     while #HZ.hitLog > 240 do table.remove(HZ.hitLog, 1) end
     if S.refreshHitPanel then S.refreshHitPanel() end
@@ -2352,6 +2381,87 @@ rebuildHazardVolumes = function()
     HZ.volumes = volumes
 end
 
+-- =========================================================================
+-- ARMING (4.5.0)
+--
+-- The floor of the boss arena was a lattice of red strips for five seconds
+-- before a single beam fired, and the dodge treated every strip as live from
+-- the moment it appeared - carving its safe ground into slivers to avoid
+-- attacks that were not happening. Those strips are the precast parts: the
+-- game builds each attack as a Model with an invisible hitBox and a visible
+-- precast, and the client script fades the precast OUT at the instant the hit
+-- lands (mapSpecificLocals: precast.Transparency tweens to 1 as the beam
+-- widens). So while the precast is visible the attack is a telegraph, and
+-- the fade IS the hit.
+--
+-- Per attack Model this tracks the least transparent its precast has been;
+-- a rise back from that is the fade, and arms it. A hitBox that moves is
+-- armed regardless (a shot in flight is live). The age at which a Model
+-- arms is learned by its name, so the NEXT cast of the same attack is
+-- time-aware from the moment it appears: floor until its lead, then danger.
+-- A Model with no precast, or one that arms sooner than armMinDelay, is
+-- live from the start and never treated as a telegraph.
+-- =========================================================================
+local function updateArming(now)
+    for _, part in ipairs(HZ.detected) do
+        local st = nil
+        if HZ.groundTruth[part] then
+            local model = part:FindFirstAncestorOfClass("Model")
+            st = model and HZ.arming[model] or nil
+            if model and not st then
+                local name = string.lower(model.Name)
+                local pc = model:FindFirstChild("precast")
+                local spawn = HZ.seenAt[part] or HZ.spawnTimes[part] or now
+                st = { name = name, spawn = spawn, precast = pc or false, minT = math.huge,
+                       armedAt = nil, impactAt = nil, seen = now }
+                if not pc then
+                    st.armedAt = now
+                else
+                    local delay = RT.armDelays[name]
+                    if delay then st.impactAt = spawn + delay end
+                end
+                HZ.arming[model] = st
+            end
+            if st then
+                st.seen = now
+                if not st.armedAt then
+                    local pc = st.precast
+                    if pc and pc.Parent then
+                        local tr = pc.Transparency
+                        if tr < st.minT then st.minT = tr end
+                        if tr >= 0.97 or tr > st.minT + CFG.armFadeStep then st.armedAt = now end
+                    else
+                        st.armedAt = now
+                    end
+                    if not st.armedAt and getHazardMotion(part) then st.armedAt = now end
+                    if st.armedAt then
+                        local age = st.armedAt - st.spawn
+                        if age >= CFG.armMinDelay then
+                            local known = RT.armDelays[st.name]
+                            if not known or age < known then RT.armDelays[st.name] = age end
+                        else
+                            RT.armDelays[st.name] = nil
+                        end
+                    end
+                end
+            end
+        end
+        HZ.armState[part] = st
+    end
+end
+
+-- A hit taken while the nearest attack was still reading as a telegraph is
+-- the one thing the fade rule cannot be allowed to be wrong about twice:
+-- that attack is live from the start from now on.
+local function noteTelegraphHit(part)
+    local st = part and HZ.armState[part]
+    if st and not st.armedAt then
+        st.armedAt = os.clock()
+        RT.armDelays[st.name] = nil
+        heavyDebug("Attacks", string.format("'%s' hit while announced; it is live from spawn from now on.", st.name))
+    end
+end
+
 local function scanDamageBricks(rootPosition)
     local now = os.clock()
     rebuildCatalogArrays()
@@ -2382,6 +2492,7 @@ local function scanDamageBricks(rootPosition)
         end
     end
     HZ.detected = found
+    updateArming(now)
     rebuildHazardVolumes()
 
     if UI.damageBrickCountLabel then
@@ -2624,6 +2735,7 @@ S.updateHitboxVisualizer = updateHitboxVisualizer
 S.updateWallHighlights = updateWallHighlights
 S.noteOwnAction = noteOwnAction
 S.getHazardMotion = getHazardMotion
+S.noteTelegraphHit = noteTelegraphHit
 S.findAttackRecord = findAttackRecord
 S.invalidateAttackBook = invalidateAttackBook
 S.describeRecord = describeRecord
