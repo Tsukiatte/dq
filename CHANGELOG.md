@@ -11,6 +11,44 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.2.0 - 2026-09-02 - "The box is the approach"
+
+The bullet-hell screenshot was the most diagnostic yet: **42 telegraphs
+detected** on the HUD, the whole floor red, the box sitting on a lethal spot.
+Detection was working. The dodge was being handed a field it could not read.
+
+### One box the size of the arena
+The mesh-swarm clustering from 3.0.5 collapses six-plus parts under one Model
+into a single bounding box. A boss pattern of forty `hitBox`es under one Model
+became **one hazard covering the arena** — every candidate read 1.0, and the
+pockets between the bullets did not exist as far as the dodge could see.
+
+Parts the game says are attacks are exact geometry and are never merged now.
+Clustering still applies to what it was built for.
+
+### No gradient
+The candidate score was the *worst* of its five samples. In a busy field every
+candidate is hit at *some* moment, so every score was exactly 1.0 and the
+nearest won — even if lethal. It is now **half the worst and half the
+average**: a spot hit at one moment on the way is not as bad as one hit at every
+moment, and in a bullet hell that difference is the only gradient there is.
+
+### The box is the approach
+Pursuit drove the character straight through the pattern to get in range
+whenever *here* was momentarily safe. In Dodge mode pursuit no longer moves the
+character at all. Among safe candidates the box prefers ones nearer the target
+(**Approach**), so the character closes on the boss only across clear ground —
+and when there is no safe way forward it **waits**, which is what a person does
+in a bullet hell. In range and safe, it stands and swings.
+
+The enemy soft ring is now a preference weighted below the move threshold,
+because standing at attack range was reading as "unsafe" and the character would
+oscillate at the edge of it.
+
+### Denser field
+Four rings of twenty-four. The pockets are small; sixteen rays at eighteen studs
+put seven studs between samples on the outer ring, wider than the gaps.
+
 ## 4.1.1 - 2026-09-02
 
 ### Noticed once, never again

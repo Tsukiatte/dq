@@ -1182,6 +1182,10 @@ local function createControlUI()
         4, 25, false,
         function() return CFG.dodgeEnemyRadius end, function(v) CFG.dodgeEnemyRadius = v end, 11,
         "Melee never telegraphs; being next to one is the attack. Chasing stops at this distance too."))
+    track(K.slider(cloneSection.content, "Approach", "Pull toward the target across safe ground",
+        0, 0.05, true,
+        function() return CFG.dodgeApproachWeight end, function(v) CFG.dodgeApproachWeight = v end, 11.5,
+        "The box is the approach. Among safe spots it prefers ones nearer the target, so the character closes only through clear ground and waits when there is none. Pursuit no longer moves the character in this mode - it walked straight through patterns to get in range."))
     track(K.slider(cloneSection.content, "Probe size", "0 uses your root part",
         0, 3, true,
         function() return CFG.dodgeProbe end, function(v) CFG.dodgeProbe = v end, 12,

@@ -265,6 +265,7 @@ local function buildConfigTable()
             dodgeShowTarget = CFG.dodgeShowTarget,
             dodgeShowRange = CFG.dodgeShowRange,
             dodgeCornerCost = CFG.dodgeCornerCost,
+            dodgeApproachWeight = CFG.dodgeApproachWeight,
             attackMethod = CFG.attackMethod,
             autoClickEnabled = CFG.autoClickEnabled,
             clickAtCursor = CFG.clickAtCursor,
@@ -389,7 +390,7 @@ local function applyConfigData(data)
         for _, key in ipairs({ "dodgeInterval", "dodgeReach", "dodgeRings", "dodgeRays", "dodgeProbe",
             "dodgeMargin", "dodgeShoulder", "dodgeLead", "dodgeLinger", "dodgeDwell", "dodgeMoveAt",
             "dodgeHysteresis", "dodgeDistanceCost", "dodgeEnemyRadius", "dodgeEnemySoft",
-            "dodgeMaxClimb", "dodgeMaxDrop", "dodgeCornerCost" }) do
+            "dodgeMaxClimb", "dodgeMaxDrop", "dodgeCornerCost", "dodgeApproachWeight" }) do
             CFG[key] = tonumber(combat[key]) or CFG[key]
         end
         for _, key in ipairs({ "dodgeManual", "dodgeShowField", "dodgeShowTarget", "dodgeShowRange" }) do
@@ -766,7 +767,7 @@ end
 -- One button's worth of tuning (4.0.0). Kept beside the loader so the defaults
 -- and the reset cannot drift apart.
 local RECOMMENDED_DODGE = {
-    dodgeInterval = 0.05, dodgeReach = 18, dodgeRings = 3, dodgeRays = 16,
+    dodgeInterval = 0.05, dodgeReach = 18, dodgeRings = 4, dodgeRays = 24, dodgeApproachWeight = 0.012,
     dodgeProbe = 0, dodgeMargin = 0.5, dodgeShoulder = 3.0,
     dodgeLead = 1.2, dodgeLinger = 0.35, dodgeDwell = 1.2,
     dodgeMoveAt = 0.15, dodgeHysteresis = 0.12, dodgeDistanceCost = 0.008,
