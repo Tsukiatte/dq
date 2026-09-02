@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 2.5.1
+    VERSION : 2.6.0
     BUILD   : 2026-09-01
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "2.5.1"
+local SCRIPT_VERSION = "2.6.0"
 local SCRIPT_BUILD_DATE = "2026-09-01"
-local SCRIPT_CODENAME = "Playback"
+local SCRIPT_CODENAME = "Firstperson"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "2.6.0", date = "2026-09-01", notes = "Macros are a top-level mode with their own panel and their own button, no longer nested inside the waypoint editor. Recording now switches the free-fly editor OFF: a macro is recorded from your ordinary first-person camera, and a detached camera would capture a route the character never walked. Switching the idle mode to Macros disables the editor for the same reason." },
     { version = "2.5.1", date = "2026-09-01", notes = "Fixed: the macro Record and Bind buttons were unreachable. The Route panel was only opened by the Edit Path button, which also threw the camera into free-fly and paused the loop - so the only way to reach the recorder was to hijack the camera first, which is exactly what makes recording impossible. Opening the panel and arming the free-fly editor are now separate buttons." },
     { version = "2.5.0", date = "2026-09-01", notes = "Macro Waypoints. A dropdown at the top of the path panel switches between the legacy hand-placed waypoints and the new macro mode. Record (with a rebindable key) captures where you went and what you did; the recordings are listed, renamable, reorderable and stored per map alongside the waypoints. Play walks to the start of each macro with the normal routed pathfinding, then replays it. Movement is stored as positions rather than held keys, so the replay self-corrects instead of drifting; the actions are the recorded inputs, anchored to the point along the route where they were made." },
     { version = "2.4.0", date = "2026-09-01", notes = "Freeze Parts holds a copy of every attack on screen so a telegraph that lasts half a second can still be pointed at, and Pick Telegraph now writes straight into the Attack Book. Trial runs, freezing and picking all work with the loop OFF. Low Detail mode hides everything in the world except the part names you pick (enemies, attacks and markers always stay); collision is untouched. Waypoint paths and low-detail keep lists are now stored PER MAP across the 14 dungeons, with a map picker; the chosen map loads on execution." },
