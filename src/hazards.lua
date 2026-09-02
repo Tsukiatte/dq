@@ -940,6 +940,21 @@ local function overlayShortlist()
     return out
 end
 
+-- A stable id per part for naming its adornments. The debug-id API needs
+-- plugin permissions and threw inside the highlight renderer under Studio,
+-- which killed the whole loop tick - dodge included - every frame.
+local partKeys = setmetatable({}, { __mode = "k" })
+local partKeyNext = 0
+local function partKey(part)
+    local k = partKeys[part]
+    if not k then
+        partKeyNext = partKeyNext + 1
+        k = tostring(partKeyNext)
+        partKeys[part] = k
+    end
+    return k
+end
+
 local function updateHazardHighlights()
     -- Nearest few only. Anything drawn last frame and not in the list is
     -- cleaned up by the same pass, so this shrinks as well as caps.
@@ -974,7 +989,7 @@ local function updateHazardHighlights()
 
     for _, part in ipairs(shortlist) do
         if part.Parent then
-            local debugId = part:GetDebugId()
+            local debugId = partKey(part)
             local velocity = getHazardMotion(part)
             local st = HZ.armState[part]
             local pending = st ~= nil and st.armedAt == nil
@@ -1172,7 +1187,7 @@ local function updateWallHighlights()
     end
 
     for part in pairs(wanted) do
-        local id = "Wall_" .. part:GetDebugId()
+        local id = "Wall_" .. partKey(part)
         if not HZ.wallHighlightsFolder:FindFirstChild(id) then
             local box = Instance.new("SelectionBox")
             box.Name = id
@@ -2832,12 +2847,15 @@ local function scanDamageBricks(rootPosition)
     -- rather than once per Heartbeat, and only when the hazard set actually moved.
     if now - HZ.lastVisualTime >= CFG.visualRefreshInterval or #found ~= HZ.lastRenderedCount then
         HZ.lastVisualTime = now
-        updateHazardHighlights()
+        -- Rendering is never allowed to take the dodge down with it.
+        local ok, err = pcall(updateHazardHighlights)
+        if not ok then heavyDebugThrottled("highlight_error", 2.0, "Visuals", "Highlights threw: " .. tostring(err)) end
     end
 
     if now - HZ.lastFeedTime >= CFG.telegraphFeedRefreshInterval or #found ~= HZ.lastRenderedCount then
         HZ.lastFeedTime = now
-        updateTelegraphFeedUI()
+        local ok, err = pcall(updateTelegraphFeedUI)
+        if not ok then heavyDebugThrottled("feed_error", 2.0, "Visuals", "Telegraph feed threw: " .. tostring(err)) end
     end
 
     HZ.lastRenderedCount = #found
