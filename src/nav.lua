@@ -648,7 +648,15 @@ local function getStandOffPosition(root, enemyRoot)
         directionAway = flatLook.Magnitude > 0.001 and flatLook.Unit or Vector3.new(0, 0, 1)
     end
 
-    return enemyPosition + (directionAway * math.max(CFG.safeDistance, 2))
+    -- In Clone mode the grid draws a circle around every enemy and calls it
+    -- unsafe, but the chase used CFG.safeDistance (8) and walked straight
+    -- through it into melee range - the dodge kept its distance and the
+    -- pursuit gave it back. Chasing now stops at the same circle.
+    local standoff = math.max(CFG.safeDistance, 2)
+    if CFG.cloneKeepDistance and S.CL and S.CL.active then
+        standoff = math.max(standoff, CFG.cloneEnemyRadius)
+    end
+    return enemyPosition + (directionAway * standoff)
 end
 
 -- Primary Wall-Aware Pathfinding Router with Debug Output
