@@ -11,6 +11,13 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.9.5 - 2026-09-02
+
+Every `HIT` block in the capture now carries a `DODGE` line: danger reading,
+reason, whether a box was held, `gapWait`, `pursuitBlocked`, and the HUD
+status at that instant. Harness metric after 4.9.4: ~5 hits/min against the
+recreated Midgardian Champion (was ~10). The rest get explained one by one.
+
 ## 4.9.4 - 2026-09-02
 
 From the Studio harness, three things the real Northern Lands fight also has:
