@@ -11,6 +11,16 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.9.3 - 2026-09-02
+
+From the Studio harness: a hit was blamed on the *nearest* known attack, and a
+beam that appeared 0.2 s ago through where we stand is nearer than the one
+that has been burning us for a second. That taught every beam to be live
+from 0.2 s and turned the arena into walls. Attribution now scores candidates
+(encloses us +2, old enough to have fired +1, armed and not over +1, learned
+window covers now +2; ties to the nearest) and the capture's HIT block gets a
+`BLAMED` line saying who and why.
+
 ## 4.9.2 - 2026-09-02
 
 Found on the first run in the Studio test harness: `updateHazardHighlights`
