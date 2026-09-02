@@ -137,7 +137,46 @@ local function getThreatAt(position, atTime)
         end
     end
 
-    -- 3. Enemies. Melee never telegraphs and never expires, so its heat is
+    -- 3. Moving hazards heat the corridor they are ABOUT to sweep, not just
+    -- the square they are in. A projectile is not a place, it is a line
+    -- through space and time - without this the square in front of an
+    -- incoming shot reads as perfectly cool and the bot walks into it.
+    if CFG.threatSweepEnabled then
+        for _, entry in ipairs(TH.projectiles) do
+            local part = entry.part
+            if part.Parent then
+                local velocity = entry.velocity
+                local speed = velocity.Magnitude
+                if speed > 0.01 then
+                    local direction = velocity / speed
+                    local toPoint = position - part.Position
+                    -- How far along its path this point lies. Negative means
+                    -- behind it, which is the one safe place to be.
+                    local along = toPoint:Dot(direction)
+                    local range = speed * CFG.threatSweepTime
+                    if along > 0 and along < range then
+                        -- Perpendicular offset from the line of travel.
+                        local perpendicular = toPoint - direction * along
+                        local sideways = Vector3.new(perpendicular.X, 0, perpendicular.Z).Magnitude
+                        local width = reach + math.max(part.Size.X, part.Size.Z) * 0.5
+                        if sideways <= width + CFG.threatFalloff
+                            and (CFG.hazardIgnoreVertical or math.abs(perpendicular.Y) < halfHeight) then
+                            -- When it gets here, against when WE would be here.
+                            -- Arriving together is lethal; well apart is not.
+                            local weight = urgency((along / speed) - atTime)
+                            if weight > 0 then
+                                local edge = sideways <= width and 1
+                                    or (1 - (sideways - width) / CFG.threatFalloff) ^ 2
+                                total = total + THREAT_LETHAL * weight * edge
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    -- 4. Enemies. Melee never telegraphs and never expires, so its heat is
     -- constant in time: being next to one simply is the attack.
     for _, epos in ipairs(TH.enemyPositions) do
         local dx, dz = position.X - epos.X, position.Z - epos.Z
@@ -151,7 +190,7 @@ local function getThreatAt(position, atTime)
         end
     end
 
-    -- 4. Safe-spot markers invert everything: some bosses mark the one circle
+    -- 5. Safe-spot markers invert everything: some bosses mark the one circle
     -- you must stand in, and outside it is the danger.
     if CFG.safeZoneEnabled and #HZ.safeZones > 0 then
         local inside = false
@@ -190,8 +229,14 @@ local function refreshThreatSources()
     for _, part in ipairs(HZ.detected) do
         if part.Parent then
             local velocity = getHazardMotion(part)
-            if velocity and velocity.Magnitude >= CFG.dodgeMinProjectileSpeed then
-                TH.projectiles[#TH.projectiles + 1] = { part = part, velocity = velocity }
+            -- A low bar on purpose: a slow drifting tornado still owns the
+            -- ground in front of it. The sidestep reflex applies its own,
+            -- higher threshold separately.
+            if velocity and velocity.Magnitude >= CFG.threatSweepMinSpeed then
+                TH.projectiles[#TH.projectiles + 1] = {
+                    part = part, velocity = velocity,
+                    fast = velocity.Magnitude >= CFG.dodgeMinProjectileSpeed,
+                }
             end
         end
     end
@@ -261,7 +306,7 @@ local function getProjectileDodge(position, velocity)
     local best, bestWeight = nil, 0
     for _, entry in ipairs(TH.projectiles) do
         local part = entry.part
-        if part.Parent then
+        if part.Parent and entry.fast then
             local radius = math.max(part.Size.X, part.Size.Z) * 0.5
             local force = calculateDodgeForce(position, velocity, part.Position, entry.velocity, radius)
             if force then

@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 3.1.0
+    VERSION : 3.1.1
     BUILD   : 2026-09-01
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "3.1.0"
+local SCRIPT_VERSION = "3.1.1"
 local SCRIPT_BUILD_DATE = "2026-09-01"
 local SCRIPT_CODENAME = "Heat"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "3.1.1", date = "2026-09-02", notes = "Two fixes. A projectile is a line through space and time, not a place: a moving hazard now heats the whole corridor it is about to sweep, weighted by whether it arrives there about when you would, so the ground in front of an oncoming shot stops reading as perfectly cool. Tornadoes and other slow drifters count too, at a much lower speed bar than the sidestep reflex uses. And the bigger one - entering evasion at all was still decided by the OLD binary test, so a heat-40 square was called safe and the bot skipped dodging entirely to go pursue an enemy through it. The field was being computed and then ignored for the one decision that matters. In Clone mode any heat at or above Move at heat now means relocate." },
     { version = "3.1.0", date = "2026-09-02", notes = "Safety stops being a yes or no and becomes heat: a number from 0 to 100 at a point AND at a moment, so the same square is cool now and lethal in a second. In a fan of radial beams every square is unsafe, a boolean leaves the search nothing to choose between, and the character stands still and dies - a scalar field always has a least-bad answer and the gaps fall out of it for free. New ThreatManager combines announced attacks (exact geometry and impact time, ramped by an urgency curve), live hazards, enemy circles and inverted safe-spot markers. The grid search is now A* with F = G + H + threat*weight, where the weight is literally how many studs of detour one point of heat is worth; cells above the lethal threshold are impassable, and if every route crosses one it re-runs allowing them rather than standing still. Projectile steering sits underneath as a per-frame reflex, shoving sideways out of the path of anything already in the air. Discs are drawn as a green-amber-red gradient." },
     { version = "3.0.5", date = "2026-09-02", notes = "Attacks built from hundreds of meshes no longer melt the frame. A dense group of parts under one model collapses into the single box it effectively is - nobody threads between the meshes of a lava pool - so the safety tests run against a handful of volumes rather than every part, and highlights and name tags are capped to the nearest few instead of drawing three hundred BillboardGuis. Chasing also keeps its distance now: the grid drew a circle around every enemy and called it unsafe, then the pursuit walked straight through it into melee using its own smaller stand-off, so the dodge kept its distance and the chase gave it back. Attack reach scales with the stand-off so it does not close the gap merely to swing." },
     { version = "3.0.4", date = "2026-09-02", notes = "One line was hiding most attacks: isDamageBrick rejected any part parented straight to Workspace, on the theory that a real attack lives inside a model. This game does the opposite - PrecastHitbox does Part.Parent = workspace literally, and so do the boss beams - so that veto was throwing away exactly what mattered. Loose parts fall through to the appearance test now. Workspace.vfxPool holds the player OWN pooled hit effects under generic names like Part, which is why the bot fled from its own ability the moment it landed; anything in that pool is ours. Defaults retuned now that the footprint is measured honestly: disc scale back to 1.0, safety margin 0.75, depth bonus 1.5, enemy space 12 and 20." },
@@ -508,12 +509,20 @@ CFG.threatDesperate = true       -- ...unless there is no path at all
 CFG.threatHorizon = 4.0          -- seconds ahead an announced attack starts to matter
 CFG.threatFalloff = 7.0          -- studs of warm shoulder outside a hazard edge
 CFG.threatMargin = 0.75          -- clearance added to the body before anything counts
+-- Any heat at or above this and the bot relocates. Deliberately low: standing
+-- in something warm waiting for it to become lethal is not a plan.
+CFG.threatMoveAt = 6
+-- A moving hazard heats the whole corridor it is about to sweep, not just the
+-- square it currently occupies.
+CFG.threatSweepEnabled = true
+CFG.threatSweepTime = 3.0        -- seconds of flight path treated as dangerous
 CFG.showThreatGradient = true    -- colour discs by heat rather than safe/unsafe
 
 -- Projectile steering: the reflex under the grid, for things already in the air.
 CFG.dodgeProjectiles = true
 CFG.dodgeLookahead = 1.4         -- seconds of flight time considered
-CFG.dodgeMinProjectileSpeed = 12 -- studs/sec before something counts as a projectile
+CFG.dodgeMinProjectileSpeed = 12 -- studs/sec before the sidestep reflex engages
+CFG.threatSweepMinSpeed = 3      -- studs/sec before a hazard heats its own path
 CFG.dodgeStrength = 14           -- studs the sideways shove aims for
 CFG.colorThreatWarm = Color3.fromRGB(255, 170, 40)
 -- A cell has to STAY safe this long after arrival, not merely be safe at the

@@ -584,7 +584,7 @@ local function startAutofarm()
             -- colours, and it pulls you out of an attack - and nothing else
             -- runs, so the character is yours between dodges.
             if CL.active and CFG.cloneManual then
-                if (S.getThreatAt(root.Position, 0) or 0) > 0 then
+                if (S.getThreatAt(root.Position, 0) or 0) >= CFG.threatMoveAt then
                     heavyDebugOnChange("loop_branch", "clone_manual_dodge", "Loop",
                         "BRANCH: CLONE MANUAL - dodging.")
                     runCloneEvasion(humanoid, root)
@@ -603,7 +603,18 @@ local function startAutofarm()
             -- sets this; the recovery detector reads it after the branch.
             NAV.driving = false
 
-            local inHazard = CFG.dodgeEnabled and not isPositionSafeFromDamageBricks(root.Position, 0.5)
+            -- In Clone mode the trigger is heat, not a yes/no. The binary test
+            -- called a heat-40 square "safe", so the bot skipped evasion
+            -- entirely and went off to pursue an enemy through it: the field
+            -- was being computed and then ignored for the one decision that
+            -- actually matters. Any warmth now means relocate.
+            local inHazard
+            if CL.active then
+                inHazard = CFG.dodgeEnabled
+                    and (S.getThreatAt(root.Position, 0) or 0) >= CFG.threatMoveAt
+            else
+                inHazard = CFG.dodgeEnabled and not isPositionSafeFromDamageBricks(root.Position, 0.5)
+            end
 
             -- Location-based stuck detection. Deliberately skipped while dodging:
             -- holding still inside a telegraph's clearance is the escape logic

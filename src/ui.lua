@@ -1131,6 +1131,17 @@ local function createControlUI()
         20, 100, false,
         function() return CFG.threatLethal end, function(v) CFG.threatLethal = v end, 7.1,
         "Heat runs 0 to 100, where 100 is standing in a live attack. Cells at or above this are walls to the search - unless every route crosses one, in which case it takes the coolest rather than standing still."))
+    track(K.slider(cloneSection.content, "Move at heat", "Relocate once this hot",
+        0, 40, false,
+        function() return CFG.threatMoveAt end, function(v) CFG.threatMoveAt = v end, 7.15,
+        "Any heat at or above this and it leaves. Low on purpose: standing somewhere warm waiting to find out whether it becomes lethal is not a plan. Raise it if the bot fidgets in mild heat instead of fighting."))
+    track(K.toggle(cloneSection.content, "Projectile paths",
+        function() return CFG.threatSweepEnabled end, function(v) CFG.threatSweepEnabled = v end, 7.16,
+        "A moving hazard heats the whole corridor it is about to sweep, not just the square it is in. Without this the ground in front of an incoming shot reads as perfectly cool and the bot walks into it."))
+    track(K.slider(cloneSection.content, "Path length", "Seconds of flight treated as dangerous",
+        0.5, 8, true,
+        function() return CFG.threatSweepTime end, function(v) CFG.threatSweepTime = v end, 7.17,
+        "How far ahead of a moving hazard the corridor runs. Longer sees shots coming from further off; too long and distant projectiles crowd the map."))
     track(K.slider(cloneSection.content, "Look ahead", "Seconds an attack starts to matter",
         1, 8, true,
         function() return CFG.threatHorizon end, function(v) CFG.threatHorizon = v end, 7.2,
