@@ -266,7 +266,10 @@ local function buildConfigTable()
             cloneKeepDistance = CFG.cloneKeepDistance,
             threatWeight = CFG.threatWeight,
             threatMoveAt = CFG.threatMoveAt,
+            adaptiveLookahead = CFG.adaptiveLookahead,
             threatWallWeight = CFG.threatWallWeight,
+            threatEnclosureWeight = CFG.threatEnclosureWeight,
+            threatEnclosureRange = CFG.threatEnclosureRange,
             escapeScanEnabled = CFG.escapeScanEnabled,
             escapeScanFar = CFG.escapeScanFar,
             cloneStuckTime = CFG.cloneStuckTime,
@@ -430,7 +433,10 @@ local function applyConfigData(data)
         if combat.cloneKeepDistance ~= nil then CFG.cloneKeepDistance = combat.cloneKeepDistance == true end
         CFG.threatWeight = tonumber(combat.threatWeight) or CFG.threatWeight
         CFG.threatMoveAt = tonumber(combat.threatMoveAt) or CFG.threatMoveAt
+        if combat.adaptiveLookahead ~= nil then CFG.adaptiveLookahead = combat.adaptiveLookahead == true end
         CFG.threatWallWeight = tonumber(combat.threatWallWeight) or CFG.threatWallWeight
+        CFG.threatEnclosureWeight = tonumber(combat.threatEnclosureWeight) or CFG.threatEnclosureWeight
+        CFG.threatEnclosureRange = tonumber(combat.threatEnclosureRange) or CFG.threatEnclosureRange
         CFG.escapeScanFar = tonumber(combat.escapeScanFar) or CFG.escapeScanFar
         CFG.cloneStuckTime = tonumber(combat.cloneStuckTime) or CFG.cloneStuckTime
         if combat.escapeScanEnabled ~= nil then CFG.escapeScanEnabled = combat.escapeScanEnabled == true end
@@ -822,6 +828,7 @@ local RECOMMENDED_CLONE = {
     threatSweepTime = 3.0, threatProjectileLead = 1.1, threatProjectileWake = 0.3,
     threatWallWeight = 60, cloneStepHeight = 2.5,
     escapeScanFar = 2.8, escapeMargin = 12, cloneStuckTime = 0.7,
+    threatEnclosureWeight = 0.55, threatEnclosureRange = 6.0,
     cloneEnemyRadius = 12.0, cloneEnemySoftRadius = 20.0,
     cloneSafeDwell = 1.6, cloneCommitTime = 0.35, cloneDepthBonus = 1.5,
 }

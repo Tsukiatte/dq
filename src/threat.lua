@@ -46,6 +46,11 @@ local huge = math.huge
 -- evaluation, twelve times a second, purely to re-derive numbers that had not
 -- changed.
 local ctxReach, ctxHalfHeight, ctxNow = 2.0, 5.0, 0
+-- Horizons stretch when the character is slow. Taken from the standalone
+-- heatmap prototype: a slow agent cannot dodge reactively, so it must see
+-- danger coming earlier. Every horizon here was a fixed constant regardless of
+-- WalkSpeed, which gave the same warning whether sprinting or crawling.
+local ctxLookahead = 1.0
 
 local function prepareThreatPass()
     local _, playerRadius, totalHeight = getPlayerHitboxMetrics()
@@ -57,6 +62,17 @@ local function prepareThreatPass()
     ctxReach = (probe > 0 and probe or playerRadius) + CFG.threatMargin
     ctxHalfHeight = (totalHeight * 0.5) + 2.0
     ctxNow = Workspace:GetServerTimeNow()
+
+    ctxLookahead = 1
+    if CFG.adaptiveLookahead then
+        local character = LocalPlayer.Character
+        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+        local speed = max((humanoid and humanoid.WalkSpeed) or CFG.lookaheadBaseSpeed, 4)
+        -- Square root, so halving your speed stretches the window by about 40%
+        -- rather than doubling it - the prototype's shape, and it stays sane at
+        -- the extremes.
+        ctxLookahead = clamp(sqrt(CFG.lookaheadBaseSpeed / speed), 0.6, 2.5)
+    end
 end
 
 -- ------------------------------------------------------------------ shapes
@@ -105,8 +121,9 @@ local function urgency(timeToImpact)
         -- Landing now, or within the window where it still hurts.
         return timeToImpact > -CFG.precastLingerTime and 1 or 0
     end
-    if timeToImpact >= CFG.threatHorizon then return 0 end
-    local t = 1 - (timeToImpact / CFG.threatHorizon)
+    local horizon = CFG.threatHorizon * ctxLookahead
+    if timeToImpact >= horizon then return 0 end
+    local t = 1 - (timeToImpact / horizon)
     return t ^ CFG.threatCurve
 end
 
@@ -129,7 +146,7 @@ end
 local function passHeat(delta, halfWindow)
     if delta >= -halfWindow and delta <= halfWindow then return 1 end
     if delta > halfWindow then
-        local over = (delta - halfWindow) / CFG.threatProjectileLead
+        local over = (delta - halfWindow) / (CFG.threatProjectileLead * ctxLookahead)
         if over >= 1 then return 0 end
         local t = 1 - over
         return t * t

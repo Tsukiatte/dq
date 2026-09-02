@@ -1595,6 +1595,79 @@ local function loadZones(list)
     return #ZN.defs
 end
 
+-- =========================================================================
+-- ATTACK CAPTURE (3.3.0)
+--
+-- Everything about a part as it appears, plus what this script decided about
+-- it. The point is the MISSES: a part that spawned next to you and was judged
+-- harmless is invisible in every other log, and that is exactly the case that
+-- needs explaining.
+-- =========================================================================
+local function describeAncestry(part)
+    local names, node = {}, part.Parent
+    for _ = 1, 5 do
+        if not node or node == Workspace then break end
+        names[#names + 1] = node.Name .. "(" .. node.ClassName .. ")"
+        node = node.Parent
+    end
+    return table.concat(names, " < ")
+end
+
+local function diagnosePart(part, verdict)
+    if not CFG.diagnoseAttacks or HZ.diagnosed[part] then return end
+    if HZ.diagnoseCount >= CFG.diagnoseMax then return end
+    local character = LocalPlayer.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    local offset = part.Position - root.Position
+    local distance = offset.Magnitude
+    if distance > CFG.diagnoseRadius then return end
+
+    HZ.diagnosed[part] = true
+    HZ.diagnoseCount = HZ.diagnoseCount + 1
+
+    local size = part.Size
+    local color = part.Color
+    local motion = getHazardMotion(part)
+    HZ.diagnoseLines[#HZ.diagnoseLines + 1] = string.format(
+        "%-5s | %-34s | %-14s | %5.0f studs | size %5.1f %5.1f %5.1f | tr %.2f | coll %s | q %s | %-10s | rgb %3d %3d %3d | vel %5.1f | anc %s",
+        verdict and "HAZ" or "-",
+        string.sub(part.Name, 1, 34),
+        part.ClassName,
+        distance,
+        size.X, size.Y, size.Z,
+        part.Transparency,
+        tostring(part.CanCollide), tostring(part.CanQuery),
+        part.Material.Name,
+        math.floor(color.R * 255), math.floor(color.G * 255), math.floor(color.B * 255),
+        motion and motion.Magnitude or 0,
+        describeAncestry(part))
+end
+
+local function saveAttackLog()
+    if type(writefile) ~= "function" then return false, "no file access in this executor" end
+    local header = {
+        "DungeonAutofarm attack capture",
+        "map: " .. tostring(RT.currentMap) .. "   parts recorded: " .. HZ.diagnoseCount,
+        "HAZ means this script treated it as an attack. A line marked - that IS an",
+        "attack is the interesting case: everything needed to explain the miss is on it.",
+        string.rep("-", 150),
+    }
+    local body = table.concat(header, "\n") .. "\n" .. table.concat(HZ.diagnoseLines, "\n")
+    local ok, err = pcall(function() writefile(CFG.diagnoseFile, body) end)
+    if ok then
+        heavyDebug("Capture", string.format("Wrote %d parts to %s.", HZ.diagnoseCount, CFG.diagnoseFile))
+        return true
+    end
+    return false, tostring(err)
+end
+
+local function clearAttackLog()
+    table.clear(HZ.diagnoseLines)
+    HZ.diagnosed = setmetatable({}, { __mode = "k" })
+    HZ.diagnoseCount = 0
+end
+
 local function classifyPoolPart(part, now)
     if not part.Parent then
         poolRemove(part)
@@ -1612,7 +1685,9 @@ local function classifyPoolPart(part, now)
     -- decoration that only announces an attack starts carrying one.
     if #ZN.defs > 0 and not part:GetAttribute("DQZone") then ensureZoneFor(part) end
 
-    setCandidate(part, maybeTelegraph and isDamageBrick(part), now)
+    local verdict = maybeTelegraph and isDamageBrick(part)
+    if CFG.diagnoseAttacks then diagnosePart(part, verdict) end
+    setCandidate(part, verdict, now)
     if CFG.showWalls then
         setInvisWall(part, isInvisibleWall(part))
     end
@@ -2396,6 +2471,8 @@ local function watchOwnAbilityRemotes()
 end
 
 S.watchOwnAbilityRemotes = watchOwnAbilityRemotes
+S.saveAttackLog = saveAttackLog
+S.clearAttackLog = clearAttackLog
 S.volumeClosestPoint = volumeClosestPoint
 S.collectSafeZones = collectSafeZones
 S.safeZonePenalty = safeZonePenalty

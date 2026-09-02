@@ -569,40 +569,66 @@ local function evaluateCells(root)
     end
     CL.evalCursor = cursor
 
-    -- A cell next to something impassable is worth a little heat of its own.
-    -- Without it the cheapest route hugs every wall, which is exactly where you
-    -- get cornered when an attack lands.
+    -- ENCLOSURE PASS
+    --
+    -- A cell inherits a share of the heat around it, sampled both immediately
+    -- and at a distance. Two things fall out of one rule:
+    --
+    --   * A green pocket ringed by red gains heat, because it is a trap - you
+    --     can stand in it now and have nowhere to go the moment it closes.
+    --   * A corner gains heat, because walls count as maximum heat here. That
+    --     is the same "do not scrape along walls" the previous edge pass did,
+    --     as a special case rather than a separate rule.
+    --
+    -- The result is that open ground beats an enclosed pocket of equal local
+    -- safety, so the bot strafes into the open instead of backing into a
+    -- corner and waiting to be cornered.
+    --
+    -- ASSIGNED from baseThreat, never accumulated, and unmeasured neighbours
+    -- are skipped rather than counted as walls. This pass runs over the whole
+    -- grid while only a slice is re-measured, and both of those rules have
+    -- already been learned the hard way here.
     if CFG.threatWallSpread then
         local n, side = CL.reach, CL.side
-        local edgeHeat = CFG.threatWallWeight * 0.35
+        local spacing = max(CFG.cloneGridSpacing, 0.5)
+        local ring = max(2, floor(CFG.threatEnclosureRange / spacing))
+        local weight = CFG.threatEnclosureWeight
+        local lethal = CFG.threatLethal
+        local blockedHeat = TH.LETHAL
+
         for idx = 1, count do
             local k = active[idx]
             local cell = cells[k]
-            if cell.standable then
+            if cell.standable and cell.measured then
                 local zeroed = k - 1
                 local di, dj = zeroed % side - n, floor(zeroed / side) - n
-                local touching = false
+                local sum, samples = 0, 0
+
                 for _, nb in ipairs(NEIGHBOURS) do
-                    local ni, nj = di + nb[1], dj + nb[2]
-                    if ni >= -n and ni <= n and nj >= -n and nj <= n then
-                        local other = cells[(nj + n) * side + (ni + n) + 1]
-                        -- MEASURED and unstandable. A cell the slicing has not
-                        -- reached yet is unknown, not a wall - treating the two
-                        -- the same put a ring of edge heat around the frontier
-                        -- of every pass, which is where the drifting yellow
-                        -- circles came from.
-                        if other.measured and not other.standable then
-                            touching = true
-                            break
+                    -- Two distances per direction: the cell beside us catches
+                    -- walls we are touching, the one further out catches a way
+                    -- through that is not immediately obvious.
+                    for _, reach in ipairs({ 1, ring }) do
+                        local ni, nj = di + nb[1] * reach, dj + nb[2] * reach
+                        if ni >= -n and ni <= n and nj >= -n and nj <= n then
+                            local other = cells[(nj + n) * side + (ni + n) + 1]
+                            if other.inRange and other.measured then
+                                if not other.standable then
+                                    sum = sum + blockedHeat
+                                else
+                                    sum = sum + min(other.baseThreat or 0, blockedHeat)
+                                end
+                                samples = samples + 1
+                            end
                         end
                     end
                 end
-                -- Assigned, never accumulated.
-                local edge = touching and edgeHeat or 0
-                cell.threat = (cell.baseThreat or huge) + edge
-                cell.threatLater = (cell.baseThreatLater or huge) + edge
-                cell.safe = cell.threat < CFG.threatLethal
-                cell.holds = max(cell.threat, cell.threatLater) < CFG.threatLethal
+
+                local enclosure = samples > 0 and (sum / samples) * weight or 0
+                cell.threat = (cell.baseThreat or huge) + enclosure
+                cell.threatLater = (cell.baseThreatLater or huge) + enclosure
+                cell.safe = cell.threat < lethal
+                cell.holds = max(cell.threat, cell.threatLater) < lethal
             end
         end
     end
