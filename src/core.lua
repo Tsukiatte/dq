@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 3.1.2
+    VERSION : 3.2.0
     BUILD   : 2026-09-01
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "3.1.2"
+local SCRIPT_VERSION = "3.2.0"
 local SCRIPT_BUILD_DATE = "2026-09-01"
-local SCRIPT_CODENAME = "Heat"
+local SCRIPT_CODENAME = "Thrift"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "3.2.0", date = "2026-09-02", notes = "Performance. getPlayerHitboxMetrics was being called inside the per-cell threat query, which at 900 cells and two time samples was 3,600 Instance lookups per evaluation, twelve times a second, re-deriving numbers that had not changed - it is computed once per pass now. The two time samples walk the threat sources once instead of twice, halving the dominant cost. The grid is evaluated in SLICES with verdicts persisting between passes, so a large radius no longer has to judge every cell inside one frame. A* stopped clearing four arrays of 900 entries on every call (a quarter of a million pointless writes a second while dodging) in favour of a generation stamp, and its open set is a real binary heap over parallel numeric arrays rather than a linear scan. Painting writes only the properties that actually changed. Separately: the safety probe is now its own setting rather than the drawn disc - probing with the whole body including limbs made the grid blind to any pocket narrower than your shoulders, which is why small safe zones went unseen." },
     { version = "3.1.2", date = "2026-09-02", notes = "A delayed attack is harmless until it nearly lands, and the squared urgency ramp did not say that - it went lethal a FULL SECOND before impact, which quietly turned every marker into a wall. With attacks overlapping, walls everywhere means no route at all; a gradient always leaves somewhere to flow to. The ramp is now cubed and adjustable, so a marker reads green through most of its wind-up and reddens hard at the end. Goal choice weights the heat where you WILL be over the heat where you land, because a square that is cool now and hot in a moment is a trap. And when nothing is safe at all it stops committing to a destination and simply flows downhill every pass, which is the behaviour that survives a saturated field. The discs are a nine-band ramp now - dark green, green, yellow-green, light yellow, dark yellow, orange, red - because across hundreds of discs a two-stop blend cannot show the difference between cool and coolest." },
     { version = "3.1.1", date = "2026-09-02", notes = "Two fixes. A projectile is a line through space and time, not a place: a moving hazard now heats the whole corridor it is about to sweep, weighted by whether it arrives there about when you would, so the ground in front of an oncoming shot stops reading as perfectly cool. Tornadoes and other slow drifters count too, at a much lower speed bar than the sidestep reflex uses. And the bigger one - entering evasion at all was still decided by the OLD binary test, so a heat-40 square was called safe and the bot skipped dodging entirely to go pursue an enemy through it. The field was being computed and then ignored for the one decision that matters. In Clone mode any heat at or above Move at heat now means relocate." },
     { version = "3.1.0", date = "2026-09-02", notes = "Safety stops being a yes or no and becomes heat: a number from 0 to 100 at a point AND at a moment, so the same square is cool now and lethal in a second. In a fan of radial beams every square is unsafe, a boolean leaves the search nothing to choose between, and the character stands still and dies - a scalar field always has a least-bad answer and the gaps fall out of it for free. New ThreatManager combines announced attacks (exact geometry and impact time, ramped by an urgency curve), live hazards, enemy circles and inverted safe-spot markers. The grid search is now A* with F = G + H + threat*weight, where the weight is literally how many studs of detour one point of heat is worth; cells above the lethal threshold are impassable, and if every route crosses one it re-runs allowing them rather than standing still. Projectile steering sits underneath as a per-frame reflex, shoving sideways out of the path of anything already in the air. Discs are drawn as a green-amber-red gradient." },
@@ -487,6 +488,11 @@ CFG.cloneDepthBonus = 1.5        -- studs of extra travel one cell of depth is w
 CFG.clonePenaltyWeight = 0.05
 CFG.cloneFloorRefresh = 3.0      -- seconds a cached floor height is trusted
 CFG.cloneFloorBudget = 150       -- floor raycasts per evaluation
+-- Cells re-tested per pass. The whole grid no longer has to be judged in one
+-- go: verdicts persist between passes, so a big grid refreshes in slices
+-- instead of dropping a frame every time it thinks. This is the single knob
+-- that decides whether a large radius is affordable on a weak machine.
+CFG.cloneEvalBudget = 320
 CFG.showClonePrisms = false      -- hundreds of prisms at boss density; off unless asked
 CFG.colorClonePath = Color3.fromRGB(80, 170, 255)
 -- Disc diameter as a multiple of the character's real footprint (2.15.1).
@@ -517,7 +523,14 @@ CFG.threatCurve = 3.0
 -- cell that is cool now and hot in a moment is a trap, not a destination.
 CFG.threatFutureBias = 0.65
 CFG.threatFalloff = 7.0          -- studs of warm shoulder outside a hazard edge
-CFG.threatMargin = 0.75          -- clearance added to the body before anything counts
+-- What safety actually probes with, in studs, INDEPENDENT of the disc drawn on
+-- screen. This is what decides the smallest gap the grid can find: a probe of
+-- radius r cannot see a safe pocket narrower than 2r, so probing with the whole
+-- body including limbs made it blind to exactly the small pockets that matter.
+-- The game damages against the root part, which is about a stud across, so that
+-- is what the probe should be. 0 means "use the character's root radius".
+CFG.threatProbeRadius = 0
+CFG.threatMargin = 0.4           -- clearance added to the probe before anything counts
 -- Any heat at or above this and the bot relocates. Deliberately low: standing
 -- in something warm waiting for it to become lethal is not a plan.
 CFG.threatMoveAt = 6
@@ -845,12 +858,17 @@ CL.side = 3
 CL.signature = ""
 CL.footprintRadius = 1.5
 CL.footprintCheckedAt = -math.huge
+CL.evalCursor = 1
+CL.searchGen = 0
 -- Last verdict per world cell, so a window shift can carry the answer over
 -- instead of blanking it. See the flicker note in clone.lua.
 CL.verdictCache = {}
 -- The committed goal, as a WORLD key rather than a window index: the window
 -- slides as you walk, so an index means somewhere different a moment later.
-CL.goalKey = nil
+-- The committed goal, as WORLD cell coordinates: the window slides as you
+-- walk, so an index into it means somewhere different a moment later.
+CL.goalI = nil
+CL.goalJ = nil
 
 -- Hand-drawn zones. `defs` is what gets saved (a signature plus a shape);
 -- `live` is [decoration part] = the volume currently following it.

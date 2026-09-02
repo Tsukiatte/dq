@@ -1100,10 +1100,18 @@ local function createControlUI()
         6, 40, false,
         function() return CFG.cloneRadius end, function(v) CFG.cloneRadius = v end, 4,
         "Capped by the cell budget: at 1.5 spacing and 900 cells the grid reaches about 22 studs whatever you ask for."))
+    track(K.slider(cloneSection.content, "Cells per pass", "Re-tested each think",
+        64, 900, false,
+        function() return CFG.cloneEvalBudget end, function(v) CFG.cloneEvalBudget = v end, 5.5,
+        "How much of the grid is re-judged each pass. The rest keeps its previous answer, so a big radius refreshes in slices instead of hitching. Lower this first if the frame rate suffers - it costs a little freshness at the edges and nothing where you are standing."))
     track(K.slider(cloneSection.content, "Cell budget", "Most discs at once",
         100, 1600, false,
         function() return CFG.cloneMaxCells end, function(v) CFG.cloneMaxCells = v end, 5,
         "The cap is the promise, the radius is the request. Every disc is tested against every attack each evaluation."))
+    track(K.slider(cloneSection.content, "Probe size", "0 uses your root part",
+        0, 4, true,
+        function() return CFG.threatProbeRadius end, function(v) CFG.threatProbeRadius = v end, 6.2,
+        "How wide the grid believes you are when testing whether a spot is clear - separate from the disc drawn on screen. This sets the smallest gap it can find: a probe of radius r cannot see a pocket narrower than twice r. Probing with your whole body including limbs made it blind to exactly the small safe pockets that matter, so 0 uses your root part instead, which is what the game damages against."))
     track(K.slider(cloneSection.content, "Safety margin", "Clearance beyond your hitbox",
         0, 4, true,
         function() return CFG.cloneSafetyMargin end, function(v) CFG.cloneSafetyMargin = v end, 6,

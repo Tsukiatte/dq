@@ -11,6 +11,53 @@ file and that table in sync on every edit.
 
 ---
 
+## 3.2.0 - 2026-09-02 - "Thrift"
+
+Performance. Measured against a 900-cell grid (radius 22 at 1.5 spacing)
+evaluating twelve times a second.
+
+### The expensive mistakes
+- **`getPlayerHitboxMetrics()` was inside the per-cell threat query.** It walks
+  the character and does two Instance lookups. At 900 cells x 2 time samples
+  that was **3,600 Instance lookups per evaluation**, twelve times a second,
+  re-deriving numbers that had not changed since the last frame. Computed once
+  per pass now, along with `GetServerTimeNow()`.
+- **The two time samples walked every threat source twice.** Same zones, same
+  volumes, same projectiles — only the time differed. `getThreatPair` does both
+  in one walk, halving the dominant cost of the whole system.
+- **A\* cleared four arrays of 900 entries on every call**, and A\* runs every
+  frame while dodging: roughly a quarter of a million table writes per second
+  doing nothing but zeroing. A **generation stamp** gives the same guarantee for
+  free — an entry not stamped with the current generation is simply unset.
+- **The open set was a linear scan.** It is a **binary heap over two parallel
+  numeric arrays** now — no per-push table allocation, which is what a heap of
+  `{k, f}` pairs would have cost.
+- **Painting wrote all three properties on all 900 discs unconditionally.**
+  Every one crosses into the engine. It writes only what changed: position only
+  when the window slides, colour only when the band changes.
+- **The goal was found by scanning all 900 cells every frame.** It is
+  arithmetic from the world coordinates now.
+- Squared-distance comparisons before taking any square root, and `math.*`
+  hoisted to module locals — each call was two hash lookups.
+
+### Sliced evaluation
+The structural one, and the setting to reach for first if frames still suffer.
+The grid no longer has to judge every cell inside a single frame: **Cells per
+pass** (320) are re-tested each think and the rest keep their previous answer.
+A cell's verdict can be a couple of passes old, which is a far better trade than
+a hitch — and the cell you are actually standing in is re-queried every frame
+by the main loop regardless.
+
+### Small safe zones
+Not a shape problem, as it turned out. **The safety probe was the drawn disc** —
+your whole body including limbs — and a probe of radius r cannot see a pocket
+narrower than 2r. That made it blind to precisely the small pockets that matter.
+
+**Probe size** is now its own setting, independent of the disc: 0 uses your root
+part, which is what the game actually damages against, and the margin dropped
+from 0.75 to 0.4. Shrinking the probe is what finds narrow gaps; the disc stays
+whatever size reads best on screen.
+
 ## 3.1.2 - 2026-09-02
 
 ### A delayed attack should be green until it nearly lands

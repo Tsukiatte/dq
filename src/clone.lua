@@ -58,6 +58,12 @@ local TH = S.TH
 -- moving hazard, so a cell in the line of fire is red before the shot arrives.
 -- =========================================================================
 
+-- Hoisted for the inner loops: each `math.floor` is two hash lookups, and
+-- these run hundreds of thousands of times a second at a large radius.
+local floor, ceil, sqrt, max, min, abs, clamp = math.floor, math.ceil, math.sqrt,
+    math.max, math.min, math.abs, math.clamp
+local huge = math.huge
+
 local DIAG = 1.41421356
 -- 8 neighbours: dx, dz, step cost multiplier, and for diagonals the two
 -- orthogonal offsets that must both be clear so a red corner is never cut.
@@ -135,7 +141,7 @@ local function destroyClones()
     table.clear(CL.cells)
     CL.nodes = CL.cells
     table.clear(CL.path)
-    CL.goalKey = nil
+    CL.goalI, CL.goalJ = nil, nil
     CL.centerI, CL.centerJ = nil, nil
     CL.safeCount = 0
 end
@@ -280,6 +286,7 @@ local function positionCells(root)
             cell.i, cell.j = ci + di, cj + dj
             cell.key = cell.i .. "," .. cell.j
             cell.x, cell.z = cell.i * spacing, cell.j * spacing
+            cell.drawnY, cell.drawnColor = nil, nil
             local cachedFloor = CL.floorCache[cell.key]
             cell.y = cachedFloor and cachedFloor.y or nil
             -- Carry the last verdict for this world position across the shift.
@@ -363,7 +370,10 @@ local function paintCells()
     for _, cell in ipairs(CL.cells) do
         local pad, prism = cell.pad, cell.prism
         if not visible or not cell.standable then
-            if pad.Transparency ~= 1 then pad.Transparency = 1 end
+            if pad.Transparency ~= 1 then
+                pad.Transparency = 1
+                cell.drawnColor = nil
+            end
             if prism and prism.Transparency ~= 1 then prism.Transparency = 1 end
         else
             local color
@@ -378,26 +388,49 @@ local function paintCells()
             else
                 color = safeColor
             end
+            -- Every property write here crosses into the engine, and there are
+            -- three per disc. Writing 2,700 of them unconditionally twelve
+            -- times a second was most of the drawing cost; almost none of them
+            -- were changing anything.
             local y = cell.y or 0
-            pad.CFrame = CFrame.new(cell.x, y + 0.1, cell.z) * DISC_UPRIGHT
-            pad.Color = color
-            pad.Transparency = (cell.isGoal or cell.onPath) and 0.05 or 0.55
-            if prism then
-                prism.CFrame = CFrame.new(cell.x, y + cell.halfHeight, cell.z)
-                prism.Color = color
-                prism.Transparency = 0.88
+            if cell.drawnY ~= y then
+                cell.drawnY = y
+                pad.CFrame = CFrame.new(cell.x, y + 0.1, cell.z) * DISC_UPRIGHT
+                if prism then
+                    prism.CFrame = CFrame.new(cell.x, y + cell.halfHeight, cell.z)
+                end
+            end
+            if cell.drawnColor ~= color then
+                cell.drawnColor = color
+                pad.Color = color
+                if prism then prism.Color = color end
+            end
+            local alpha = (cell.isGoal or cell.onPath) and 0.05 or 0.55
+            if pad.Transparency ~= alpha then
+                pad.Transparency = alpha
+                if prism then prism.Transparency = 0.88 end
             end
         end
     end
 end
 
--- Throttled. Floor, standability, and then the heat at the moment we would
--- actually be standing there.
+-- Throttled AND sliced. Floor, standability, then the heat at the moment we
+-- would actually be standing there.
+--
+-- The whole grid used to be judged in one go, which meant a 900-cell radius
+-- did 900 floor checks and 1,800 threat queries inside a single frame and
+-- visibly hitched. Verdicts persist in the cache between passes, so the grid
+-- is refreshed in slices instead: each pass judges CFG.cloneEvalBudget cells
+-- and picks up where it left off. A cell's answer can be up to a couple of
+-- passes old, which is a far better trade than dropping frames - and the cell
+-- the character is actually standing in is re-queried every frame anyway, by
+-- the main loop.
 local function evaluateCells(root)
     local now = os.clock()
     if now - CL.lastEvalTime < CFG.cloneEvalInterval then return false end
     CL.lastEvalTime = now
     refreshThreatSources()
+    S.prepareThreatPass()
 
     local rootY = root.Position.Y
     local rootPos = root.Position
@@ -405,13 +438,24 @@ local function evaluateCells(root)
     params.FilterType = Enum.RaycastFilterType.Exclude
     params.FilterDescendantsInstances = getRaycastExclusions(nil)
     local budget = CFG.cloneFloorBudget
-    local safeCount = 0
 
     local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-    local speed = math.max((humanoid and humanoid.WalkSpeed) or 16, 4)
-    local hottest = 1
+    local speed = max((humanoid and humanoid.WalkSpeed) or 16, 4)
+    local dwell = CFG.cloneSafeDwell
+    local lethal = CFG.threatLethal
+    local getThreatPair = S.getThreatPair
 
-    for _, cell in ipairs(CL.cells) do
+    local cells = CL.cells
+    local count = #cells
+    local slice = min(max(floor(CFG.cloneEvalBudget), 32), count)
+    local cursor = CL.evalCursor
+    local rx, rz = rootPos.X, rootPos.Z
+
+    for _ = 1, slice do
+        if cursor > count then cursor = 1 end
+        local cell = cells[cursor]
+        cursor = cursor + 1
+
         local y
         y, budget = floorFor(cell, rootY, params, budget)
         cell.y = y
@@ -419,24 +463,19 @@ local function evaluateCells(root)
             and (y - rootY) < CFG.cloneMaxClimb and (y - rootY) > -CFG.cloneMaxDrop
         cell.standable = standable
         if standable then
-            local pos = Vector3.new(cell.x, y, cell.z)
-            -- Judged at arrival, not now: that is what makes time the third
-            -- dimension rather than decoration.
-            local travel = Vector3.new(cell.x - rootPos.X, 0, cell.z - rootPos.Z).Magnitude / speed
+            local dx, dz = cell.x - rx, cell.z - rz
+            local travel = sqrt(dx * dx + dz * dz) / speed
             cell.eta = travel
-            cell.threat = getThreatAt(pos, travel)
-            -- And it has to still be tolerable a moment later, so the bot does
-            -- not walk somewhere, stop, and be hit by what it already knew was
-            -- coming.
-            local later = getThreatAt(pos, travel + CFG.cloneSafeDwell)
-            cell.threatLater = later
-            cell.holds = math.max(cell.threat, later) < CFG.threatLethal
-            cell.safe = cell.threat < CFG.threatLethal
-            if cell.safe then safeCount = safeCount + 1 end
-            hottest = math.max(hottest, cell.threat)
+            -- Both time samples in one walk over the threat sources.
+            local nowHeat, laterHeat = getThreatPair(
+                Vector3.new(cell.x, y, cell.z), travel, travel + dwell)
+            cell.threat = nowHeat
+            cell.threatLater = laterHeat
+            cell.holds = max(nowHeat, laterHeat) < lethal
+            cell.safe = nowHeat < lethal
         else
-            cell.threat = math.huge
-            cell.threatLater = math.huge
+            cell.threat = huge
+            cell.threatLater = huge
             cell.safe = false
             cell.holds = false
         end
@@ -445,8 +484,15 @@ local function evaluateCells(root)
             threat = cell.threat, threatLater = cell.threatLater,
         }
     end
+    CL.evalCursor = cursor
+
+    -- Counted over the whole grid, not just the slice, so the saturated test
+    -- stays honest.
+    local safeCount = 0
+    for i = 1, count do
+        if cells[i].standable and cells[i].safe then safeCount = safeCount + 1 end
+    end
     CL.safeCount = safeCount
-    CL.hottest = hottest
     return true
 end
 
@@ -465,84 +511,119 @@ end
 -- not a reason to stand still and take it.
 -- =========================================================================
 
--- Scratch buffers, reused. Allocating four tables of a few hundred entries
--- several times a second is exactly the kind of churn that shows up as stutter.
-local gScore, fScore, cameFrom, closed, openHeap = {}, {}, {}, {}, {}
+-- Scratch buffers, reused across calls and never cleared.
+--
+-- Clearing four arrays of side^2 entries per call was 3,600 table writes at a
+-- 900-cell grid, and A* runs EVERY FRAME while dodging - a quarter of a
+-- million writes a second doing nothing but zeroing. A generation stamp gets
+-- the same guarantee for free: an entry whose stamp is not the current
+-- generation is simply treated as unset.
+local gScore, fScore, cameFrom, stamp = {}, {}, {}, {}
+-- Binary min-heap over two parallel NUMERIC arrays. A heap of {k, f} tables
+-- would allocate per push, which is exactly the churn this is avoiding; two
+-- number arrays allocate nothing after they have grown once.
+local heapK, heapF = {}, {}
 
-local function heuristic(ax, az, bx, bz, spacing)
-    -- Octile: diagonals cost sqrt(2), so the admissible estimate is the
-    -- straight runs plus the diagonal shortcut, never an overestimate.
-    local dx, dz = math.abs(ax - bx), math.abs(az - bz)
-    local lo, hi = math.min(dx, dz), math.max(dx, dz)
-    return (hi - lo + lo * DIAG) * spacing
+local function heapPush(count, k, f)
+    count = count + 1
+    heapK[count], heapF[count] = k, f
+    local i = count
+    while i > 1 do
+        local parent = floor(i / 2)
+        if heapF[parent] <= heapF[i] then break end
+        heapK[i], heapK[parent] = heapK[parent], heapK[i]
+        heapF[i], heapF[parent] = heapF[parent], heapF[i]
+        i = parent
+    end
+    return count
+end
+
+local function heapPop(count)
+    local topK = heapK[1]
+    heapK[1], heapF[1] = heapK[count], heapF[count]
+    count = count - 1
+    local i = 1
+    while true do
+        local left, right = i * 2, i * 2 + 1
+        local smallest = i
+        if left <= count and heapF[left] < heapF[smallest] then smallest = left end
+        if right <= count and heapF[right] < heapF[smallest] then smallest = right end
+        if smallest == i then break end
+        heapK[i], heapK[smallest] = heapK[smallest], heapK[i]
+        heapF[i], heapF[smallest] = heapF[smallest], heapF[i]
+        i = smallest
+    end
+    return count, topK
+end
+
+local function heuristic(ax, az, bx, bz)
+    -- Octile: diagonals cost sqrt(2), so the straight runs plus the diagonal
+    -- shortcut is admissible - it never overestimates, which is what keeps A*
+    -- optimal.
+    local dx, dz = abs(ax - bx), abs(az - bz)
+    local lo, hi = min(dx, dz), max(dx, dz)
+    return (hi - lo) + lo * DIAG
 end
 
 local function astar(goalK, allowLethal)
-    local n, side = CL.reach, CL.side
-    local spacing = math.max(CFG.cloneGridSpacing, 0.5)
-    local total = side * side
-    local startK = indexOf(0, 0)
     if not goalK then return nil end
+    local n, side = CL.reach, CL.side
+    local spacing = max(CFG.cloneGridSpacing, 0.5)
+    local startK = (0 + n) * side + (0 + n) + 1
+    local cells = CL.cells
+    local goalCell = cells[goalK]
+    local gx, gz = goalCell.x, goalCell.z
+    local lethal = CFG.threatLethal
+    local weight = CFG.threatWeight
+    local maxClimb = CFG.cloneMaxClimb
 
-    for k = 1, total do
-        gScore[k] = math.huge
-        fScore[k] = math.huge
-        cameFrom[k] = nil
-        closed[k] = false
-    end
-    local goalCell = CL.cells[goalK]
+    CL.searchGen = CL.searchGen + 1
+    local gen = CL.searchGen
 
+    stamp[startK] = gen
     gScore[startK] = 0
-    fScore[startK] = heuristic(CL.cells[startK].x, CL.cells[startK].z,
-        goalCell.x, goalCell.z, 1)
-    local openCount = 1
-    openHeap[1] = startK
+    cameFrom[startK] = nil
+    local count = heapPush(0, startK, heuristic(cells[startK].x, cells[startK].z, gx, gz))
 
-    while openCount > 0 do
-        -- Linear scan for the lowest F. A binary heap is asymptotically better
-        -- but the window is a few hundred cells, and the scan avoids the
-        -- per-push allocations a heap of tables would cost.
-        local bestIdx, bestK, bestF = 1, openHeap[1], fScore[openHeap[1]]
-        for i = 2, openCount do
-            local k = openHeap[i]
-            if fScore[k] < bestF then bestIdx, bestK, bestF = i, k, fScore[k] end
-        end
-        openHeap[bestIdx] = openHeap[openCount]
-        openHeap[openCount] = nil
-        openCount = openCount - 1
+    while count > 0 do
+        local topK
+        count, topK = heapPop(count)
+        if topK == goalK then return cameFrom, startK end
 
-        if bestK == goalK then return cameFrom, startK end
-        closed[bestK] = true
+        local cell = cells[topK]
+        local base = gScore[topK]
+        local zeroed = topK - 1
+        local di, dj = zeroed % side - n, floor(zeroed / side) - n
+        local cellY = cell.y or 0
 
-        local cell = CL.cells[bestK]
-        local di, dj = (bestK - 1) % side - n, math.floor((bestK - 1) / side) - n
         for _, nb in ipairs(NEIGHBOURS) do
             local ni, nj = di + nb[1], dj + nb[2]
-            local other = cellAt(ni, nj)
-            if other and other.standable and not closed[indexOf(ni, nj)]
-                and math.abs((other.y or 0) - (cell.y or 0)) <= CFG.cloneMaxClimb then
-                local passable = allowLethal or other.threat < CFG.threatLethal
-                if passable and nb[4] then
-                    -- Diagonal: both orthogonal neighbours must be walkable, or
-                    -- the corner of a hot cell gets clipped on the way past.
-                    local a = cellAt(di + nb[4], dj + nb[5])
-                    local b = cellAt(di + nb[6], dj + nb[7])
-                    passable = a ~= nil and b ~= nil and a.standable and b.standable
-                end
-                if passable then
-                    local nk = indexOf(ni, nj)
-                    local step = spacing * nb[3]
-                    -- Heat is paid per unit of exposure, so crossing a hot cell
-                    -- quickly costs less than loitering in a warm one.
-                    local heat = math.min(other.threat, TH.LETHAL * 2) * CFG.threatWeight * nb[3]
-                    local tentative = gScore[bestK] + step + heat
-                    if tentative < gScore[nk] then
-                        cameFrom[nk] = bestK
-                        gScore[nk] = tentative
-                        fScore[nk] = tentative
-                            + heuristic(other.x, other.z, goalCell.x, goalCell.z, 1)
-                        openCount = openCount + 1
-                        openHeap[openCount] = nk
+            if ni >= -n and ni <= n and nj >= -n and nj <= n then
+                local nk = (nj + n) * side + (ni + n) + 1
+                local other = cells[nk]
+                if other.standable and abs((other.y or 0) - cellY) <= maxClimb then
+                    local passable = allowLethal or other.threat < lethal
+                    if passable and nb[4] then
+                        -- Diagonal: both orthogonal neighbours must be walkable,
+                        -- or the corner of a hot cell gets clipped on the way.
+                        local ak = (dj + nb[5] + n) * side + (di + nb[4] + n) + 1
+                        local bk = (dj + nb[7] + n) * side + (di + nb[6] + n) + 1
+                        local a, b = cells[ak], cells[bk]
+                        passable = a ~= nil and b ~= nil and a.standable and b.standable
+                    end
+                    if passable then
+                        local step = nb[3]
+                        -- Heat paid per unit of exposure, so crossing something
+                        -- hot quickly costs less than loitering in something warm.
+                        local heat = min(other.threat, 200) * weight * step
+                        local tentative = base + spacing * step + heat
+                        if stamp[nk] ~= gen or tentative < gScore[nk] then
+                            stamp[nk] = gen
+                            gScore[nk] = tentative
+                            cameFrom[nk] = topK
+                            count = heapPush(count, nk,
+                                tentative + heuristic(other.x, other.z, gx, gz) * spacing)
+                        end
                     end
                 end
             end
@@ -611,10 +692,14 @@ local function runCloneEvasion(humanoid, root)
     -- The goal is held as a WORLD KEY, not an index into the window: the window
     -- is centred on the character and slides as it walks, so an index means a
     -- different place a moment later.
+    -- The goal is a world cell; its index in the window is arithmetic, not a
+    -- search. This used to scan all 900 cells every frame to find it again.
     local goalK = nil
-    if CL.goalKey then
-        for k, cell in ipairs(CL.cells) do
-            if cell.key == CL.goalKey then goalK = k break end
+    if CL.goalI then
+        local di, dj = CL.goalI - CL.centerI, CL.goalJ - CL.centerJ
+        local n = CL.reach
+        if di >= -n and di <= n and dj >= -n and dj <= n then
+            goalK = (dj + n) * CL.side + (di + n) + 1
         end
     end
 
@@ -630,11 +715,16 @@ local function runCloneEvasion(humanoid, root)
         or CL.cells[goalK].threat >= CFG.threatLethal
     if stale then
         goalK = bestGoal(root)
-        CL.goalKey = goalK and CL.cells[goalK].key or nil
+        if goalK then
+            CL.goalI, CL.goalJ = CL.cells[goalK].i, CL.cells[goalK].j
+        else
+            CL.goalI, CL.goalJ = nil, nil
+        end
         CL.goalAt = now
     end
 
     if not goalK then
+        CL.goalI, CL.goalJ = nil, nil
         setMovementState("CLONE - nowhere to stand")
         buildPath(nil, nil, nil)
         paintCells()
@@ -661,7 +751,7 @@ local function runCloneEvasion(humanoid, root)
 
     local goal = CL.cells[goalK]
     if #CL.path == 0 or Vector3.new(goal.x - rootPos.X, 0, goal.z - rootPos.Z).Magnitude <= 1.0 then
-        CL.goalKey = nil
+        CL.goalI, CL.goalJ = nil, nil
         setMovementState(string.format("CLONE holding (heat %.0f)", goal.threat))
         return true
     end
@@ -679,7 +769,7 @@ local function runCloneEvasion(humanoid, root)
     if not isPathSegmentClear(rootPos, targetPos, nil) then
         CL.floorCache[target.key] = { y = false, t = os.clock() }
         target.standable = false
-        CL.goalKey = nil
+        CL.goalI, CL.goalJ = nil, nil
         heavyDebugThrottled("clone_wall", 1.0, "Clone",
             string.format("Cell %s is walled off; marked impassable, re-routing.", target.key))
         setMovementState("CLONE - re-routing")

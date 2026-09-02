@@ -34,6 +34,31 @@ local getPlayerHitboxMetrics = S.getPlayerHitboxMetrics
 
 local THREAT_LETHAL = 100
 
+-- Locals for everything used inside the per-cell loops. Each `math.sqrt` in
+-- Lua is a hash lookup on the global table followed by one on `math`; at the
+-- call counts below that is not a rounding error.
+local sqrt, max, min, abs, clamp = math.sqrt, math.max, math.min, math.abs, math.clamp
+local huge = math.huge
+
+-- Per-pass constants, computed ONCE for the whole grid instead of once per
+-- query. getPlayerHitboxMetrics walks the character and does two Instance
+-- lookups; at 900 cells x 2 time samples that was 3,600 Instance lookups per
+-- evaluation, twelve times a second, purely to re-derive numbers that had not
+-- changed.
+local ctxReach, ctxHalfHeight, ctxNow = 2.0, 5.0, 0
+
+local function prepareThreatPass()
+    local _, playerRadius, totalHeight = getPlayerHitboxMetrics()
+    -- The probe is deliberately NOT the drawn disc. The disc is how big you
+    -- look; the probe is how big the game thinks you are when it decides
+    -- whether something hit you, and probing with the wider of the two makes
+    -- the grid blind to any pocket narrower than your shoulders.
+    local probe = CFG.threatProbeRadius
+    ctxReach = (probe > 0 and probe or playerRadius) + CFG.threatMargin
+    ctxHalfHeight = (totalHeight * 0.5) + 2.0
+    ctxNow = Workspace:GetServerTimeNow()
+end
+
 -- ------------------------------------------------------------------ shapes
 -- Circle: trivial, but done flat. Height is handled separately because a
 -- telegraph on the floor below a ledge should not heat the ledge.
@@ -86,94 +111,104 @@ local function urgency(timeToImpact)
 end
 
 -- ------------------------------------------------------------------ queries
--- The whole field in one call: 0 is safe, THREAT_LETHAL and above is lethal.
--- `atTime` is how many seconds from now we would be standing there.
-local function getThreatAt(position, atTime)
-    atTime = atTime or 0
-    local total = 0
-    local _, playerRadius, totalHeight = getPlayerHitboxMetrics()
-    local reach = playerRadius + CFG.threatMargin
-    local halfHeight = (totalHeight * 0.5) + 2.0
+-- Heat at a point, at TWO moments, in a single walk over the threat sources.
+--
+-- The grid needs both "how hot when I arrive" and "how hot once I have stood
+-- here a moment", and asking twice meant walking every zone, volume,
+-- projectile and safe marker twice over. The sources are the same; only the
+-- time sample differs, so one pass computes both. Halves the dominant cost of
+-- the whole system.
+local function getThreatPair(position, timeA, timeB)
+    local totalA, totalB = 0, 0
+    local px, py, pz = position.X, position.Y, position.Z
+    local reach, halfHeight, now = ctxReach, ctxHalfHeight, ctxNow
+    local ignoreVertical = CFG.hazardIgnoreVertical
+    local falloff = CFG.threatFalloff
 
     -- 1. Announced ground attacks. Exact geometry, exact timing.
     if CFG.usePrecast then
-        local now = Workspace:GetServerTimeNow()
         for _, zone in ipairs(PC.zones) do
-            local timeToImpact = (zone.impactAt - now) - atTime
-            local weight = urgency(timeToImpact)
-            if weight > 0 then
+            local eta = zone.impactAt - now
+            local wA = urgency(eta - timeA)
+            local wB = urgency(eta - timeB)
+            if wA > 0 or wB > 0 then
                 local depth, vertical
                 if zone.shape == "Circle" then
-                    depth = circleDepth(position, zone.position, zone.radius)
-                    vertical = math.abs(position.Y - zone.position.Y)
+                    local c = zone.position
+                    local dx, dz = px - c.X, pz - c.Z
+                    depth = sqrt(dx * dx + dz * dz) - zone.radius
+                    vertical = abs(py - c.Y)
                 else
                     depth, vertical = boxDepth(position, zone.cframe,
                         zone.size.X * 0.5, zone.size.Z * 0.5)
+                    vertical = abs(vertical)
                 end
-                if CFG.hazardIgnoreVertical or math.abs(vertical) < halfHeight then
+                if ignoreVertical or vertical < halfHeight then
+                    local share
                     if depth <= reach then
-                        total = total + THREAT_LETHAL * weight
-                    elseif depth <= reach + CFG.threatFalloff then
-                        -- Outside but close: a shoulder of heat, so the search
-                        -- prefers the middle of a gap to its very edge.
-                        local t = 1 - ((depth - reach) / CFG.threatFalloff)
-                        total = total + THREAT_LETHAL * weight * t * t * 0.6
+                        share = 1
+                    elseif depth <= reach + falloff then
+                        local t = 1 - ((depth - reach) / falloff)
+                        share = t * t * 0.6
+                    end
+                    if share then
+                        totalA = totalA + THREAT_LETHAL * wA * share
+                        totalB = totalB + THREAT_LETHAL * wB * share
                     end
                 end
             end
         end
     end
 
-    -- 2. Physical hazards already in the world. These are live damage, so they
-    -- carry full weight regardless of time - there is nothing to wait for.
+    -- 2. Live hazards. Full weight at both times: nothing to wait for.
     for _, volume in ipairs(HZ.volumes) do
         if not volume.part or volume.part.Parent then
             local closest = S.volumeClosestPoint(volume, position)
-            local dx, dz = position.X - closest.X, position.Z - closest.Z
-            local depth = math.sqrt(dx * dx + dz * dz) - reach
-            if CFG.hazardIgnoreVertical or math.abs(position.Y - closest.Y) < halfHeight then
+            local dx, dz = px - closest.X, pz - closest.Z
+            local depth = sqrt(dx * dx + dz * dz) - reach
+            if ignoreVertical or abs(py - closest.Y) < halfHeight then
+                local share
                 if depth <= 0 then
-                    total = total + THREAT_LETHAL
-                elseif depth <= CFG.threatFalloff then
-                    local t = 1 - (depth / CFG.threatFalloff)
-                    total = total + THREAT_LETHAL * t * t
+                    share = 1
+                elseif depth <= falloff then
+                    local t = 1 - (depth / falloff)
+                    share = t * t
+                end
+                if share then
+                    local heat = THREAT_LETHAL * share
+                    totalA = totalA + heat
+                    totalB = totalB + heat
                 end
             end
         end
     end
 
-    -- 3. Moving hazards heat the corridor they are ABOUT to sweep, not just
-    -- the square they are in. A projectile is not a place, it is a line
-    -- through space and time - without this the square in front of an
-    -- incoming shot reads as perfectly cool and the bot walks into it.
+    -- 3. Moving hazards heat the corridor they are ABOUT to sweep. A
+    -- projectile is not a place, it is a line through space and time.
     if CFG.threatSweepEnabled then
+        local sweepTime = CFG.threatSweepTime
         for _, entry in ipairs(TH.projectiles) do
             local part = entry.part
             if part.Parent then
                 local velocity = entry.velocity
-                local speed = velocity.Magnitude
+                local speed = entry.speed
                 if speed > 0.01 then
-                    local direction = velocity / speed
-                    local toPoint = position - part.Position
-                    -- How far along its path this point lies. Negative means
-                    -- behind it, which is the one safe place to be.
-                    local along = toPoint:Dot(direction)
-                    local range = speed * CFG.threatSweepTime
-                    if along > 0 and along < range then
-                        -- Perpendicular offset from the line of travel.
-                        local perpendicular = toPoint - direction * along
-                        local sideways = Vector3.new(perpendicular.X, 0, perpendicular.Z).Magnitude
-                        local width = reach + math.max(part.Size.X, part.Size.Z) * 0.5
-                        if sideways <= width + CFG.threatFalloff
-                            and (CFG.hazardIgnoreVertical or math.abs(perpendicular.Y) < halfHeight) then
-                            -- When it gets here, against when WE would be here.
-                            -- Arriving together is lethal; well apart is not.
-                            local weight = urgency((along / speed) - atTime)
-                            if weight > 0 then
-                                local edge = sideways <= width and 1
-                                    or (1 - (sideways - width) / CFG.threatFalloff) ^ 2
-                                total = total + THREAT_LETHAL * weight * edge
-                            end
+                    local origin = part.Position
+                    local dx, dy, dz = px - origin.X, py - origin.Y, pz - origin.Z
+                    local ux, uy, uz = entry.ux, entry.uy, entry.uz
+                    -- Distance along the line of travel. Negative is behind it,
+                    -- which is the one safe place to be.
+                    local along = dx * ux + dy * uy + dz * uz
+                    if along > 0 and along < speed * sweepTime then
+                        local ox, oy, oz = dx - ux * along, dy - uy * along, dz - uz * along
+                        local sideways = sqrt(ox * ox + oz * oz)
+                        local width = reach + entry.radius
+                        if sideways <= width + falloff and (ignoreVertical or abs(oy) < halfHeight) then
+                            local edge = sideways <= width and 1
+                                or (1 - (sideways - width) / falloff) ^ 2
+                            local arrive = along / speed
+                            totalA = totalA + THREAT_LETHAL * urgency(arrive - timeA) * edge
+                            totalB = totalB + THREAT_LETHAL * urgency(arrive - timeB) * edge
                         end
                     end
                 end
@@ -181,37 +216,53 @@ local function getThreatAt(position, atTime)
         end
     end
 
-    -- 4. Enemies. Melee never telegraphs and never expires, so its heat is
-    -- constant in time: being next to one simply is the attack.
+    -- 4. Enemies. Constant in time: melee never telegraphs and never expires.
+    local hard, soft = CFG.cloneEnemyRadius, CFG.cloneEnemySoftRadius
+    local softSpan = max(soft - hard, 0.01)
     for _, epos in ipairs(TH.enemyPositions) do
-        local dx, dz = position.X - epos.X, position.Z - epos.Z
-        local d = math.sqrt(dx * dx + dz * dz)
-        if d < CFG.cloneEnemyRadius then
-            total = total + THREAT_LETHAL
-        elseif d < CFG.cloneEnemySoftRadius then
-            local t = 1 - ((d - CFG.cloneEnemyRadius)
-                / math.max(CFG.cloneEnemySoftRadius - CFG.cloneEnemyRadius, 0.01))
-            total = total + THREAT_LETHAL * t * t * 0.5
+        local dx, dz = px - epos.X, pz - epos.Z
+        local dSquared = dx * dx + dz * dz
+        -- Squared comparison first: most cells are nowhere near an enemy, and
+        -- this skips the square root entirely for those.
+        if dSquared < soft * soft then
+            local d = sqrt(dSquared)
+            local heat
+            if d < hard then
+                heat = THREAT_LETHAL
+            else
+                local t = 1 - ((d - hard) / softSpan)
+                heat = THREAT_LETHAL * t * t * 0.5
+            end
+            totalA = totalA + heat
+            totalB = totalB + heat
         end
     end
 
-    -- 5. Safe-spot markers invert everything: some bosses mark the one circle
-    -- you must stand in, and outside it is the danger.
+    -- 5. Safe-spot markers invert everything: outside the circle is the danger.
     if CFG.safeZoneEnabled and #HZ.safeZones > 0 then
         local inside = false
         for _, part in ipairs(HZ.safeZones) do
             if part.Parent then
                 local size = part.Size
-                if circleDepth(position, part.Position, math.max(size.X, size.Z) * 0.5) < 0 then
-                    inside = true
-                    break
-                end
+                local r = max(size.X, size.Z) * 0.5
+                local dx, dz = px - part.Position.X, pz - part.Position.Z
+                if dx * dx + dz * dz < r * r then inside = true break end
             end
         end
-        if not inside then total = total + THREAT_LETHAL end
+        if not inside then
+            totalA = totalA + THREAT_LETHAL
+            totalB = totalB + THREAT_LETHAL
+        end
     end
 
-    return total
+    return totalA, totalB
+end
+
+-- Single-time query, for callers that only need one sample.
+local function getThreatAt(position, atTime)
+    prepareThreatPass()
+    local a = getThreatPair(position, atTime or 0, atTime or 0)
+    return a
 end
 
 -- Refreshed once per evaluation pass rather than per query: walking the enemy
@@ -238,9 +289,15 @@ local function refreshThreatSources()
             -- ground in front of it. The sidestep reflex applies its own,
             -- higher threshold separately.
             if velocity and velocity.Magnitude >= CFG.threatSweepMinSpeed then
+                -- Unit vector and radius precomputed here rather than per
+                -- cell: this is once per projectile, that was 900 times.
+                local speed = velocity.Magnitude
+                local size = part.Size
                 TH.projectiles[#TH.projectiles + 1] = {
-                    part = part, velocity = velocity,
-                    fast = velocity.Magnitude >= CFG.dodgeMinProjectileSpeed,
+                    part = part, velocity = velocity, speed = speed,
+                    ux = velocity.X / speed, uy = velocity.Y / speed, uz = velocity.Z / speed,
+                    radius = max(size.X, size.Z) * 0.5,
+                    fast = speed >= CFG.dodgeMinProjectileSpeed,
                 }
             end
         end
@@ -325,6 +382,8 @@ end
 
 TH.LETHAL = THREAT_LETHAL
 S.getThreatAt = getThreatAt
+S.getThreatPair = getThreatPair
+S.prepareThreatPass = prepareThreatPass
 S.refreshThreatSources = refreshThreatSources
 S.calculateDodgeForce = calculateDodgeForce
 S.getProjectileDodge = getProjectileDodge
