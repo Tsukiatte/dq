@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 3.0.5
+    VERSION : 3.1.0
     BUILD   : 2026-09-01
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "3.0.5"
+local SCRIPT_VERSION = "3.1.0"
 local SCRIPT_BUILD_DATE = "2026-09-01"
-local SCRIPT_CODENAME = "Ground truth"
+local SCRIPT_CODENAME = "Heat"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "3.1.0", date = "2026-09-02", notes = "Safety stops being a yes or no and becomes heat: a number from 0 to 100 at a point AND at a moment, so the same square is cool now and lethal in a second. In a fan of radial beams every square is unsafe, a boolean leaves the search nothing to choose between, and the character stands still and dies - a scalar field always has a least-bad answer and the gaps fall out of it for free. New ThreatManager combines announced attacks (exact geometry and impact time, ramped by an urgency curve), live hazards, enemy circles and inverted safe-spot markers. The grid search is now A* with F = G + H + threat*weight, where the weight is literally how many studs of detour one point of heat is worth; cells above the lethal threshold are impassable, and if every route crosses one it re-runs allowing them rather than standing still. Projectile steering sits underneath as a per-frame reflex, shoving sideways out of the path of anything already in the air. Discs are drawn as a green-amber-red gradient." },
     { version = "3.0.5", date = "2026-09-02", notes = "Attacks built from hundreds of meshes no longer melt the frame. A dense group of parts under one model collapses into the single box it effectively is - nobody threads between the meshes of a lava pool - so the safety tests run against a handful of volumes rather than every part, and highlights and name tags are capped to the nearest few instead of drawing three hundred BillboardGuis. Chasing also keeps its distance now: the grid drew a circle around every enemy and called it unsafe, then the pursuit walked straight through it into melee using its own smaller stand-off, so the dodge kept its distance and the chase gave it back. Attack reach scales with the stand-off so it does not close the gap merely to swing." },
     { version = "3.0.4", date = "2026-09-02", notes = "One line was hiding most attacks: isDamageBrick rejected any part parented straight to Workspace, on the theory that a real attack lives inside a model. This game does the opposite - PrecastHitbox does Part.Parent = workspace literally, and so do the boss beams - so that veto was throwing away exactly what mattered. Loose parts fall through to the appearance test now. Workspace.vfxPool holds the player OWN pooled hit effects under generic names like Part, which is why the bot fled from its own ability the moment it landed; anything in that pool is ours. Defaults retuned now that the footprint is measured honestly: disc scale back to 1.0, safety margin 0.75, depth bonus 1.5, enemy space 12 and 20." },
     { version = "3.0.3", date = "2026-09-02", notes = "Enemies get a circle of their own: melee does not telegraph, being next to one IS the attack, so cells within Enemy space are unsafe and cells out to Enemy spacing are expensive. Two fixes for the dithering. The committed goal was a window INDEX, but the window is centred on the character and slides as it walks, so the goal silently moved to a different place every time you crossed a cell boundary - it is a world key now. And a cell was judged only at the instant of arrival, so somewhere an announced attack would land a moment later read as green: the bot walked there, stopped, and died. A cell must now stay safe for Must stay safe for seconds after arrival to count as a destination, with a fallback to merely-safe so a moment with something inbound everywhere never returns nothing." },
@@ -119,6 +120,8 @@ local CL = {}
 local ZN = {}
 -- PC = precast: the attacks the game has announced but not yet landed.
 local PC = {}
+-- TH = threat field: the sources it is built from each pass.
+local TH = {}
 -- RT = loose runtime flags and handles (farmEnabled, debugLevel, connections...)
 -- that used to be bare locals. They live in a table so every module sees the
 -- same value; a bare local copied into another module would go stale.
@@ -495,6 +498,24 @@ CFG.cloneEnemySoftRadius = 20.0  -- beyond the hard circle, discouraged not forb
 -- distance and the pursuit immediately walked back into melee, which on a high
 -- tier is one tap.
 CFG.cloneKeepDistance = true
+
+-- Threat field (3.1.0). Heat rather than a yes/no verdict: in a fan of beams
+-- every square is unsafe, so a boolean leaves the search nothing to choose
+-- between and the character stands still and dies.
+CFG.threatWeight = 2.6           -- studs of detour one point of heat is worth
+CFG.threatLethal = 55            -- at or above this a cell is impassable...
+CFG.threatDesperate = true       -- ...unless there is no path at all
+CFG.threatHorizon = 4.0          -- seconds ahead an announced attack starts to matter
+CFG.threatFalloff = 7.0          -- studs of warm shoulder outside a hazard edge
+CFG.threatMargin = 0.75          -- clearance added to the body before anything counts
+CFG.showThreatGradient = true    -- colour discs by heat rather than safe/unsafe
+
+-- Projectile steering: the reflex under the grid, for things already in the air.
+CFG.dodgeProjectiles = true
+CFG.dodgeLookahead = 1.4         -- seconds of flight time considered
+CFG.dodgeMinProjectileSpeed = 12 -- studs/sec before something counts as a projectile
+CFG.dodgeStrength = 14           -- studs the sideways shove aims for
+CFG.colorThreatWarm = Color3.fromRGB(255, 170, 40)
 -- A cell has to STAY safe this long after arrival, not merely be safe at the
 -- instant of arrival. Standing still is a decision too.
 CFG.cloneSafeDwell = 1.6
@@ -831,6 +852,10 @@ PC.connection = nil
 PC.bridge = nil
 PC.failed = false
 PC.total = 0
+
+TH.enemyPositions = {}
+TH.projectiles = {}
+TH.LETHAL = 100
 PC.received = 0                  -- payloads seen on the bridge, parsed or not
 PC.lastShown = -1
 PC.lastTotal = -1
@@ -991,6 +1016,7 @@ S.MC = MC
 S.CL = CL
 S.ZN = ZN
 S.PC = PC
+S.TH = TH
 S.MAP_CODES = MAP_CODES
 S.MAP_LABELS = MAP_LABELS
 end

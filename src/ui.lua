@@ -1123,14 +1123,31 @@ local function createControlUI()
         0, 4, true,
         function() return CFG.cloneSafeDwell end, function(v) CFG.cloneSafeDwell = v end, 6.7,
         "A cell counts as a destination only if nothing lands on it for this long after you get there. At 0 it judges the instant of arrival only, which is how it used to walk somewhere, stop, and be killed by an attack that was already announced."))
-    track(K.slider(cloneSection.content, "Danger cost", "How much it hates crossing red",
-        5, 60, false,
-        function() return CFG.cloneDangerCost end, function(v) CFG.cloneDangerCost = v end, 7,
-        "A red cell costs this many green cells to cross. It still will, when there is no way around."))
-    track(K.slider(cloneSection.content, "Depth bonus", "Prefer the middle of a safe area",
-        0, 4, true,
-        function() return CFG.cloneDepthBonus end, function(v) CFG.cloneDepthBonus = v end, 8,
-        "Each cell of distance from the nearest red is worth this many studs of extra travel. 0 means the nearest green wins."))
+    track(K.slider(cloneSection.content, "Caution", "Studs of detour one point of heat is worth",
+        0.5, 8, true,
+        function() return CFG.threatWeight end, function(v) CFG.threatWeight = v end, 7,
+        "The survival-versus-speed dial, in one number. Higher takes longer routes to stay cool; lower cuts corners through danger. Survival-first defaults sit high."))
+    track(K.slider(cloneSection.content, "Lethal at", "Heat a cell is impassable above",
+        20, 100, false,
+        function() return CFG.threatLethal end, function(v) CFG.threatLethal = v end, 7.1,
+        "Heat runs 0 to 100, where 100 is standing in a live attack. Cells at or above this are walls to the search - unless every route crosses one, in which case it takes the coolest rather than standing still."))
+    track(K.slider(cloneSection.content, "Look ahead", "Seconds an attack starts to matter",
+        1, 8, true,
+        function() return CFG.threatHorizon end, function(v) CFG.threatHorizon = v end, 7.2,
+        "How far in advance an announced attack begins heating its area. It ramps up as impact approaches, so a marker firing in four seconds is barely warm and one firing now is lethal."))
+    track(K.slider(cloneSection.content, "Edge shoulder", "Warm band outside a hazard",
+        0, 16, true,
+        function() return CFG.threatFalloff end, function(v) CFG.threatFalloff = v end, 7.3,
+        "Heat fades over this distance outside an attack's edge, so the middle of a gap is preferred to its lip."))
+    track(K.toggle(cloneSection.content, "Sidestep projectiles",
+        function() return CFG.dodgeProjectiles end, function(v) CFG.dodgeProjectiles = v end, 7.4,
+        "A per-frame sideways shove out of the path of anything already in the air. The grid replans a few times a second, which is right for ground attacks and far too slow for a shot in flight."))
+    track(K.toggle(cloneSection.content, "Heat gradient",
+        function() return CFG.showThreatGradient end, function(v) CFG.showThreatGradient = v end, 7.5,
+        "Colour the discs green through amber to red by how hot they are, instead of only safe or unsafe."))
+    track(K.colorRow(cloneSection.content, "Warm colour",
+        function() return CFG.colorThreatWarm end, function(c) CFG.colorThreatWarm = c end, 7.6,
+        "The middle of the gradient."))
     track(K.slider(cloneSection.content, "Commit time", "Seconds before it reconsiders",
         0.1, 1.5, true,
         function() return CFG.cloneCommitTime end, function(v) CFG.cloneCommitTime = v end, 9,

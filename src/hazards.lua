@@ -2396,6 +2396,7 @@ local function watchOwnAbilityRemotes()
 end
 
 S.watchOwnAbilityRemotes = watchOwnAbilityRemotes
+S.volumeClosestPoint = volumeClosestPoint
 S.collectSafeZones = collectSafeZones
 S.safeZonePenalty = safeZonePenalty
 end
