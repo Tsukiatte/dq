@@ -11,6 +11,42 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.3.0 - 2026-09-02 - "Nothing is held"
+
+### The straight line into a new attack
+The box had hysteresis, and the hysteresis re-read danger **at the box and
+nowhere else**. An attack placed between the character and the box did not
+exist as far as the held box was concerned, so the character kept walking its
+straight line into it while a step to either side was open.
+
+The bots that beat bullet hells commit to nothing. twinject, the Touhou player
+(`github.com/Netdex/twinject`), is a velocity-obstacle bot: it re-picks its
+velocity every frame from scratch and holds no target at all. The box now
+survives a decision only while every sample along the line to it *and* at it
+still passes. Otherwise it is dropped on the spot (`line closed`), the field
+is re-read, and the re-read prices the straight line - which is what puts the
+new box to the left or the right. A held box that wins the re-read is kept,
+which also stops the approach creeping a stud at a time.
+
+### Pursuit is back, underneath the dodge
+4.2.0 dropped pursuit outright in Dodge mode, so the bot could no longer cross
+a room. Pursuit walks the map again. The loop only reaches it with no box to
+follow, and even then it gets a step only if the next **Pursuit probe** studs
+of its route are clear (`dodgeStepClear`). When they are not, the character
+holds (`holding for a gap`) and the box, told pursuit is blocked, picks the
+way in one safe spot at a time. Near the target the box is the approach, as
+before. Dodging always outranks pursuit.
+
+### Macros are gone
+The recorder, the player, the macro file, the island option, the Routes
+section, the overlay toggles and every `macro*` setting. The island is
+**Legacy** or **Dodge**; a saved `macroMode` of `macro` loads as Legacy. Dodge
+is the default.
+
+### Settings versus lists of settings
+Section headers are darker than the rows, and an open section's rows sit in a
+darker well, so a setting and a list you can open no longer look the same.
+
 ## 4.2.1 - 2026-09-02
 - The HUD status names the active mover in brackets — `DODGE waiting for a gap
   [tween]` — so "is it tweening?" is answered by looking. The **Movement**

@@ -8,8 +8,8 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 4.2.1
-    BUILD   : 2026-09-01
+    VERSION : 4.3.0
+    BUILD   : 2026-09-02
 
     VERSIONING RULES (semantic):
         MAJOR -> rewrite / breaking change to core architecture
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "4.2.1"
-local SCRIPT_BUILD_DATE = "2026-09-01"
-local SCRIPT_CODENAME = "The box is the approach"
+local SCRIPT_VERSION = "4.3.0"
+local SCRIPT_BUILD_DATE = "2026-09-02"
+local SCRIPT_CODENAME = "Nothing is held"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "4.3.0", date = "2026-09-02", notes = "Nothing is held. The box had hysteresis, and the hysteresis re-read danger at the box and nowhere else - so an attack placed between the character and the box did not exist as far as the held box was concerned, and the character walked its straight line into it while a step to either side was open. The bots that beat bullet hells commit to nothing: twinject, the Touhou player, re-picks its velocity every frame from scratch. The box now survives a decision only while every sample along the line to it and at it still passes; otherwise it is dropped on the spot, the field is re-read, and the re-read prices the straight line, which is what puts the new box to the left or the right. Pursuit is back underneath the dodge: 4.2.0 had dropped it outright so the bot could no longer cross a room. The loop only reaches pursuit with no box to follow, and even then it gets a step only if the next few studs of its route are clear; when they are not it holds and the box, told pursuit is blocked, picks the way in one safe spot at a time. Near the target the box is the approach as before. Macros are gone - the recorder, the player, the file, the island option, the Routes section and their settings - and the island is Legacy or Dodge. Section headers and the well their rows sit in are darker than the rows now, so a setting and a list of settings no longer look the same." },
     { version = "4.2.1", date = "2026-09-02", notes = "The HUD status names the active mover in brackets - DODGE waiting for a gap [tween] - so whether it is tweening is answered by looking rather than guessed from how it moves. The Movement dropdown at the top of the Dodge section switches between tween, walk, steer and velocity; tween is the default and nothing in a saved config overrides it unless one was saved on an older build." },
     { version = "4.2.0", date = "2026-09-02", notes = "Bullet hell. The HUD showed forty-two telegraphs detected and the whole floor red with the box on a lethal spot, so detection was working and the dodge was being handed a field it could not read. Three causes. The mesh-swarm clustering from 3.0.5 merged a boss pattern of forty hitBoxes under one Model into one bounding box the size of the arena, so every candidate read as lethal and the pockets between bullets did not exist as far as the dodge could see - exact attack geometry is never merged now. The candidate score was the worst of its five samples, which in a busy field is 1.0 for every candidate with no gradient left, so the nearest won; it is now half the worst and half the average, and a spot hit at one moment beats one hit at every moment. And pursuit walked straight through the pattern to get in range: the box is the approach now, drifting toward the target only across safe ground and waiting when there is none, which is what a person does in a bullet hell. The field is denser too, four rings of twenty-four, because the pockets are small." },
     { version = "4.1.1", date = "2026-09-02", notes = "Why the same attack was noticed once and never again: an attack aimed at the player spawns at the player, a moment after we swung, and the own-attack timing heuristic claimed it as one of our own effects. The capture showed it plainly - the cogs of a Cog Shooter shot spawned at the enemy and were dodged, the precast of the same shot spawned on us and was waved through. Ground truth now beats timing: a structural or named enemy attack, or anything inside a creature, is never marked as ours. Enemies are judged where they will be, not where they are, from their own velocity, so the character backs away from an advance instead of sidestepping into whatever is beside it; big bosses widen their circle by their body so a stomping leg counts. And walls are pockets now, not just obstacles: three rays from each candidate - ahead and to both sides - price how little room lies past it." },
@@ -133,8 +134,6 @@ local NAV = {}
 local HZ = {}
 -- LD = low-detail mode: the keep list and what is currently hidden.
 local LD = {}
--- MC = macro recording and playback.
-local MC = {}
 -- DG = dodge: the box, the candidates around the character, and what was
 -- gathered for the last decision.
 local DG = {}
@@ -401,29 +400,6 @@ CFG.maxHazardOverlays = 28          -- highlights and name tags drawn at once
 CFG.lowDetailBudget = 400           -- parts hidden/restored per frame while sweeping
 CFG.lowDetailKillEffects = true     -- also switch off particles, trails and beams
 
--- Macros (2.5.0). A macro is a recording of a run: where the character went and
--- what it did, sampled as it happened. Playback walks the recorded route and
--- fires the recorded actions at the point along it where they were made.
---
--- Movement is stored as POSITIONS, not as held keys. Replaying raw key presses
--- desynchronises within seconds - a different framerate, a slightly different
--- spawn point or one bump into a doorframe and every later input lands
--- somewhere else - whereas a position is absolute and self-correcting, so the
--- replay converges back onto the recorded route after any disturbance. The
--- actions (clicks, Q, E, jumps) are the recorded inputs, anchored to the sample
--- they were made at rather than to a wall-clock offset.
-CFG.macroSampleInterval = 0.12   -- seconds between position samples at most
-CFG.macroSampleDistance = 2.5    -- ...or this far moved, whichever comes first
-CFG.macroArriveRadius = 4.5      -- how close counts as having reached a sample
-CFG.macroStartRadius = 6.0       -- close enough to the start to begin the replay
-CFG.macroGiveUpTime = 6.0        -- no progress toward a sample for this long: skip it
-CFG.macroSkipLimit = 12          -- consecutive skips before the macro is abandoned
-CFG.macroMaxSamples = 9000       -- roughly 18 minutes; a guard, not a target
-CFG.macroLoop = false            -- restart the list after the last macro
-CFG.macroShowRoute = true        -- draw the selected macro's route in the world
-CFG.macroFaceRecorded = true     -- replay the facing you had, not just where you walked
-CFG.macroFile = "DungeonAutofarm_macros.json"
-
 -- Targeting (2.7.0). "closest" is the historical behaviour; the HP modes pick
 -- among enemies within targetHpRange so the bot does not sprint across the
 -- dungeon for a wounded straggler, falling back to closest when none qualify.
@@ -491,6 +467,9 @@ CFG.dodgeApproachWeight = 0.012  -- danger-equivalent per stud short of the targ
 -- Enemy soft ring is a preference, not a danger: it must sit below dodgeMoveAt
 -- or standing at attack range reads as unsafe and the character oscillates.
 CFG.dodgeEnemySoftWeight = 0.12
+-- Pursuit walks the map underneath the dodge (4.3.0) and asks before every
+-- step whether the next few studs of its route are clear. This is how many.
+CFG.dodgeStepProbe = 5
 -- A spot with a wall right behind it is a pocket. Continuing to flee from
 -- there is impossible, so it costs extra in proportion to how little room
 -- there is beyond it.
@@ -577,7 +556,6 @@ CFG.colorAbilityRadius = Color3.fromRGB(170, 100, 255)
 CFG.colorPursuit = Color3.fromRGB(0, 160, 255)
 CFG.colorEscape = Color3.fromRGB(255, 170, 0)
 CFG.colorWaypoint = Color3.fromRGB(255, 190, 40)
-CFG.colorMacro = Color3.fromRGB(150, 110, 255)
 CFG.accentColor = Color3.fromRGB(255, 182, 38)
 
 -- Overlay visibility, so the Overlays section can switch each one off.
@@ -801,10 +779,6 @@ LD.pickerEnabled = false
 -- every map in the config, so saving one map never drops the others.
 RT.currentMap = MAP_CODES[1]
 RT.mapData = {}
--- Macros live in their own file, keyed by map: they are far bulkier than the
--- rest of the config (thousands of samples each) and being separate makes them
--- easy to open, copy between machines and hand to someone else.
-RT.macroData = {}
 -- Named config snapshots: { name, savedAt, data }. Kept in their own file so
 -- the working config stays one small readable thing.
 RT.configs = {}
@@ -822,40 +796,15 @@ RT.pinnedWindows = {}
 RT.vfxPool = nil
 RT.menuBindCapture = false
 -- Per-map attack books, and per-map hand-drawn zones. Both are properties of a
--- dungeon, so they are keyed by map like the waypoints and the macros.
+-- dungeon, so they are keyed by map like the waypoints.
 RT.attackData = {}
 RT.zoneData = {}
 RT.rejectData = nil
 
--- Clone evasion state (2.9.0).
--- Macros (2.5.0). "legacy" = the hand-placed waypoint path; "macro" = recorded
--- runs. The dropdown at the top of the path panel picks which one is in charge
--- when the bot has nothing to fight.
-MC.mode = "legacy"
-MC.macros = {}                   -- the current map's recordings, in play order
-MC.recording = false
-MC.recordStart = 0
-MC.samples = nil                 -- being recorded: array of { t, x, y, z }
-MC.actions = nil                 -- being recorded: array of { t, i, kind }
-MC.lastSampleTime = 0
-MC.lastSamplePosition = nil
-MC.recordBind = Enum.KeyCode.RightBracket
-MC.bindCapture = false           -- the next key pressed becomes the bind
--- TWO connection lists, deliberately. The bind listener is global and must
--- outlive any recording; the action listener belongs to one recording and is
--- torn down with it. They shared a table until 2.7.0, so starting a recording
--- disconnected the bind key and it never fired again.
-MC.connections = {}              -- global: the record bind, and bind capture
-MC.recordConnections = {}        -- per-recording: the action input listener
-MC.playing = false
-MC.playIndex = 1                 -- which macro in the list
-MC.playPhase = "approach"        -- "approach" (walk to its start) then "replay"
-MC.playCursor = 1                -- sample index being walked to
-MC.playActionCursor = 1          -- next action not yet fired
-MC.playProgressTime = 0
-MC.playProgressDistance = nil
-MC.playSkips = 0
-MC.routeFolder = nil             -- drawn route of the selected macro
+-- Which system drives the character: "legacy" searches for a safe point when
+-- something lands near you; "clone" is the box. The value is "clone" rather
+-- than "dodge" so a config saved on an earlier build still loads.
+RT.mode = "clone"
 
 -- Dodge (4.0.0). See dodge.lua.
 DG.active = false
@@ -888,6 +837,7 @@ DG.dangerHere = 0
 DG.target = nil                  -- where the box is; nil when here is fine
 DG.targetReason = ""
 DG.lastDecision = -math.huge
+DG.pursuitBlocked = false        -- pursuit's next step was refused; the box takes over the approach
 
 -- Hand-drawn zones. `defs` is what gets saved (a signature plus a shape);
 -- `live` is [decoration part] = the volume currently following it.
@@ -1068,7 +1018,6 @@ S.setMovementState = setMovementState
 S.sliderConnections = sliderConnections
 S.getVisualRoot = getVisualRoot
 S.LD = LD
-S.MC = MC
 S.DG = DG
 S.ZN = ZN
 S.PC = PC
