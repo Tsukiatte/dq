@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 2.4.0
+    VERSION : 2.5.0
     BUILD   : 2026-09-01
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "2.4.0"
+local SCRIPT_VERSION = "2.5.0"
 local SCRIPT_BUILD_DATE = "2026-09-01"
-local SCRIPT_CODENAME = "Cartography"
+local SCRIPT_CODENAME = "Playback"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "2.5.0", date = "2026-09-01", notes = "Macro Waypoints. A dropdown at the top of the path panel switches between the legacy hand-placed waypoints and the new macro mode. Record (with a rebindable key) captures where you went and what you did; the recordings are listed, renamable, reorderable and stored per map alongside the waypoints. Play walks to the start of each macro with the normal routed pathfinding, then replays it. Movement is stored as positions rather than held keys, so the replay self-corrects instead of drifting; the actions are the recorded inputs, anchored to the point along the route where they were made." },
     { version = "2.4.0", date = "2026-09-01", notes = "Freeze Parts holds a copy of every attack on screen so a telegraph that lasts half a second can still be pointed at, and Pick Telegraph now writes straight into the Attack Book. Trial runs, freezing and picking all work with the loop OFF. Low Detail mode hides everything in the world except the part names you pick (enemies, attacks and markers always stay); collision is untouched. Waypoint paths and low-detail keep lists are now stored PER MAP across the 14 dungeons, with a map picker; the chosen map loads on execution." },
     { version = "2.3.0", date = "2026-09-01", notes = "Trial runs: with Trial Run on, every hit taken is matched to the parts that appeared around the player just before it, and those are written into a named Attack Book (what the attack and its warning look like) that drives detection from then on; panel to rename / disable / delete entries, Save writes it to the config. Projectile prediction: moving hazards are dodged along the strip they will sweep, not where they are, and escape candidates are added sideways out of their path. Enemy attacks are always highlighted now, with a billboard name tag and a predicted-path line on moving ones." },
     { version = "2.2.0", date = "2026-09-01", notes = "Recovery: when the character loiters in a 10-stud area for 2.5s while trying to move, it walks the nearest stretch of the manual path (routed through the navmesh, jumping allowed) and then returns to pursuit; re-sticking soon after walks further. Path waypoints are now reached by navmesh route, not a straight steer, and an unreachable one is skipped. Terrain: the shin-height steering probe no longer treats ramps and steps as walls (that is what pinned the bot at the foot of every incline), drops are allowed while climbs are capped at a jump, and a stall on a navmesh route hops too. Q/E can be limited to an enemy radius (button + slider + drawn radius). Own ability effects are recognised by timing against our own casts and learned by name (saved), with a Pick Own FX picker; the bot no longer dodges its own slashes. Attacks always click; the guessed remote is never fired." },
@@ -85,6 +86,8 @@ local NAV = {}
 local HZ = {}
 -- LD = low-detail mode: the keep list and what is currently hidden.
 local LD = {}
+-- MC = macro recording and playback.
+local MC = {}
 -- RT = loose runtime flags and handles (farmEnabled, debugLevel, connections...)
 -- that used to be bare locals. They live in a table so every module sees the
 -- same value; a bare local copied into another module would go stale.
@@ -328,6 +331,27 @@ CFG.freezeCap = 400                 -- held copies before it stops adding
 CFG.lowDetailBudget = 400           -- parts hidden/restored per frame while sweeping
 CFG.lowDetailKillEffects = true     -- also switch off particles, trails and beams
 
+-- Macros (2.5.0). A macro is a recording of a run: where the character went and
+-- what it did, sampled as it happened. Playback walks the recorded route and
+-- fires the recorded actions at the point along it where they were made.
+--
+-- Movement is stored as POSITIONS, not as held keys. Replaying raw key presses
+-- desynchronises within seconds - a different framerate, a slightly different
+-- spawn point or one bump into a doorframe and every later input lands
+-- somewhere else - whereas a position is absolute and self-correcting, so the
+-- replay converges back onto the recorded route after any disturbance. The
+-- actions (clicks, Q, E, jumps) are the recorded inputs, anchored to the sample
+-- they were made at rather than to a wall-clock offset.
+CFG.macroSampleInterval = 0.12   -- seconds between position samples at most
+CFG.macroSampleDistance = 2.5    -- ...or this far moved, whichever comes first
+CFG.macroArriveRadius = 4.5      -- how close counts as having reached a sample
+CFG.macroStartRadius = 6.0       -- close enough to the start to begin the replay
+CFG.macroGiveUpTime = 6.0        -- no progress toward a sample for this long: skip it
+CFG.macroSkipLimit = 12          -- consecutive skips before the macro is abandoned
+CFG.macroMaxSamples = 9000       -- roughly 18 minutes; a guard, not a target
+CFG.macroLoop = false            -- restart the list after the last macro
+CFG.macroShowRoute = true        -- draw the selected macro's route in the world
+
 -- The dungeons, as the config keys them. Waypoint paths and low-detail keep
 -- lists are stored per map, so one config carries every dungeon you set up.
 -- The labels are cosmetic only; correct them freely.
@@ -535,6 +559,30 @@ LD.pickerEnabled = false
 RT.currentMap = MAP_CODES[1]
 RT.mapData = {}
 
+-- Macros (2.5.0). "legacy" = the hand-placed waypoint path; "macro" = recorded
+-- runs. The dropdown at the top of the path panel picks which one is in charge
+-- when the bot has nothing to fight.
+MC.mode = "legacy"
+MC.macros = {}                   -- the current map's recordings, in play order
+MC.recording = false
+MC.recordStart = 0
+MC.samples = nil                 -- being recorded: array of { t, x, y, z }
+MC.actions = nil                 -- being recorded: array of { t, i, kind }
+MC.lastSampleTime = 0
+MC.lastSamplePosition = nil
+MC.recordBind = Enum.KeyCode.RightBracket
+MC.bindCapture = false           -- the next key pressed becomes the bind
+MC.connections = {}
+MC.playing = false
+MC.playIndex = 1                 -- which macro in the list
+MC.playPhase = "approach"        -- "approach" (walk to its start) then "replay"
+MC.playCursor = 1                -- sample index being walked to
+MC.playActionCursor = 1          -- next action not yet fired
+MC.playProgressTime = 0
+MC.playProgressDistance = nil
+MC.playSkips = 0
+MC.routeFolder = nil             -- drawn route of the selected macro
+
 -- Smallest deviation first, so steering hugs the intended heading.
 local STEER_FAN_ANGLES = { 0, 20, -20, 40, -40, 65, -65, 90, -90, 120, -120 }
 -- Relative to the root's centre: roughly shin height and roughly head height.
@@ -678,6 +726,7 @@ S.setMovementState = setMovementState
 S.sliderConnections = sliderConnections
 S.getVisualRoot = getVisualRoot
 S.LD = LD
+S.MC = MC
 S.MAP_CODES = MAP_CODES
 S.MAP_LABELS = MAP_LABELS
 end

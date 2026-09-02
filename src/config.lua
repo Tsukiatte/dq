@@ -29,8 +29,11 @@ local SCRIPT_VERSION = S.SCRIPT_VERSION
 =========================================================================== ]]
 
 local LD = S.LD
+local MC = S.MC
 local MAP_LABELS = S.MAP_LABELS
 local refreshLowDetail = S.refreshLowDetail
+local serializeMacros = S.serializeMacros
+local loadMacros = S.loadMacros
 
 local CONFIG_FILE = "DungeonAutofarm_config.json"
 
@@ -73,7 +76,11 @@ local function syncCurrentMapToStore()
     for name in pairs(LD.keepNames) do
         table.insert(keep, name)
     end
-    RT.mapData[RT.currentMap] = { waypath = waypath, keep = keep }
+    RT.mapData[RT.currentMap] = {
+        waypath = waypath,
+        keep = keep,
+        macros = serializeMacros(),
+    }
 end
 
 -- Checks a map's stored data out into the live tables. Does NOT save.
@@ -101,10 +108,12 @@ local function applyMapFromStore(code)
     refreshLowDetail()
     if S.refreshMapPanel then S.refreshMapPanel() end
 
+    local macroCount = loadMacros(entry.macros)
+
     local keepCount = 0
     for _ in pairs(LD.keepNames) do keepCount = keepCount + 1 end
-    heavyDebug("Map", string.format("%s (%s): %d waypoint(s), %d kept part name(s).",
-        code, MAP_LABELS[code] or code, #NAV.waypath, keepCount))
+    heavyDebug("Map", string.format("%s (%s): %d waypoint(s), %d macro(s), %d kept part name(s).",
+        code, MAP_LABELS[code] or code, #NAV.waypath, macroCount, keepCount))
 end
 
 -- The map picker. Checks the current map in, then the requested one out.
@@ -160,6 +169,10 @@ local function buildConfigTable()
             followPath = CFG.followPath,
             loopPath = CFG.loopPath,
             waypointClearRadius = CFG.waypointClearRadius,
+            macroMode = MC.mode,
+            macroLoop = CFG.macroLoop,
+            macroShowRoute = CFG.macroShowRoute,
+            macroRecordBind = MC.recordBind.Name,
             abilityRadiusEnabled = CFG.abilityRadiusEnabled,
             abilityRadius = CFG.abilityRadius,
             showAbilityRadius = CFG.showAbilityRadius,
@@ -262,6 +275,16 @@ local function loadConfig()
         if combat.recoveryEnabled ~= nil then
             CFG.recoveryEnabled = combat.recoveryEnabled == true
         end
+        if combat.macroMode == "macro" or combat.macroMode == "legacy" then
+            MC.mode = combat.macroMode
+        end
+        if combat.macroLoop ~= nil then CFG.macroLoop = combat.macroLoop == true end
+        if combat.macroShowRoute ~= nil then CFG.macroShowRoute = combat.macroShowRoute == true end
+        if type(combat.macroRecordBind) == "string" then
+            -- Enum.KeyCode[name] throws on a bad name rather than returning nil.
+            local ok, keyCode = pcall(function() return Enum.KeyCode[combat.macroRecordBind] end)
+            if ok and keyCode then MC.recordBind = keyCode end
+        end
     end
 
     local visuals = data.visuals
@@ -360,6 +383,7 @@ local function loadConfig()
                 RT.mapData[code] = {
                     waypath = type(entry.waypath) == "table" and entry.waypath or {},
                     keep = type(entry.keep) == "table" and entry.keep or {},
+                    macros = type(entry.macros) == "table" and entry.macros or {},
                 }
             end
         end
