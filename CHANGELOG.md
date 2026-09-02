@@ -11,6 +11,38 @@ file and that table in sync on every edit.
 
 ---
 
+## 3.6.2 - 2026-09-02
+
+### Why it stood still
+Nothing was disabling **Roblox's default control module**. It calls
+`Humanoid:Move(...)` every frame from player input — with no keys held, that is
+`Move(Vector3.zero)` — on **RenderStepped, before physics**. Our call lands on
+Heartbeat, *after*. So the control script's "stop" is what physics actually
+acts on, and both `steer` and `velocity` were overruled every single frame.
+
+`MoveTo` survived only because it is a separate, persistent mechanism the
+control module does not clobber. That is the whole reason walking "worked" and
+the two supposedly-better modes did not.
+
+### Tween is the default
+Writing the root's CFrame is the one path the Humanoid does not mediate, so the
+control module cannot argue with it. It is also, as you said, simply what the
+other script is doing.
+
+Two things make it behave:
+
+- **Capped to walking speed.** Each step is at most `WalkSpeed * frameDelta`, so
+  the displacement a server sees is ordinary walking — there is no
+  teleport-sized jump to notice.
+- **Collision-checked.** Every step is raycast first and stopped short of
+  whatever it hits, and if the character is flat against something the Humanoid
+  takes over, because it knows how to slide along a wall and step over a lip.
+  **Clipping through geometry is the one genuinely conspicuous thing about
+  moving this way**, and it is now impossible rather than merely unlikely.
+
+The Move-based modes take the player's controls while they run and hand them
+straight back when they stop.
+
 ## 3.6.1 - 2026-09-02
 
 ### Fixing the regression 3.6.0 shipped

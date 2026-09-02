@@ -267,6 +267,7 @@ local function buildConfigTable()
             threatWeight = CFG.threatWeight,
             threatMoveAt = CFG.threatMoveAt,
             moveMode = CFG.moveMode,
+            moveTakeControls = CFG.moveTakeControls,
             moveArriveRadius = CFG.moveArriveRadius,
             adaptiveLookahead = CFG.adaptiveLookahead,
             threatWallWeight = CFG.threatWallWeight,
@@ -442,6 +443,7 @@ local function applyConfigData(data)
             CFG.moveMode = mode
         end
         CFG.moveArriveRadius = tonumber(combat.moveArriveRadius) or CFG.moveArriveRadius
+        if combat.moveTakeControls ~= nil then CFG.moveTakeControls = combat.moveTakeControls == true end
         if combat.adaptiveLookahead ~= nil then CFG.adaptiveLookahead = combat.adaptiveLookahead == true end
         CFG.threatWallWeight = tonumber(combat.threatWallWeight) or CFG.threatWallWeight
         CFG.threatEnclosureWeight = tonumber(combat.threatEnclosureWeight) or CFG.threatEnclosureWeight
@@ -860,7 +862,7 @@ local RECOMMENDED_CLONE = {
 local function applySimpleClone()
     -- Ground truth and precision: keep.
     CFG.usePrecast = true
-    CFG.moveMode = "steer"
+    CFG.moveMode = "tween"
     CFG.moveArriveRadius = 1.2
     CFG.threatProbeRadius = 0
     CFG.threatMargin = 0.4
