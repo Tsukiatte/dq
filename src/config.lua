@@ -249,6 +249,9 @@ local function buildConfigTable()
             cloneAutoRings = CFG.cloneAutoRings,
             cloneRingSpacing = CFG.cloneRingSpacing,
             pathfindingEnabled = CFG.pathfindingEnabled,
+            attackMethod = CFG.attackMethod,
+            autoClickEnabled = CFG.autoClickEnabled,
+            clickAtCursor = CFG.clickAtCursor,
             usePrecast = CFG.usePrecast,
             showPrecast = CFG.showPrecast,
             safeZoneEnabled = CFG.safeZoneEnabled,
@@ -404,6 +407,11 @@ local function applyConfigData(data)
         CFG.cloneRingSpacing = tonumber(combat.cloneRingSpacing) or CFG.cloneRingSpacing
         if combat.cloneAutoRings ~= nil then CFG.cloneAutoRings = combat.cloneAutoRings == true end
         if combat.pathfindingEnabled ~= nil then CFG.pathfindingEnabled = combat.pathfindingEnabled == true end
+        if combat.attackMethod == "auto" or combat.attackMethod == "tool" or combat.attackMethod == "click" then
+            CFG.attackMethod = combat.attackMethod
+        end
+        if combat.autoClickEnabled ~= nil then CFG.autoClickEnabled = combat.autoClickEnabled == true end
+        if combat.clickAtCursor ~= nil then CFG.clickAtCursor = combat.clickAtCursor == true end
         if combat.usePrecast ~= nil then CFG.usePrecast = combat.usePrecast == true end
         if combat.showPrecast ~= nil then CFG.showPrecast = combat.showPrecast == true end
         if combat.safeZoneEnabled ~= nil then CFG.safeZoneEnabled = combat.safeZoneEnabled == true end

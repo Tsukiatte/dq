@@ -939,6 +939,24 @@ local function createControlUI()
     -- ------------------------------------------------------------------
     -- Navigation
     -- ------------------------------------------------------------------
+    local attackSection = K.section(autofarm.body, "Attacking", nextOrder(),
+        "How the basic attack is delivered.")
+    table.insert(legacySections, attackSection)
+    K.caption(attackSection.content,
+        "The weapon is a Tool whose Activated event the server handles, and Tool:Activate() raises it from the client - no cursor, so nothing to press by accident.", 1)
+    track(K.dropdown(attackSection.content, "Method", {
+        { value = "auto", label = "Auto - Activate, click if no tool" },
+        { value = "tool", label = "Tool only - never clicks" },
+        { value = "click", label = "Click only" },
+    }, function() return CFG.attackMethod end, function(v) CFG.attackMethod = v end, 2,
+        "Auto uses Tool:Activate() when a weapon is equipped and falls back to a click otherwise. Tool only never touches the mouse at all. Click only is the old behaviour."))
+    track(K.toggle(attackSection.content, "Allow auto-clicking",
+        function() return CFG.autoClickEnabled end, function(v) CFG.autoClickEnabled = v end, 3,
+        "Off means the script never synthesises a mouse click for anything. Turn it off if the bot is pressing buttons instead of swinging - with Method on Auto or Tool it will still attack."))
+    track(K.toggle(attackSection.content, "Click at the cursor",
+        function() return CFG.clickAtCursor end, function(v) CFG.clickAtCursor = v end, 4,
+        "Off sends any click to the middle of the screen instead of wherever your cursor is resting. Clicking at the cursor is what made the bot press whatever happened to be under it."))
+
     local navigation = K.section(autofarm.body, "Navigation", nextOrder(),
         "How it gets to things, and what it does when it cannot.")
     table.insert(legacySections, navigation)

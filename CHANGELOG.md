@@ -11,6 +11,34 @@ file and that table in sync on every edit.
 
 ---
 
+## 3.2.3 - 2026-09-02
+
+### Attacking without the mouse
+The basic attack was a synthetic click **at the cursor's current position** — so
+it pressed whatever the cursor happened to be resting on, which was regularly
+one of the buttons.
+
+There is a proper way to do this. The weapon is a `Tool`, its `Activated` event
+is handled on the server, and **`Tool:Activate()` raises that same event
+straight from the client**. No cursor, nothing to press by accident, and no
+fight with the player over where the mouse is pointing.
+
+**Method** (in the new Attacking section):
+- **Auto** — `Tool:Activate()` when a weapon is equipped, click if not. Default.
+- **Tool only** — never touches the mouse under any circumstances.
+- **Click only** — the old behaviour, kept for anything Activate does not drive.
+
+Two more switches:
+- **Allow auto-clicking** — off means the script never synthesises a click for
+  anything. With Method on Auto or Tool it still attacks perfectly well.
+- **Click at the cursor** — off by default now. Any click that does happen goes
+  to the middle of the viewport instead, which is clear of the interface.
+
+The detected attack remote is still deliberately not fired. Its argument
+signature is unknown, and replaying it with guessed arguments either does
+nothing or risks a malformed-remote kick — `Activate` gets the same result
+through a supported path.
+
 ## 3.2.2 - 2026-09-02
 
 ### Walls are threats
