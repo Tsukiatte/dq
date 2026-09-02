@@ -11,6 +11,39 @@ file and that table in sync on every edit.
 
 ---
 
+## 2.10.0 - 2026-09-02 - "Profiles"
+Two new panels.
+
+### Configs
+- **Save the whole setup under a name, as many as you like.** Type a name,
+  press the tick, and every current setting is snapshotted. Click a row to load
+  it back, the pencil renames, the bin deletes, and each row shows when it was
+  saved.
+- Loading is the row itself rather than a third icon, because it is the thing
+  you do most and the design has two icons.
+- Saving under a name that already exists **overwrites** it, which is what you
+  want when you are tuning one setup rather than accumulating near-duplicates.
+- They live in their own `DungeonAutofarm_configs.json`, so the working config
+  stays one small readable file.
+- To make this possible `loadConfig` was split: `applyConfigData(data)` does the
+  applying, and `loadConfig` is now just the file read in front of it. A stored
+  profile goes through the same path a file load does.
+
+### Modules
+- **Turns each panel on and off.** Autofarm, Routes & Data, User, Configs and
+  the HUD. A panel switched off stays off when you next open the interface.
+- **A square toggle**, deliberately a different shape from the pill used for
+  settings: a pill reads as a setting, and these are not settings - they decide
+  whether a thing is on screen at all. On takes the accent gradient, off greys
+  out.
+- **The Modules panel is not in its own list.** Hiding the thing that unhides
+  everything else is a door that locks behind you.
+
+### Also
+- **Window positions are clamped into the viewport.** The defaults are laid out
+  for a wide screen; on a small one a window could previously open past the edge
+  where there was no titlebar left to drag it back by.
+
 ## 2.9.0 - 2026-09-02 - "Clone"
 Clone evasion: a third mode beside Legacy and Macro.
 

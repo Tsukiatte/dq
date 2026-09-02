@@ -93,6 +93,10 @@ local saveConfig = S.saveConfig
 local loadConfig = S.loadConfig
 local syncStreamerToggleWidget = S.syncStreamerToggleWidget
 local setCurrentMap = S.setCurrentMap
+local saveNamedConfig = S.saveNamedConfig
+local loadNamedConfig = S.loadNamedConfig
+local deleteNamedConfig = S.deleteNamedConfig
+local renameNamedConfig = S.renameNamedConfig
 local MAP_CODES = S.MAP_CODES
 local MAP_LABELS = S.MAP_LABELS
 
@@ -418,9 +422,31 @@ local function createControlUI()
         position = UDim2.fromOffset(24, 24), visible = false,
         info = "Everything the bot does while it is running. Sections stay collapsed until you open them.",
     })
+    -- Windows are laid out for a wide screen and dragged from there, but a
+    -- position off the edge of a small one is a window you cannot reach to
+    -- drag. Every default gets clamped into the actual viewport.
+    local viewportX = (camera and camera.ViewportSize.X) or 1600
+    local function place(x, y, w, h)
+        return UDim2.fromOffset(
+            math.clamp(x, 8, math.max(8, viewportX - w - 8)),
+            math.clamp(y, 8, math.max(8, viewportY - h - 8)))
+    end
+
     local account = K.window(gui, {
         name = "Account", title = "User", width = 310, height = 172,
-        position = UDim2.fromOffset(716, 24), visible = false,
+        position = place(716, 24, 310, 172), visible = false,
+    })
+
+    local configs = K.window(gui, {
+        name = "Configs", title = "Configs", width = 310, height = 360,
+        position = place(716, 214, 310, 360), visible = false,
+        info = "Saved setups. Each one is a complete snapshot of every setting, kept in its own file so it survives between sessions.",
+    })
+
+    local modules = K.window(gui, {
+        name = "Modules", title = "Modules", width = 260, height = 260,
+        position = place(1040, 24, 260, 260), visible = false,
+        info = "Which panels appear when you open the interface. This one always does - hiding the thing that unhides everything else would be a door that locks behind you.",
     })
 
     local routes = K.window(gui, {
@@ -500,6 +526,91 @@ local function createControlUI()
     end, "There is no account system yet, so this only closes the interface. It is here for when there is one.")
     accountButtons.add("Detach", "danger", destructScript,
         "Unload the script completely: stops both loops, puts the world back the way it was and removes the interface.")
+
+    -- ------------------------------------------------------------------
+    -- Configs: save the whole setup under a name, as many as you like.
+    -- ------------------------------------------------------------------
+    local configList
+    K.textField(configs.body, "type name", function(name)
+        local ok, why = saveNamedConfig(name)
+        setMovementState(ok and ("saved config '" .. name .. "'") or ("save failed: " .. tostring(why)))
+    end, 1, "Type a name and press the tick to save every current setting under it. An existing name is overwritten.")
+    configList = K.list(configs.body, 240, 2)
+
+    S.refreshConfigPanel = function()
+        if not configList.Parent then return end
+        for _, child in ipairs(configList:GetChildren()) do
+            if child:IsA("GuiObject") then child:Destroy() end
+        end
+        if #RT.configs == 0 then
+            local l = K.label(configList, "Nothing saved yet. Name your current setup above and press the tick.", "captionSub", 1)
+            l.Size = UDim2.new(1, 0, 0, 32)
+            l.TextWrapped = true
+            return
+        end
+        for i, entry in ipairs(RT.configs) do
+            local stamp = entry.savedAt > 0
+                and os.date("%m/%d/%Y : %H:%M", entry.savedAt) or "unsaved"
+            local row = K.listEntry(configList, entry.name, stamp, i, 2)
+            K.tip(row.frame, "Click to load this config. The pencil renames it, the bin deletes it.")
+
+            -- Loading is the thing you do most, so it is the whole row rather
+            -- than a third icon competing with the two in the design.
+            row.frame.Active = true
+            row.frame.InputBegan:Connect(function(input)
+                if input.UserInputType ~= Enum.UserInputType.MouseButton1
+                    and input.UserInputType ~= Enum.UserInputType.Touch then return end
+                local ok, wantsStreamer = loadNamedConfig(i)
+                if ok then
+                    if wantsStreamer ~= SM.enabled then setStreamerEnabled(wantsStreamer) end
+                    refreshAllWidgets()
+                    setMovementState("loaded config '" .. entry.name .. "'")
+                end
+            end)
+
+            K.iconButton(row.actions, "edit", function()
+                -- Rename in place: the title label becomes a box.
+                local box = Instance.new("TextBox")
+                box.BackgroundColor3 = T.SurfaceField
+                box.BorderSizePixel = 0
+                box.Size = UDim2.new(1, 0, 0, 16)
+                box.Text = entry.name
+                box.TextColor3 = T.TextPrimary
+                box.TextSize = 12
+                box.TextXAlignment = Enum.TextXAlignment.Left
+                box.ClearTextOnFocus = false
+                box.LayoutOrder = 0
+                K.setFont(box, "sans", Enum.FontWeight.SemiBold)
+                box.Parent = row.title.Parent
+                K.corner(box, 4)
+                K.pad(box, 0, 4, 0, 4)
+                row.title.Visible = false
+                box:CaptureFocus()
+                box.FocusLost:Connect(function()
+                    renameNamedConfig(i, box.Text)
+                    S.refreshConfigPanel()
+                end)
+            end, 1, "Rename this config.")
+
+            K.iconButton(row.actions, "delete", function()
+                deleteNamedConfig(i)
+            end, 2, "Delete this config.")
+        end
+    end
+    S.refreshConfigPanel()
+
+    -- ------------------------------------------------------------------
+    -- Modules: which panels exist on screen.
+    -- ------------------------------------------------------------------
+    local panelToggles = {}
+    K.caption(modules.body,
+        "Switch a panel off and it stays off when you open the interface. This panel is always here, so there is always a way back.", 1)
+
+    local function panelToggle(label, order, get, set, explain)
+        local widget = track(K.squareToggle(modules.body, label, get, set, order, explain))
+        table.insert(panelToggles, widget)
+        return widget
+    end
 
     -- ------------------------------------------------------------------
     -- The island: which system is in charge. Legacy is the pathfinding and
@@ -1495,12 +1606,37 @@ local function createControlUI()
     -- Open and close
     -- ------------------------------------------------------------------
     local function setOpen(open)
-        autofarm.frame.Visible = open
-        routes.frame.Visible = open
-        account.frame.Visible = open
+        autofarm.frame.Visible = open and CFG.panelAutofarm
+        routes.frame.Visible = open and CFG.panelRoutes
+        account.frame.Visible = open and CFG.panelAccount
+        configs.frame.Visible = open and CFG.panelConfigs
+        modules.frame.Visible = open
         if not open then K.hideTip() end
     end
     S.setPanelsOpen = setOpen
+
+    -- Built here rather than beside the other panel code because flipping one
+    -- has to re-run setOpen, and setOpen has to exist first.
+    panelToggle("Autofarm", 2,
+        function() return CFG.panelAutofarm end,
+        function(v) CFG.panelAutofarm = v setOpen(true) end,
+        "The main window: combat, abilities, navigation, telegraphs, overlays.")
+    panelToggle("Routes & Data", 3,
+        function() return CFG.panelRoutes end,
+        function(v) CFG.panelRoutes = v setOpen(true) end,
+        "Maps, waypoints, macros, streamer mode and the live telegraph feed.")
+    panelToggle("User", 4,
+        function() return CFG.panelAccount end,
+        function(v) CFG.panelAccount = v setOpen(true) end,
+        "Your account card, and Detach.")
+    panelToggle("Configs", 5,
+        function() return CFG.panelConfigs end,
+        function(v) CFG.panelConfigs = v setOpen(true) end,
+        "Saved setups.")
+    panelToggle("HUD", 6,
+        function() return CFG.showHud end,
+        function(v) CFG.showHud = v end,
+        "The panel in the bottom-left corner. Unlike the rest it stays on screen with the interface closed - it is the only thing that does.")
     table.insert(sliderConnections, UserInputService.InputBegan:Connect(function(input, processed)
         if processed then return end
         if input.KeyCode == Enum.KeyCode.RightShift then
