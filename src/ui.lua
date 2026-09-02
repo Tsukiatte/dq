@@ -653,6 +653,16 @@ local function createControlUI()
     end
     S.refreshPrecastPanel()
 
+    local hitLabel = K.label(attacks.body, "No hits taken yet.", "captionSub", 7.45)
+    hitLabel.Size = UDim2.new(1, 0, 0, 30)
+    hitLabel.TextWrapped = true
+    S.refreshHitPanel = function()
+        if not hitLabel.Parent then return end
+        hitLabel.Text = HZ.lastHitName
+            and ("Last hit: next to '" .. tostring(HZ.lastHitName) .. "'. Every hit is written into the capture, and an unknown culprit is learned.")
+            or "No hits taken yet."
+    end
+
     K.caption(attacks.body,
         "If an attack is going unnoticed, record a fight and send the file. A place file says what exists in storage; this says what actually spawned, what it was called, and what the script decided about it.", 7.5)
     track(K.toggle(attacks.body, "Record what spawns",
@@ -1176,6 +1186,13 @@ local function createControlUI()
         0, 3, true,
         function() return CFG.dodgeProbe end, function(v) CFG.dodgeProbe = v end, 12,
         "How wide it believes you are when testing a spot. The root part is what the game damages against; probing with the whole body makes narrow gaps read as closed."))
+    track(K.slider(cloneSection.content, "Corner penalty", "Cost of a spot with a wall behind it",
+        0, 1, true,
+        function() return CFG.dodgeCornerCost end, function(v) CFG.dodgeCornerCost = v end, 12.5,
+        "A spot you cannot keep fleeing from is a pocket. This is how much it costs in proportion to how little room lies beyond it - what stops the character reversing into a corner or a prop and staying there."))
+    track(K.toggle(cloneSection.content, "Show search range",
+        function() return CFG.dodgeShowRange end, function(v) CFG.dodgeShowRange = v end, 12.7,
+        "Draw the ring the outer candidates sit on, so you can tell nowhere-was-safe from it-was-not-looking-far-enough."))
     track(K.toggle(cloneSection.content, "Show field",
         function() return CFG.dodgeShowField end, function(v) CFG.dodgeShowField = v end, 13,
         "Draw the candidate points, green through yellow to red by danger."))

@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 4.0.0
+    VERSION : 4.1.0
     BUILD   : 2026-09-01
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "4.0.0"
+local SCRIPT_VERSION = "4.1.0"
 local SCRIPT_BUILD_DATE = "2026-09-01"
-local SCRIPT_CODENAME = "The box"
+local SCRIPT_CODENAME = "Ground truth, all the way down"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "4.1.0", date = "2026-09-02", notes = "Most attacks were being dropped one line after being detected. 3.4.0 made classification structural so the invisible hitBox that actually damages you became a candidate - and the per-frame scan had its own transparency gate that threw it out again every frame. The precast showed, the precast faded, and the damage volume underneath was never dodged. Parts the game says are attacks are stamped as ground truth at classification and exempt from that gate. Creature body parts were reaching the appearance scorer whenever they sat inside a nested gear Model, because the creature check looked only at the nearest Model; it walks every ancestor now. Every hit names what was next to you, writes it into the capture, and learns an unknown culprit by its model name, so damage teaches detection again. The dodge charges extra for a spot with a wall right behind it - a pocket you cannot keep fleeing from - which is what stops the character reversing into a corner or a prop. And the search range is drawn as a ring." },
     { version = "4.0.0", date = "2026-09-02", notes = "The dodge is rebuilt from scratch around the thing that actually works in a few hundred lines: a box that is never in danger, and a character that follows it. clone.lua and threat.lua are gone - the 900-cell grid, the heat field, the space-time A*, the enclosure, cover, depth, freshness, hysteresis and slicing passes, and seventy-nine settings with them. What remains is 1009 lines across dodge, mover and precast. A few dozen points around the character are checked twenty times a second for what lands on the way there and what lands once you stop, at the moments those things happen, using exact geometry and timing for announced attacks, the footprint for physical ones, a swept segment for anything moving and a circle for every enemy. The box goes on the best point; the character goes to the box. There is no path: deciding every frame and moving exactly, the straight line is the path, and the on-the-way check is what keeps that line off anything that lands while you are on it. Ground truth detection, the precast listener and the collision-checked tween mover are kept unchanged." },
     { version = "3.6.2", date = "2026-09-02", notes = "Why steer and velocity both stood still: nothing was disabling Roblox's default control module. It calls Humanoid:Move every frame from input - with no keys held that is Move(zero) - on RenderStepped, BEFORE physics, while ours lands on Heartbeat after. Its stop is what physics sees. MoveTo survived only because it is a separate persistent mechanism. Tween is the default now, because writing the CFrame is the one path the control module cannot argue with, and it is what a script that tweens to a marker is doing. It is capped to the distance the character could actually have walked this frame, so the speed a server sees is ordinary walking speed, and each step is raycast so it never passes through anything - clipping through a wall is the one genuinely conspicuous thing about moving this way and it is now impossible. The Move-based modes take the player controls while they run and hand them straight back." },
     { version = "3.6.1", date = "2026-09-02", notes = "Fixes the regression 3.6.0 shipped. The new velocity mover wrote the horizontal velocity and then called Humanoid:Move(Vector3.zero) on the very next line - and Move(zero) is an instruction to BRAKE, which the Humanoid re-applies every physics step. The two fought and the Humanoid always wins, so the character stood still in the middle of attacks. Both must be told the same direction; then the Humanoid handles animation, footing and slopes while the direct write removes the acceleration ramp. The default is now steer, which is plain Humanoid:Move with a direction: it still fixes the arrival tolerance and the re-planning that made MoveTo miss, and it cannot stall because it is the Humanoid driving itself. And a watchdog - any mode that is asked to move and produces no movement for a second falls back to walk, so a mover bug can never again strand the character inside an attack." },
@@ -478,6 +479,14 @@ CFG.dodgeRayBudget = 12          -- candidates raycast per decision, cheapest fi
 CFG.dodgeManual = false          -- dodge only; you drive the rest
 CFG.dodgeShowField = true
 CFG.dodgeShowTarget = true
+CFG.dodgeShowRange = true        -- draw the ring the candidates sit inside
+-- A spot with a wall right behind it is a pocket. Continuing to flee from
+-- there is impossible, so it costs extra in proportion to how little room
+-- there is beyond it.
+CFG.dodgeCornerCost = 0.35
+-- Damage attribution: how far around you to look for the culprit on a hit.
+CFG.hitSearchRadius = 14
+CFG.hitLearnCooldown = 0.4
 CFG.colorDodgeTarget = Color3.fromRGB(255, 255, 255)
 CFG.colorDodgeSafe = Color3.fromRGB(60, 220, 120)
 CFG.colorDodgeDanger = Color3.fromRGB(255, 70, 70)
@@ -647,6 +656,14 @@ HZ.safeZones = {}
 HZ.diagnosed = setmetatable({}, { __mode = "k" })
 HZ.diagnoseLines = {}
 HZ.diagnoseCount = 0
+-- Parts the GAME says are attacks (structure or name), stamped at
+-- classification so the per-frame scan can exempt them from appearance
+-- tests. Weak keys: a destroyed part drops out on its own.
+HZ.groundTruth = setmetatable({}, { __mode = "k" })
+-- What was next to you each time you took damage. Newest last, capped.
+HZ.hitLog = {}
+HZ.lastHitAt = -math.huge
+HZ.lastHitName = nil
 -- What the safety tests actually iterate: single parts, plus one box for each
 -- dense cluster. Rebuilt with HZ.detected.
 HZ.volumes = {}
