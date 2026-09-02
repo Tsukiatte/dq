@@ -276,10 +276,14 @@ local function passiveBeam(angle)
     m.Parent = WS
     Debris:AddItem(m, 7.0)
     local t0 = tick()
+    -- The game's convention everywhere its client code shows it: the precast
+    -- is the warning, and it FADES at the instant the hit begins. The beam
+    -- then burns invisibly until 5.5 s. (An earlier version of this sim
+    -- faded at the end instead and taught the learner that beams arm at
+    -- 5.4 s.)
     if visible() and pc then
         pc.Transparency = 0.6
-        task.delay(1.5, function() if pc.Parent then pc.Color = Color3.fromRGB(255, 120, 0) pc.Transparency = 0.2 end end)
-        task.delay(5.5, function() if pc.Parent then pc.Transparency = 1 end end)
+        task.delay(1.5, function() if pc.Parent then pc.Transparency = 1 end end)
     end
     if hb then addLive(hb, 150, "passive beam", t0 + 1.5, t0 + 5.5) end
 end

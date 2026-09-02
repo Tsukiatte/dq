@@ -11,6 +11,16 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.9.6 - 2026-09-02
+
+A hit that lands after an attack's warning has faded (and the fade marked it
+over) means the attack keeps hurting after its warning - the passive beams
+burn for four seconds after the precast goes. Such attacks are remembered by
+name (`armLongLived`, saved); their fade no longer ends them, only the learned
+window, a removed hitBox or the Model going away. The harness simulator was
+corrected to the game's convention (precast fades **at** the hit) after it
+was caught teaching the learner that beams arm at 5.4 s.
+
 ## 4.9.5 - 2026-09-02
 
 Every `HIT` block in the capture now carries a `DODGE` line: danger reading,
