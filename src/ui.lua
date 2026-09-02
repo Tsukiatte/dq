@@ -49,6 +49,9 @@ local refreshLowDetail = S.refreshLowDetail
 local clearKeepList = S.clearKeepList
 local removeAttackRecord = S.removeAttackRecord
 local addZoneDef = S.addZoneDef
+local acceptRecommendation = S.acceptRecommendation
+local rejectRecommendation = S.rejectRecommendation
+local clearRecommendations = S.clearRecommendations
 local removeZoneDef = S.removeZoneDef
 local clearZonePreview = S.clearZonePreview
 local clearAttackBook = S.clearAttackBook
@@ -180,6 +183,7 @@ local function destructScript()
     setPathEditEnabled(false)
     stopMacroSubsystem()
     S.setCloneActive(false)
+    clearRecommendations()
     -- Through setLowDetailEnabled, so the mode flag is cleared first and the
     -- effect restore is not immediately undone.
     setLowDetailEnabled(false)
@@ -499,8 +503,8 @@ local function createControlUI()
 
     local attacks = K.window(gui, {
         onPinChanged = onPinChanged,
-        name = "Attacks", title = "Attacks", width = 330, height = 560,
-        position = place(1040, 300, 330, 560), visible = false,
+        name = "Attacks", title = "Attacks", width = 330, height = 720,
+        position = place(1040, 300, 330, 720), visible = false,
         info = "Everything about this map's attacks: freeze them so you can point at one, add it to the book, and draw a hazard around a decoration that only announces one.",
     })
 
@@ -617,10 +621,62 @@ local function createControlUI()
         end, 1,
         "The attack book and the drawn zones below belong to this dungeon. Switching here switches everything else too."))
 
+    -- Recommendations: the scorer puts its candidates forward, you answer.
     K.caption(attacks.body,
-        "An attack only exists on screen for a fraction of a second. Freeze holds a copy of every one that appears so you can take your time pointing at it.", 2)
+        "It puts forward what it thinks is an attack, held in the world in its own colour with a number on it. Tick if it is one, cross if it only looks like one. The entry stays after the attack is gone.", 2)
+    track(K.toggle(attacks.body, "Recommend candidates",
+        function() return CFG.recommendEnabled end, function(v) CFG.recommendEnabled = v end, 3,
+        "Off stops new ones being put forward. The list keeps what is already in it."))
+    track(K.slider(attacks.body, "Rate", "Recommendations per second",
+        0.2, 5, true,
+        function() return CFG.recommendRate end, function(v) CFG.recommendRate = v end, 4,
+        "How fast new candidates arrive. Nearest first, one at a time, never one already in the book or already answered."))
+    track(K.slider(attacks.body, "List size", "Entries kept at once",
+        3, 12, false,
+        function() return CFG.recommendMax end, function(v) CFG.recommendMax = v end, 5,
+        "Once the list is full nothing new arrives until you answer something or an old entry expires."))
+    local recommendList = K.list(attacks.body, 210, 6)
+    local recommendButtons = K.buttonRow(attacks.body, 7)
+    recommendButtons.add("Clear list", "ghost", function() clearRecommendations() end,
+        "Drop every entry without answering. Nothing is learned or rejected.")
 
-    local attackPickers = K.buttonRow(attacks.body, 3)
+    S.refreshRecommendPanel = function()
+        if not recommendList.Parent then return end
+        for _, child in ipairs(recommendList:GetChildren()) do
+            if child:IsA("GuiObject") then child:Destroy() end
+        end
+        if #HZ.recommendations == 0 then
+            local l = K.label(recommendList,
+                CFG.recommendEnabled and "Waiting for something that looks like an attack."
+                    or "Recommendations are off.", "captionSub", 1)
+            l.Size = UDim2.new(1, 0, 0, 32)
+            l.TextWrapped = true
+            return
+        end
+        local now = os.clock()
+        for i, entry in ipairs(HZ.recommendations) do
+            local state = entry.gone and string.format("gone %.0fs ago", now - entry.gone)
+                or string.format("live, %.0f studs", entry.distance or 0)
+            local meta = string.format("%s%s%s", state,
+                entry.parentName ~= "" and ("  -  in " .. entry.parentName) or "",
+                entry.moving and "  -  moving" or "")
+            local row = K.listEntry(recommendList, string.format("#%d  %s", entry.index, entry.name),
+                meta, i, 2, 46, entry.color)
+            K.tip(row.frame, entry.melee
+                and "Inside a creature model: this is its swing hitbox. Ticking it adds it OFF, so the bot does not run from every enemy."
+                or "Tick: it is an attack, add it to this map's book. Cross: it only looks like one, never dodge or ask again.")
+            K.iconButton(row.actions, "check", function() acceptRecommendation(i) end, 1,
+                "Yes - this is an attack.")
+            K.iconButton(row.actions, "cross", function() rejectRecommendation(i) end, 2,
+                "No - it only looks like one.")
+        end
+    end
+    S.refreshRecommendPanel()
+
+    K.caption(attacks.body,
+        "Or by hand: Freeze holds a copy of every attack that appears, so one that lasts half a second can be pointed at.", 8)
+
+    local attackPickers = K.buttonRow(attacks.body, 9)
     local freezeButton2, pickButton2, zoneButton
     syncAttackButtons = function()
         local pickOn = HZ.pickerEnabled and not HZ.ownPickerEnabled and not LD.pickerEnabled and not ZN.pickerEnabled
@@ -652,16 +708,16 @@ local function createControlUI()
 
     local shapeDropdown = track(K.dropdown(attacks.body, "Zone shape", {
         { value = "circle" }, { value = "square" },
-    }, function() return ZN.draftShape end, function(v) ZN.draftShape = v end, 4,
+    }, function() return ZN.draftShape end, function(v) ZN.draftShape = v end, 10,
         "The shape drawn by the next drag. Circle suits a shockwave, square suits a floor tile."))
 
-    K.caption(attacks.body, "This map's attack book", 5)
-    local attackList = K.list(attacks.body, 190, 6)
-    local attackButtons = K.buttonRow(attacks.body, 7)
+    K.caption(attacks.body, "This map's attack book", 11)
+    local attackList = K.list(attacks.body, 170, 12)
+    local attackButtons = K.buttonRow(attacks.body, 13)
 
-    K.caption(attacks.body, "Zones drawn on this map", 8)
-    local zoneList = K.list(attacks.body, 130, 9)
-    local zoneButtons = K.buttonRow(attacks.body, 10)
+    K.caption(attacks.body, "Zones drawn on this map", 14)
+    local zoneList = K.list(attacks.body, 110, 15)
+    local zoneButtons = K.buttonRow(attacks.body, 16)
 
     S.refreshZonePanel = function()
         if not zoneList.Parent then return end
@@ -1103,7 +1159,7 @@ local function createControlUI()
     -- belongs with the pickers that fill it). These are the widgets it uses.
     local bookList = attackList
     local bookButtons = attackButtons
-    K.caption(attacks.body, "", 11)
+    K.caption(attacks.body, "", 17)
 
     S.refreshAttackBookPanel = function()
         if not bookList.Parent then return end

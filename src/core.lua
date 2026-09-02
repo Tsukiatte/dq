@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 2.13.0
+    VERSION : 2.14.0
     BUILD   : 2026-09-01
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "2.13.0"
+local SCRIPT_VERSION = "2.14.0"
 local SCRIPT_BUILD_DATE = "2026-09-01"
-local SCRIPT_CODENAME = "Floor"
+local SCRIPT_CODENAME = "Second opinion"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "2.14.0", date = "2026-09-02", notes = "Recommendations replace freeze-and-pick as the way to fill the Attack Book. The scorer puts forward what it currently believes is an attack, nearest first, one at a time at a rate you set, each held in the world in its own colour with a number on it and listed in the Attacks panel. Tick writes a book entry from the signature captured when it was put forward, so it works after the part is gone; cross is remembered per map and vetoes the name as a hazard, so the bot stops dodging it as well as stops asking. Entries outlive their part on purpose - that was the whole reason freeze existed. Freeze and the pickers remain underneath as the manual route." },
     { version = "2.13.0", date = "2026-09-02", notes = "Two testing switches at the top of Navigation: Pathfinding and Dodging. Off stops the bot driving your character with what it finds - it still finds it. Dodging moved here from Telegraphs so one setting has one control, and both are saved now (Dodging never was). Clone ring geometry fixed: the innermost ring sat at 55% of the radius, so widening the ring opened a hole around the character, and every ring got the same number of volumes, so the outer ring had gaps nearly twice as wide as the inner one. Now the first ring sits at a fixed inner radius, rings are added automatically so the gap between them stays about Ring spacing, and volumes are shared out by circumference." },
     { version = "2.12.0", date = "2026-09-02", notes = "Every window header has a pin beside the info circle. Grey when it is not pinned, accent when it is; a pinned window stays on screen after RightShift closes the rest, and is still draggable. Click it again and it goes back to hiding with everything else. Pins are remembered between sessions. The blur and dim stay tied to the interface rather than to any pinned window - dimming the whole game for one pinned readout would be absurd." },
     { version = "2.11.0", date = "2026-09-02", notes = "New Attacks panel: pick the map, freeze the attacks so a half-second telegraph can be pointed at, select one into the Attack Book, and draw a hazard around a decoration that only ANNOUNCES an attack - press on it, drag outwards, release, and every copy of that decoration carries one from then on. The Attack Book and the drawn zones are now stored PER MAP and survive between executions; a pre-2.11 global book is adopted into the current map. Clone gained a manual mode - the ring dodges for you and nothing else runs. Rings cap at 10 and volumes at 100. Opening the interface blurs and darkens the game behind it, both adjustable. List entries are laid out explicitly now; nested auto-layout had mangled them." },
@@ -384,6 +385,16 @@ CFG.targetHpRange = 150.0
 CFG.pathfindingEnabled = true
 CFG.dodgeEnabled = true
 
+-- Recommendations (2.14.0). Instead of freezing everything and hunting for
+-- the right part with the mouse, the scorer puts forward what it currently
+-- believes is an attack, one at a time, each held in the world in its own
+-- colour with a number on it, and you say yes or no from a list. Yes writes a
+-- book entry; no is remembered per map and vetoes the name outright.
+CFG.recommendEnabled = true
+CFG.recommendRate = 1.0          -- recommendations per second
+CFG.recommendMax = 8             -- entries kept in the list
+CFG.recommendTTL = 25.0          -- seconds an entry lingers after its part is gone
+
 -- Hand-drawn hazard zones (2.11.0). Some attacks are announced by a
 -- decoration that is not itself the damage - a rune on the floor, a glow - and
 -- no amount of appearance scoring will make a decal into a hitbox. So you point
@@ -653,6 +664,16 @@ RT.healthConnection = nil
 -- Freeze: held copies of attacks, so a telegraph can be pointed at after the
 -- real one has gone. Keyed on the original (weak, so a destroyed original does
 -- not pin the entry) - the copy itself is held in the array.
+-- Recommendations: { part, copy, sig, name, partName, parentName, color,
+-- index, since, gone }. `recommendedNames` stops the same attack being put
+-- forward twice while one entry for it is still in the list; `rejectedNames`
+-- is the per-map memory of every "no".
+HZ.recommendations = {}
+HZ.recommendedNames = {}
+HZ.rejectedNames = {}
+HZ.recommendFolder = nil
+HZ.lastRecommendTime = -math.huge
+HZ.recommendSerial = 0
 HZ.freezeEnabled = false
 HZ.frozenFolder = nil
 HZ.frozenOf = setmetatable({}, { __mode = "k" })
@@ -689,6 +710,7 @@ RT.pinnedWindows = {}
 -- dungeon, so they are keyed by map like the waypoints and the macros.
 RT.attackData = {}
 RT.zoneData = {}
+RT.rejectData = {}
 
 -- Clone evasion state (2.9.0).
 -- Macros (2.5.0). "legacy" = the hand-placed waypoint path; "macro" = recorded

@@ -1074,7 +1074,7 @@ end
 -- mangled two different things in this GUI (the HUD came apart, row labels were
 -- pushed off screen). Two labels and a row of icons do not need a layout engine
 -- to place them.
-local function listEntry(parent, title, meta, order, actionCount, height)
+local function listEntry(parent, title, meta, order, actionCount, height, accent)
     local n = actionCount or 2
     local actionsWidth = n * 24 + math.max(n - 1, 0) * 2
     local h = height or 46
@@ -1090,15 +1090,27 @@ local function listEntry(parent, title, meta, order, actionCount, height)
     corner(e, Theme.RadiusSm)
     stroke(e, Theme.Hairline, 1)
 
-    local textWidth = -(10 + actionsWidth + 16)
+    -- With an accent, a colour bar runs down the left edge and the text moves
+    -- over to make room; this is how a list entry says "the cyan one".
+    local textX = 10
+    if accent then
+        local bar = Instance.new("Frame")
+        bar.Name = "Accent"
+        bar.BackgroundColor3 = accent
+        bar.BorderSizePixel = 0
+        bar.Size = UDim2.new(0, 5, 1, 0)
+        bar.Parent = e
+        textX = 16
+    end
+    local textWidth = -(textX + actionsWidth + 16)
 
     local titleLabel = label(e, title, "rowEntry", 1)
-    titleLabel.Position = UDim2.fromOffset(10, 5)
+    titleLabel.Position = UDim2.fromOffset(textX, 5)
     titleLabel.Size = UDim2.new(1, textWidth, 0, 17)
     titleLabel.TextTruncate = Enum.TextTruncate.AtEnd
 
     local metaLabel = label(e, meta or "", "monoMeta", 2)
-    metaLabel.Position = UDim2.fromOffset(10, 24)
+    metaLabel.Position = UDim2.fromOffset(textX, 24)
     metaLabel.Size = UDim2.new(1, textWidth, 0, 14)
     metaLabel.TextTruncate = Enum.TextTruncate.AtEnd
 
@@ -1159,6 +1171,12 @@ local function iconButton(parent, kind, onClick, order, explain)
     elseif kind == "play" then
         piece(Theme.StatusGood, 3, 10, 10, 12, 0, 1)
         piece(Theme.StatusGood, 3, 10, 14, 12, 0, 1)
+    elseif kind == "check" then
+        piece(Theme.StatusGood, 3, 7, 9, 14, -45, 1)
+        piece(Theme.StatusGood, 3, 13, 14, 11, 45, 1)
+    elseif kind == "cross" then
+        piece(Theme.StatusBad, 3, 14, 12, 12, 45, 1)
+        piece(Theme.StatusBad, 3, 14, 12, 12, -45, 1)
     end
 
     if onClick then b.MouseButton1Click:Connect(onClick) end
