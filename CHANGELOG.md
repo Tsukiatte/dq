@@ -11,6 +11,31 @@ file and that table in sync on every edit.
 
 ---
 
+## 3.5.1 - 2026-09-02
+
+Two bugs in the day-old cover code, both found by watching a clip of the
+Midgardian Champion fight rather than by reading the code.
+
+### The cover ray was cast from the wrong place
+`TH.origin` picked the nearest enemy and then **overrode it** with the soonest
+announced zone. A radial fan is a dozen separate zones, and a ray from the
+middle of one beam to a cell says nothing about whether anything is shielding
+you — the beams converge on the **boss**, and that is the only origin that
+makes the question meaningful.
+
+The nearest enemy now wins outright; an announced zone is a fallback for when
+there is no enemy to blame.
+
+### Enclosure was fighting cover
+Pressing against the thing that is shielding you is the entire point of cover.
+But the enclosure pass counts **any solid neighbour as heat**, so it was shoving
+the bot back out from behind the pillar and into the open — which is exactly
+where the beams are.
+
+Covered cells are now largely exempt from the enclosure penalty. Two rules that
+were each right on their own and cancelled each other out in the one situation
+they both existed for.
+
 ## 3.5.0 - 2026-09-02 - "Space-time"
 
 ### Space-time A\*
