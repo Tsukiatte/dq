@@ -1146,6 +1146,14 @@ local function createControlUI()
         1, 8, true,
         function() return CFG.threatHorizon end, function(v) CFG.threatHorizon = v end, 7.2,
         "How far in advance an announced attack begins heating its area. It ramps up as impact approaches, so a marker firing in four seconds is barely warm and one firing now is lethal."))
+    track(K.slider(cloneSection.content, "Ramp sharpness", "How late an attack turns red",
+        1, 6, true,
+        function() return CFG.threatCurve end, function(v) CFG.threatCurve = v end, 7.25,
+        "A delayed attack is harmless until nearly landing, so it should read green through most of its wind-up and then redden hard. Higher keeps it green longer. At 2 it went lethal a whole second early, which turned every marker into a wall - and with attacks overlapping, walls everywhere means no route at all."))
+    track(K.slider(cloneSection.content, "Trust the future", "Weight on heat when you arrive",
+        0, 1, true,
+        function() return CFG.threatFutureBias end, function(v) CFG.threatFutureBias = v end, 7.26,
+        "How much the heat where you WILL be outweighs the heat where you land. High means it avoids squares that are cool now and hot in a moment, which is how you die standing still."))
     track(K.slider(cloneSection.content, "Edge shoulder", "Warm band outside a hazard",
         0, 16, true,
         function() return CFG.threatFalloff end, function(v) CFG.threatFalloff = v end, 7.3,
@@ -1155,7 +1163,11 @@ local function createControlUI()
         "A per-frame sideways shove out of the path of anything already in the air. The grid replans a few times a second, which is right for ground attacks and far too slow for a shot in flight."))
     track(K.toggle(cloneSection.content, "Heat gradient",
         function() return CFG.showThreatGradient end, function(v) CFG.showThreatGradient = v end, 7.5,
-        "Colour the discs green through amber to red by how hot they are, instead of only safe or unsafe."))
+        "Colour the discs by how hot they are - dark green, green, yellow-green, light yellow, dark yellow, orange, red - instead of only safe or unsafe."))
+    track(K.slider(cloneSection.content, "Colour bands", "Steps in the heat ramp",
+        3, 16, false,
+        function() return CFG.threatColorBands end, function(v) CFG.threatColorBands = v end, 7.55,
+        "Discrete steps rather than a smooth blend. Across several hundred discs a continuous ramp turns to mush; banding makes the edge between cooler and hotter ground visible, which is what you actually need to read."))
     track(K.colorRow(cloneSection.content, "Warm colour",
         function() return CFG.colorThreatWarm end, function(c) CFG.colorThreatWarm = c end, 7.6,
         "The middle of the gradient."))

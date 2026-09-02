@@ -307,12 +307,56 @@ local function positionCells(root)
     return true
 end
 
--- Green through orange to red, by heat. The gradient is the point: in a fan of
--- beams every cell is dangerous, and what matters is which is least so.
+-- The heat ramp: dark green through light green, light and dark yellow, orange,
+-- to red. Seven stops rather than two, because with several hundred discs on
+-- screen a two-stop blend cannot show the difference between "cool" and
+-- "coolest", and that difference is exactly what you need to see when nothing
+-- is truly safe.
+--
+-- Built from the three colours in the panel so the pickers still mean
+-- something: the cool end is your safe colour darkened, the middle is your warm
+-- colour lightened and plain, the hot end is your danger colour.
+local RAMP = {}
+local rampSignature = nil
+
+local function rebuildRamp()
+    local safe, warm, danger = CFG.colorCloneSafe, CFG.colorThreatWarm, CFG.colorCloneDanger
+    local black, white = Color3.new(0, 0, 0), Color3.new(1, 1, 1)
+    RAMP = {
+        safe:Lerp(black, 0.55),      -- 0.00 darkest green: the coolest ground
+        safe:Lerp(black, 0.25),      -- deep green
+        safe,                        -- green
+        safe:Lerp(warm, 0.5),        -- yellow-green
+        warm:Lerp(white, 0.4),       -- light yellow
+        warm,                        -- dark yellow
+        warm:Lerp(danger, 0.5),      -- orange
+        danger,                      -- red
+        danger:Lerp(black, 0.3),     -- 1.00 deep red: standing in it
+    }
+    rampSignature = tostring(safe) .. tostring(warm) .. tostring(danger)
+end
+
+local function heatColor(t)
+    if rampSignature ~= (tostring(CFG.colorCloneSafe) .. tostring(CFG.colorThreatWarm)
+        .. tostring(CFG.colorCloneDanger)) then
+        rebuildRamp()
+    end
+    -- Quantised into bands: adjacent cells with near-identical heat share a
+    -- colour, so the boundaries between hotter and cooler ground are visible
+    -- edges rather than an imperceptible drift.
+    local bands = math.max(math.floor(CFG.threatColorBands), 2)
+    local band = math.floor(math.clamp(t, 0, 1) * (bands - 1) + 0.5) / (bands - 1)
+    local pos = band * (#RAMP - 1)
+    local i = math.floor(pos)
+    local frac = pos - i
+    local a = RAMP[i + 1] or RAMP[#RAMP]
+    local b = RAMP[i + 2] or RAMP[#RAMP]
+    return a:Lerp(b, frac)
+end
+
 local function paintCells()
     local visible = CFG.showClones
     local safeColor, dangerColor, pathColor = CFG.colorCloneSafe, CFG.colorCloneDanger, CFG.colorClonePath
-    local warmColor = CFG.colorThreatWarm
     local trailColor = pathColor:Lerp(Color3.new(1, 1, 1), 0.3)
     local lethal = math.max(CFG.threatLethal, 1)
 
@@ -328,14 +372,7 @@ local function paintCells()
             elseif cell.onPath then
                 color = trailColor
             elseif CFG.showThreatGradient then
-                -- Two stops so the middle of the range is visibly amber rather
-                -- than a muddy blend of green and red.
-                local t = math.clamp((cell.threat or 0) / lethal, 0, 1)
-                if t < 0.5 then
-                    color = safeColor:Lerp(warmColor, t * 2)
-                else
-                    color = warmColor:Lerp(dangerColor, (t - 0.5) * 2)
-                end
+                color = heatColor((cell.threat or 0) / lethal)
             elseif cell.threat >= lethal then
                 color = dangerColor
             else
@@ -523,7 +560,12 @@ local function bestGoal(root)
     for k, cell in ipairs(CL.cells) do
         if cell.standable then
             local travel = Vector3.new(cell.x - rootPos.X, 0, cell.z - rootPos.Z).Magnitude
-            local score = math.max(cell.threat, cell.threatLater) * CFG.threatWeight
+            -- Blend rather than max, biased to the future: standing on a cell
+            -- that is cool now and hot in a moment is how you die on the spot.
+            -- A cell whose heat is FALLING scores better than one merely cool.
+            local bias = CFG.threatFutureBias
+            local expected = cell.threat * (1 - bias) + cell.threatLater * bias
+            local score = expected * CFG.threatWeight
                 + travel * 0.35
                 - cell.depth * CFG.cloneDepthBonus
             if score < bestScore then bestK, bestScore = k, score end
@@ -576,8 +618,15 @@ local function runCloneEvasion(humanoid, root)
         end
     end
 
+    -- With attacks overlapping and nowhere actually safe, committing to a
+    -- destination for a third of a second is the wrong shape of decision: the
+    -- field is changing faster than that. Saturated, it re-picks every pass and
+    -- simply flows downhill, which is what keeps you alive when there is no
+    -- exit - you are never in the hottest place for long.
+    local saturated = CL.safeCount == 0
+    local commit = saturated and 0 or CFG.cloneCommitTime
     local stale = not goalK
-        or (now - CL.goalAt) >= CFG.cloneCommitTime
+        or (now - CL.goalAt) >= commit
         or CL.cells[goalK].threat >= CFG.threatLethal
     if stale then
         goalK = bestGoal(root)

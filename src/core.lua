@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 3.1.1
+    VERSION : 3.1.2
     BUILD   : 2026-09-01
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "3.1.1"
+local SCRIPT_VERSION = "3.1.2"
 local SCRIPT_BUILD_DATE = "2026-09-01"
 local SCRIPT_CODENAME = "Heat"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "3.1.2", date = "2026-09-02", notes = "A delayed attack is harmless until it nearly lands, and the squared urgency ramp did not say that - it went lethal a FULL SECOND before impact, which quietly turned every marker into a wall. With attacks overlapping, walls everywhere means no route at all; a gradient always leaves somewhere to flow to. The ramp is now cubed and adjustable, so a marker reads green through most of its wind-up and reddens hard at the end. Goal choice weights the heat where you WILL be over the heat where you land, because a square that is cool now and hot in a moment is a trap. And when nothing is safe at all it stops committing to a destination and simply flows downhill every pass, which is the behaviour that survives a saturated field. The discs are a nine-band ramp now - dark green, green, yellow-green, light yellow, dark yellow, orange, red - because across hundreds of discs a two-stop blend cannot show the difference between cool and coolest." },
     { version = "3.1.1", date = "2026-09-02", notes = "Two fixes. A projectile is a line through space and time, not a place: a moving hazard now heats the whole corridor it is about to sweep, weighted by whether it arrives there about when you would, so the ground in front of an oncoming shot stops reading as perfectly cool. Tornadoes and other slow drifters count too, at a much lower speed bar than the sidestep reflex uses. And the bigger one - entering evasion at all was still decided by the OLD binary test, so a heat-40 square was called safe and the bot skipped dodging entirely to go pursue an enemy through it. The field was being computed and then ignored for the one decision that matters. In Clone mode any heat at or above Move at heat now means relocate." },
     { version = "3.1.0", date = "2026-09-02", notes = "Safety stops being a yes or no and becomes heat: a number from 0 to 100 at a point AND at a moment, so the same square is cool now and lethal in a second. In a fan of radial beams every square is unsafe, a boolean leaves the search nothing to choose between, and the character stands still and dies - a scalar field always has a least-bad answer and the gaps fall out of it for free. New ThreatManager combines announced attacks (exact geometry and impact time, ramped by an urgency curve), live hazards, enemy circles and inverted safe-spot markers. The grid search is now A* with F = G + H + threat*weight, where the weight is literally how many studs of detour one point of heat is worth; cells above the lethal threshold are impassable, and if every route crosses one it re-runs allowing them rather than standing still. Projectile steering sits underneath as a per-frame reflex, shoving sideways out of the path of anything already in the air. Discs are drawn as a green-amber-red gradient." },
     { version = "3.0.5", date = "2026-09-02", notes = "Attacks built from hundreds of meshes no longer melt the frame. A dense group of parts under one model collapses into the single box it effectively is - nobody threads between the meshes of a lava pool - so the safety tests run against a handful of volumes rather than every part, and highlights and name tags are capped to the nearest few instead of drawing three hundred BillboardGuis. Chasing also keeps its distance now: the grid drew a circle around every enemy and called it unsafe, then the pursuit walked straight through it into melee using its own smaller stand-off, so the dodge kept its distance and the chase gave it back. Attack reach scales with the stand-off so it does not close the gap merely to swing." },
@@ -507,6 +508,14 @@ CFG.threatWeight = 2.6           -- studs of detour one point of heat is worth
 CFG.threatLethal = 55            -- at or above this a cell is impassable...
 CFG.threatDesperate = true       -- ...unless there is no path at all
 CFG.threatHorizon = 4.0          -- seconds ahead an announced attack starts to matter
+-- Shape of the ramp from "announced" to "landing". Higher stays cool longer and
+-- then reddens hard, which is what a delayed attack actually does: it is not
+-- dangerous at all until it nearly lands. Squared went lethal a full second
+-- early, which quietly turned every marker into a wall.
+CFG.threatCurve = 3.0
+-- How much the heat where you WILL be outweighs the heat where you arrive. A
+-- cell that is cool now and hot in a moment is a trap, not a destination.
+CFG.threatFutureBias = 0.65
 CFG.threatFalloff = 7.0          -- studs of warm shoulder outside a hazard edge
 CFG.threatMargin = 0.75          -- clearance added to the body before anything counts
 -- Any heat at or above this and the bot relocates. Deliberately low: standing
@@ -517,6 +526,10 @@ CFG.threatMoveAt = 6
 CFG.threatSweepEnabled = true
 CFG.threatSweepTime = 3.0        -- seconds of flight path treated as dangerous
 CFG.showThreatGradient = true    -- colour discs by heat rather than safe/unsafe
+-- Discrete bands rather than a continuous blend. Across several hundred discs a
+-- smooth ramp turns to mush; banding makes "this patch is cooler than that one"
+-- readable at a glance, which is the whole point of drawing it.
+CFG.threatColorBands = 9
 
 -- Projectile steering: the reflex under the grid, for things already in the air.
 CFG.dodgeProjectiles = true
