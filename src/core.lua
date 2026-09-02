@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 2.15.0
+    VERSION : 2.15.1
     BUILD   : 2026-09-01
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "2.15.0"
+local SCRIPT_VERSION = "2.15.1"
 local SCRIPT_BUILD_DATE = "2026-09-01"
 local SCRIPT_CODENAME = "Grid"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "2.15.1", date = "2026-09-02", notes = "Clone discs are sized from the character's real bounding footprint instead of the 2-stud root part, with a Disc size scale to match by eye. The safety test is given the same radius, so a green disc still means the whole footprint fits." },
     { version = "2.15.0", date = "2026-09-02", notes = "Clone mode moved from a ring to a dense grid anchored to the world, and the dodge became a search across it. Discs the size of your hitbox every 1.5 studs, overlapping, so a safe pocket a few studs wide between two boss attacks still shows up; green means your whole body fits there. The way out is found cell by cell: red cells cost twenty-five green ones to cross so they are crossed only when there is no way around, pits and walls are never crossed, and a depth pass lets it prefer the interior of a safe area over a single green cell about to close. The old ring checked the straight line for walls only and would run through a red strip to a green node behind it. Floor heights are cached per cell; walls are learned by trying. Also: the menu key is rebindable at the top of Modules, and a pinned window no longer stops the key from reopening the interface." },
     { version = "2.14.0", date = "2026-09-02", notes = "Recommendations replace freeze-and-pick as the way to fill the Attack Book. The scorer puts forward what it currently believes is an attack, nearest first, one at a time at a rate you set, each held in the world in its own colour with a number on it and listed in the Attacks panel. Tick writes a book entry from the signature captured when it was put forward, so it works after the part is gone; cross is remembered per map and vetoes the name as a hazard, so the bot stops dodging it as well as stops asking. Entries outlive their part on purpose - that was the whole reason freeze existed. Freeze and the pickers remain underneath as the manual route." },
     { version = "2.13.0", date = "2026-09-02", notes = "Two testing switches at the top of Navigation: Pathfinding and Dodging. Off stops the bot driving your character with what it finds - it still finds it. Dodging moved here from Telegraphs so one setting has one control, and both are saved now (Dodging never was). Clone ring geometry fixed: the innermost ring sat at 55% of the radius, so widening the ring opened a hole around the character, and every ring got the same number of volumes, so the outer ring had gaps nearly twice as wide as the inner one. Now the first ring sits at a fixed inner radius, rings are added automatically so the gap between them stays about Ring spacing, and volumes are shared out by circumference." },
@@ -467,6 +468,8 @@ CFG.cloneFloorRefresh = 3.0      -- seconds a cached floor height is trusted
 CFG.cloneFloorBudget = 150       -- floor raycasts per evaluation
 CFG.showClonePrisms = false      -- hundreds of prisms at boss density; off unless asked
 CFG.colorClonePath = Color3.fromRGB(80, 170, 255)
+-- Disc diameter as a multiple of the character's real footprint (2.15.1).
+CFG.cloneDiscScale = 1.0
 CFG.colorCloneSafe = Color3.fromRGB(60, 220, 120)
 CFG.colorCloneDanger = Color3.fromRGB(255, 70, 70)
 

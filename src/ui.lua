@@ -1154,6 +1154,10 @@ local function createControlUI()
         0.1, 1.5, true,
         function() return CFG.cloneCommitTime end, function(v) CFG.cloneCommitTime = v end, 9,
         "Holding a chosen goal briefly stops the character stuttering between two equally good regions. The path to it is re-planned constantly."))
+    track(K.slider(cloneSection.content, "Disc size", "Times your footprint",
+        0.5, 2, true,
+        function() return CFG.cloneDiscScale end, function(v) CFG.cloneDiscScale = v end, 15,
+        "1.0 is the width of your character with its limbs. The safety test uses the same radius, so a green disc means all of you fits."))
     track(K.toggle(cloneSection.content, "Show the grid",
         function() return CFG.showClones end, function(v) CFG.showClones = v end, 10,
         "Draw the discs. Turning them off keeps the dodging - only the drawing stops."))
