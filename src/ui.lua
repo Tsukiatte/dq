@@ -62,6 +62,15 @@ local removeAttackRecord = S.removeAttackRecord
 local clearAttackBook = S.clearAttackBook
 local invalidateAttackBook = S.invalidateAttackBook
 local describeRecord = S.describeRecord
+local LD = S.LD
+local MAP_CODES = S.MAP_CODES
+local MAP_LABELS = S.MAP_LABELS
+local setCurrentMap = S.setCurrentMap
+local setFreezeEnabled = S.setFreezeEnabled
+local clearFrozenParts = S.clearFrozenParts
+local setLowDetailEnabled = S.setLowDetailEnabled
+local clearKeepList = S.clearKeepList
+local refreshLowDetail = S.refreshLowDetail
 
 local function addCorner(instance, radius)
     local corner = Instance.new("UICorner")
@@ -587,6 +596,13 @@ local function destructScript()
     setPendingBindField(nil)
     setStreamerEnabled(false)
 
+    -- Put the world back before tearing anything down, or low detail would
+    -- leave the whole dungeon invisible (and its particles off) after the
+    -- script is gone. Through setLowDetailEnabled, so the mode flag is cleared
+    -- first and the effect restore is not immediately undone.
+    setLowDetailEnabled(false)
+    clearFrozenParts()
+
     -- Everything drawn in the world lives under this one folder.
     if RT.visualRoot then
         RT.visualRoot:Destroy()
@@ -609,7 +625,10 @@ end
 _G.DungeonAutofarmDestruct = destructScript
 
 local function createControlUI()
-    local bookPanel  -- Attack Book panel; built below, referenced by the buttons above it
+    -- Panels and cross-referencing helpers are built further down than the
+    -- buttons that open them, so they are declared here.
+    local bookPanel, mapPanel
+    local syncPickerButtons
     local playerGui = LocalPlayer:WaitForChild("PlayerGui")
     local oldGui = playerGui:FindFirstChild("DungeonAutofarmUI")
     if oldGui then oldGui:Destroy() end
@@ -910,6 +929,21 @@ local function createControlUI()
         return button
     end
 
+    -- Three across, for rows that hold a set of related pickers.
+    local function makeThirdButton(x, y)
+        local button = Instance.new("TextButton")
+        button.Size = UDim2.fromOffset(88, 32)
+        button.Position = UDim2.fromOffset(x, y)
+        button.BackgroundColor3 = Color3.fromRGB(180, 64, 64)
+        button.BorderSizePixel = 0
+        button.Font = Enum.Font.GothamBold
+        button.TextColor3 = Color3.fromRGB(255, 255, 255)
+        button.TextSize = 12
+        button.Parent = mainFrame
+        addCorner(button, 7)
+        return button
+    end
+
     UI.abilityRadiusButton = makeHalfButton(12, 298)
     UI.showAbilityRadiusButton = makeHalfButton(156, 298)
 
@@ -963,17 +997,13 @@ local function createControlUI()
     UI.renderPathButton.Parent = mainFrame
     addCorner(UI.renderPathButton, 7)
 
-    UI.renderHitboxButton = Instance.new("TextButton")
-    UI.renderHitboxButton.Size = UDim2.new(1, -24, 0, 32)
-    UI.renderHitboxButton.Position = UDim2.fromOffset(12, 667)
+    UI.renderHitboxButton = makeHalfButton(12, 667)
     UI.renderHitboxButton.BackgroundColor3 = Color3.fromRGB(52, 168, 83)
-    UI.renderHitboxButton.BorderSizePixel = 0
-    UI.renderHitboxButton.Font = Enum.Font.GothamBold
-    UI.renderHitboxButton.Text = "Render Player Hitbox: ON"
-    UI.renderHitboxButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    UI.renderHitboxButton.TextSize = 13
-    UI.renderHitboxButton.Parent = mainFrame
-    addCorner(UI.renderHitboxButton, 7)
+    UI.renderHitboxButton.Text = "Hitbox: ON"
+
+    UI.mapPanelButton = makeHalfButton(156, 667)
+    UI.mapPanelButton.BackgroundColor3 = Color3.fromRGB(78, 142, 232)
+    UI.mapPanelButton.Text = "Map & Detail"
 
     UI.wallDisplayButton = Instance.new("TextButton")
     UI.wallDisplayButton.Size = UDim2.fromOffset(132, 32)
@@ -1011,12 +1041,15 @@ local function createControlUI()
     UI.streamerPanelButton.Parent = mainFrame
     addCorner(UI.streamerPanelButton, 7)
 
-    -- Two pickers side by side: mark a telegraph the heuristics missed, or mark
-    -- one of your own ability effects so it is never treated as one (2.2.0).
-    UI.pickerButton = makeHalfButton(12, 781)
-    UI.pickerButton.Text = "Pick Telegraph: OFF"
-    UI.ownPickerButton = makeHalfButton(156, 781)
-    UI.ownPickerButton.Text = "Pick Own FX: OFF"
+    -- The picker row: mark a telegraph the heuristics missed, mark one of your
+    -- own ability effects so it is never treated as one, and freeze the world's
+    -- attacks so a half-second telegraph can actually be pointed at (2.4.0).
+    UI.pickerButton = makeThirdButton(12, 781)
+    UI.pickerButton.Text = "Pick Atk"
+    UI.ownPickerButton = makeThirdButton(106, 781)
+    UI.ownPickerButton.Text = "Pick Own"
+    UI.freezeButton = makeThirdButton(200, 781)
+    UI.freezeButton.Text = "Freeze"
 
     UI.debugButton = Instance.new("TextButton")
     UI.debugButton.Size = UDim2.new(1, -24, 0, 32)
@@ -1462,6 +1495,225 @@ local function createControlUI()
     end
     S.refreshAttackBookPanel()
 
+    -- Map & Detail panel (2.4.0): which dungeon's waypoints and keep list are
+    -- checked out, and the low-detail keep list itself.
+    mapPanel = Instance.new("Frame")
+    mapPanel.Name = "MapPanel"
+    mapPanel.Size = UDim2.fromOffset(300, 470)
+    mapPanel.Position = UDim2.new(0, 610, 0, 20)
+    mapPanel.BackgroundColor3 = Color3.fromRGB(25, 27, 34)
+    mapPanel.BorderSizePixel = 0
+    mapPanel.Active = true
+    mapPanel.Visible = false
+    mapPanel.Parent = RT.scriptGui
+    addCorner(mapPanel, 10)
+
+    local mapTitle = Instance.new("TextLabel")
+    mapTitle.Size = UDim2.new(1, -20, 0, 26)
+    mapTitle.Position = UDim2.fromOffset(12, 8)
+    mapTitle.BackgroundTransparency = 1
+    mapTitle.Font = Enum.Font.GothamBold
+    mapTitle.Text = "Map & Detail"
+    mapTitle.TextColor3 = Color3.fromRGB(120, 190, 255)
+    mapTitle.TextSize = 15
+    mapTitle.TextXAlignment = Enum.TextXAlignment.Left
+    mapTitle.Parent = mapPanel
+    makeDraggable(mapTitle, mapPanel)
+
+    -- Map picker: < CODE - Name >
+    local mapLabel = Instance.new("TextLabel")
+    mapLabel.Size = UDim2.fromOffset(200, 34)
+    mapLabel.Position = UDim2.fromOffset(50, 38)
+    mapLabel.BackgroundColor3 = Color3.fromRGB(35, 38, 47)
+    mapLabel.BorderSizePixel = 0
+    mapLabel.Font = Enum.Font.GothamBold
+    mapLabel.Text = "--"
+    mapLabel.TextColor3 = Color3.fromRGB(235, 237, 245)
+    mapLabel.TextSize = 13
+    mapLabel.Parent = mapPanel
+    addCorner(mapLabel, 6)
+
+    local function cycleMap(delta)
+        local index = 1
+        for i, code in ipairs(MAP_CODES) do
+            if code == RT.currentMap then index = i break end
+        end
+        index = ((index - 1 + delta) % #MAP_CODES) + 1
+        setCurrentMap(MAP_CODES[index])
+        S.refreshMapPanel()
+    end
+
+    local function arrow(text, x, delta)
+        local b = Instance.new("TextButton")
+        b.Size = UDim2.fromOffset(34, 34)
+        b.Position = UDim2.fromOffset(x, 38)
+        b.BackgroundColor3 = Color3.fromRGB(70, 110, 175)
+        b.BorderSizePixel = 0
+        b.Font = Enum.Font.GothamBold
+        b.Text = text
+        b.TextColor3 = Color3.fromRGB(255, 255, 255)
+        b.TextSize = 16
+        b.Parent = mapPanel
+        addCorner(b, 6)
+        b.MouseButton1Click:Connect(function() cycleMap(delta) end)
+    end
+    arrow("<", 12, -1)
+    arrow(">", 254, 1)
+
+    local mapHint = Instance.new("TextLabel")
+    mapHint.Size = UDim2.new(1, -24, 0, 30)
+    mapHint.Position = UDim2.fromOffset(12, 76)
+    mapHint.BackgroundTransparency = 1
+    mapHint.Font = Enum.Font.Gotham
+    mapHint.Text = "Waypoints and the keep list below belong to this map. Switching maps checks the current one in first, so nothing is lost."
+    mapHint.TextColor3 = Color3.fromRGB(160, 165, 180)
+    mapHint.TextSize = 11
+    mapHint.TextWrapped = true
+    mapHint.TextXAlignment = Enum.TextXAlignment.Left
+    mapHint.TextYAlignment = Enum.TextYAlignment.Top
+    mapHint.Parent = mapPanel
+
+    local function mapButton(text, x, y, width, color, onClick)
+        local b = Instance.new("TextButton")
+        b.Size = UDim2.fromOffset(width, 30)
+        b.Position = UDim2.fromOffset(x, y)
+        b.BackgroundColor3 = color
+        b.BorderSizePixel = 0
+        b.Font = Enum.Font.GothamBold
+        b.Text = text
+        b.TextColor3 = Color3.fromRGB(255, 255, 255)
+        b.TextSize = 12
+        b.Parent = mapPanel
+        addCorner(b, 6)
+        b.MouseButton1Click:Connect(onClick)
+        return b
+    end
+
+    mapButton("Save all maps", 12, 112, 136, Color3.fromRGB(52, 168, 83), function()
+        local ok, err = saveConfig()
+        setMovementState(ok and ("saved (" .. RT.currentMap .. ")") or ("save failed: " .. tostring(err)))
+    end)
+    mapButton("Reload config", 152, 112, 136, Color3.fromRGB(78, 142, 232), function()
+        loadConfig()
+        if S.refreshPathPanel then S.refreshPathPanel() end
+        S.refreshMapPanel()
+        setMovementState("config loaded (" .. RT.currentMap .. ")")
+    end)
+
+    UI.lowDetailButton = mapButton("Low Detail: OFF", 12, 152, 136, Color3.fromRGB(180, 64, 64), function()
+        setLowDetailEnabled(not LD.enabled)
+        S.refreshMapPanel()
+    end)
+    UI.keepPickerButton = mapButton("Pick parts to keep", 152, 152, 136, Color3.fromRGB(70, 110, 175), function()
+        local turnOn = not (HZ.pickerEnabled and LD.pickerEnabled)
+        setTelegraphPickerEnabled(turnOn, "keep")
+        if syncPickerButtons then syncPickerButtons() end
+    end)
+
+    local keepHint = Instance.new("TextLabel")
+    keepHint.Size = UDim2.new(1, -24, 0, 42)
+    keepHint.Position = UDim2.fromOffset(12, 188)
+    keepHint.BackgroundTransparency = 1
+    keepHint.Font = Enum.Font.Gotham
+    keepHint.Text = "Low detail hides every part whose name is not below. Enemies, attacks and our own markers always stay. Collision is untouched - hidden floor is still solid."
+    keepHint.TextColor3 = Color3.fromRGB(160, 165, 180)
+    keepHint.TextSize = 11
+    keepHint.TextWrapped = true
+    keepHint.TextXAlignment = Enum.TextXAlignment.Left
+    keepHint.TextYAlignment = Enum.TextYAlignment.Top
+    keepHint.Parent = mapPanel
+
+    local keepList = Instance.new("ScrollingFrame")
+    keepList.Size = UDim2.new(1, -24, 1, -282)
+    keepList.Position = UDim2.fromOffset(12, 236)
+    keepList.BackgroundTransparency = 1
+    keepList.BorderSizePixel = 0
+    keepList.ScrollBarThickness = 4
+    keepList.ScrollBarImageColor3 = Color3.fromRGB(80, 85, 100)
+    keepList.CanvasSize = UDim2.new(0, 0, 0, 0)
+    keepList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    keepList.Parent = mapPanel
+    local keepLayout = Instance.new("UIListLayout")
+    keepLayout.Padding = UDim.new(0, 4)
+    keepLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    keepLayout.Parent = keepList
+
+    mapButton("Clear keeps", 12, 0, 136, Color3.fromRGB(180, 64, 64), clearKeepList).Position =
+        UDim2.new(0, 12, 1, -38)
+    mapButton("Close", 152, 0, 136, Color3.fromRGB(70, 75, 90), function()
+        mapPanel.Visible = false
+    end).Position = UDim2.new(0, 152, 1, -38)
+
+    S.refreshMapPanel = function()
+        mapLabel.Text = string.format("%s  -  %s", RT.currentMap, MAP_LABELS[RT.currentMap] or "?")
+        if UI.lowDetailButton then
+            UI.lowDetailButton.Text = "Low Detail: " .. (LD.enabled and "ON" or "OFF")
+            UI.lowDetailButton.BackgroundColor3 = LD.enabled
+                and Color3.fromRGB(52, 168, 83) or Color3.fromRGB(180, 64, 64)
+        end
+        if not keepList.Parent then return end
+        for _, child in ipairs(keepList:GetChildren()) do
+            if child:IsA("GuiObject") then child:Destroy() end
+        end
+
+        local names = {}
+        for name in pairs(LD.keepNames) do names[#names + 1] = name end
+        table.sort(names)
+
+        if #names == 0 then
+            local empty = Instance.new("TextLabel")
+            empty.Size = UDim2.new(1, 0, 0, 24)
+            empty.BackgroundTransparency = 1
+            empty.Font = Enum.Font.Gotham
+            empty.Text = "Nothing kept yet. Arm the picker and click the parts you want to see."
+            empty.TextColor3 = Color3.fromRGB(150, 153, 165)
+            empty.TextSize = 12
+            empty.TextWrapped = true
+            empty.Parent = keepList
+            return
+        end
+
+        for i, name in ipairs(names) do
+            local row = Instance.new("Frame")
+            row.Size = UDim2.new(1, 0, 0, 26)
+            row.BackgroundColor3 = Color3.fromRGB(35, 38, 47)
+            row.BorderSizePixel = 0
+            row.LayoutOrder = i
+            row.Parent = keepList
+            addCorner(row, 5)
+
+            local info = Instance.new("TextLabel")
+            info.Size = UDim2.new(1, -36, 1, 0)
+            info.Position = UDim2.fromOffset(8, 0)
+            info.BackgroundTransparency = 1
+            info.Font = Enum.Font.GothamMedium
+            info.Text = name
+            info.TextColor3 = Color3.fromRGB(225, 227, 235)
+            info.TextSize = 12
+            info.TextXAlignment = Enum.TextXAlignment.Left
+            info.TextTruncate = Enum.TextTruncate.AtEnd
+            info.Parent = row
+
+            local del = Instance.new("TextButton")
+            del.Size = UDim2.fromOffset(24, 20)
+            del.Position = UDim2.new(1, -30, 0.5, -10)
+            del.BackgroundColor3 = Color3.fromRGB(180, 64, 64)
+            del.BorderSizePixel = 0
+            del.Font = Enum.Font.GothamBold
+            del.Text = "X"
+            del.TextColor3 = Color3.fromRGB(255, 255, 255)
+            del.TextSize = 12
+            del.Parent = row
+            addCorner(del, 5)
+            del.MouseButton1Click:Connect(function()
+                LD.keepNames[name] = nil
+                refreshLowDetail()
+                S.refreshMapPanel()
+            end)
+        end
+    end
+    S.refreshMapPanel()
+
     UI.pathEditButton.MouseButton1Click:Connect(function()
         local turnOn = not NAV.pathEditEnabled
         if turnOn then
@@ -1536,9 +1788,21 @@ local function createControlUI()
         end
     end)
 
+    UI.mapPanelButton.MouseButton1Click:Connect(function()
+        mapPanel.Visible = not mapPanel.Visible
+        if mapPanel.Visible then S.refreshMapPanel() end
+    end)
+
+    UI.freezeButton.MouseButton1Click:Connect(function()
+        setFreezeEnabled(not HZ.freezeEnabled)
+        UI.freezeButton.Text = HZ.freezeEnabled and "Frozen" or "Freeze"
+        UI.freezeButton.BackgroundColor3 = HZ.freezeEnabled
+            and Color3.fromRGB(90, 190, 255) or Color3.fromRGB(180, 64, 64)
+    end)
+
     UI.renderHitboxButton.MouseButton1Click:Connect(function()
         RT.renderHitboxEnabled = not RT.renderHitboxEnabled
-        UI.renderHitboxButton.Text = "Render Player Hitbox: " .. (RT.renderHitboxEnabled and "ON" or "OFF")
+        UI.renderHitboxButton.Text = "Hitbox: " .. (RT.renderHitboxEnabled and "ON" or "OFF")
         UI.renderHitboxButton.BackgroundColor3 = RT.renderHitboxEnabled and Color3.fromRGB(52, 168, 83) or Color3.fromRGB(180, 64, 64)
         if not RT.renderHitboxEnabled then clearHitboxVisualizer() else updateHitboxVisualizer() end
     end)
@@ -1557,19 +1821,25 @@ local function createControlUI()
         end
     end)
 
-    local function syncPickerButtons()
-        local telegraphOn = HZ.pickerEnabled and not HZ.ownPickerEnabled
+    -- One picker at a time; every button that arms one refreshes all of them.
+    syncPickerButtons = function()
+        local ARMED = Color3.fromRGB(232, 142, 78)
+        local OFF = Color3.fromRGB(180, 64, 64)
+        local telegraphOn = HZ.pickerEnabled and not HZ.ownPickerEnabled and not LD.pickerEnabled
         local ownOn = HZ.pickerEnabled and HZ.ownPickerEnabled
-        UI.pickerButton.Text = "Pick Telegraph: " .. (telegraphOn and "ON" or "OFF")
-        UI.pickerButton.BackgroundColor3 = telegraphOn
-            and Color3.fromRGB(232, 142, 78) or Color3.fromRGB(180, 64, 64)
-        UI.ownPickerButton.Text = "Pick Own FX: " .. (ownOn and "ON" or "OFF")
-        UI.ownPickerButton.BackgroundColor3 = ownOn
-            and Color3.fromRGB(232, 142, 78) or Color3.fromRGB(180, 64, 64)
+        local keepOn = HZ.pickerEnabled and LD.pickerEnabled
+        UI.pickerButton.Text = telegraphOn and "Picking" or "Pick Atk"
+        UI.pickerButton.BackgroundColor3 = telegraphOn and ARMED or OFF
+        UI.ownPickerButton.Text = ownOn and "Picking" or "Pick Own"
+        UI.ownPickerButton.BackgroundColor3 = ownOn and ARMED or OFF
+        if UI.keepPickerButton then
+            UI.keepPickerButton.Text = keepOn and "Picking keeps - click parts" or "Pick parts to keep"
+            UI.keepPickerButton.BackgroundColor3 = keepOn and ARMED or Color3.fromRGB(70, 110, 175)
+        end
     end
 
     UI.pickerButton.MouseButton1Click:Connect(function()
-        local turnOn = not (HZ.pickerEnabled and not HZ.ownPickerEnabled)
+        local turnOn = not (HZ.pickerEnabled and not HZ.ownPickerEnabled and not LD.pickerEnabled)
         setTelegraphPickerEnabled(turnOn, "telegraph")
         syncPickerButtons()
     end)

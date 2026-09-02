@@ -1,6 +1,6 @@
 # Dungeon Autofarm — Handoff
 
-Context for whoever picks this up next. Updated at **v2.3.0 "Fieldnotes"**.
+Context for whoever picks this up next. Updated at **v2.4.0 "Cartography"**.
 
 - **Repo:** `Tsukiatte/dq`. Source is `src/*.lua` (eight modules, Roblox Luau,
   run through an executor). `DungeonAutofarm.lua` at the root is a **built
@@ -228,9 +228,40 @@ perpendicular to each moving hazard.
 moving hazards, a predicted-path line (`Pred_<id>` Part, owner tracked in
 `HZ.predictionOwner`), all pooled in `HZ.highlightsFolder`.
 
+**Freeze (2.4.0).** A telegraph lasts well under a second, which is not long
+enough to point at. `Freeze` copies every detected attack into
+`HZ.frozenFolder`: an anchored, `CanQuery = true`, childless clone that outlives
+the original, carrying the original's name and parent as the attributes
+`DQOriginalName` / `DQOriginalParent`. `resolvePickedIdentity` is what every
+picker calls, so picking a copy acts on the real attack's identity. Capped at
+`CFG.freezeCap`; cleared on toggle-off and on Destruct.
+
+**Pick Telegraph writes to the Attack Book** (`source = "picked"`), as well as
+the learned-names set, so hand picks are renameable and deletable like anything
+the trial runs found.
+
+**Low detail (2.4.0), `LD` in core.** `LD.keepNames` is a set of lowercased part
+names (saved per map). `lowDetailStep` (run from `worldIndexStep`) sweeps a
+bounded slice of the part pool per frame and calls `hidePart` / `restorePart`:
+**`Transparency = 1` and no shadow, never destruction**, so collision is
+untouched and a hidden floor is still walkable. `shouldKeepVisible` always keeps
+kept names, current attack candidates, Terrain/Baseplate, and anything under a
+model with a Humanoid. Particles/trails/beams are indexed into `LD.effects` and
+switched off with the mode. **`setLowDetailEnabled(false)` must run on Destruct**
+(it does) or the dungeon is left invisible after the script is gone.
+
+**Per-map storage (2.4.0), config.lua.** `RT.mapData[code] = { waypath, keep }`
+for every map the config knows; the live `NAV.waypath` / `LD.keepNames` are the
+selected map's entry checked out for editing. `syncCurrentMapToStore` checks in,
+`applyMapFromStore` checks out, `setCurrentMap` does both. `buildConfigTable`
+syncs first and writes every stored map, so saving one never drops the rest. A
+pre-2.4 top-level `waypath` is adopted into the named map on load. Map codes and
+labels are `MAP_CODES` / `MAP_LABELS` in core — **the labels are cosmetic
+guesses**, correct them freely.
+
 `Dump GUI candidates to console` (Streamer panel) still exists for GUI structure.
-For telegraph problems, ask for the `[Picker]`, `[OwnAttack]` and `[Trial]` log
-lines.
+For telegraph problems, ask for the `[Picker]`, `[OwnAttack]`, `[Trial]`,
+`[Freeze]`, `[LowDetail]` and `[Map]` log lines.
 
 ---
 
@@ -333,6 +364,16 @@ it while deliberately holding still or it will fire spuriously).
   the cap.
 - **Projectile prediction is linear.** Homing or arcing projectiles are
   predicted along their current velocity only.
+- **Low detail hides by part NAME**, so a map that names its walls and its
+  treasure chests the same thing cannot separate them. If that bites, the keep
+  list would need to become signature-based like the Attack Book.
+- **Nothing hidden by low detail is ever re-hidden if the game rewrites its
+  Transparency.** The sweep only revisits a part when it comes round the pool
+  again (a lap is bounded but not instant), which is fine for static geometry
+  and wrong for anything that animates its own transparency.
+- **`CFG.hookRemotes`, trial runs and freezing all keep working with the loop
+  off**; if a report says "nothing happens with the loop off", check which of
+  those three is actually armed before looking further.
 - **Navmesh often returns `NoPath` map-wide** in this game. Unresolved. Direct
   walking and now the routed path cover it.
 - **Own-attack timing has one known blind spot:** an enemy telegraph landing at

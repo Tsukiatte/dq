@@ -428,7 +428,26 @@ local function startAutofarm()
             unhookAttackRemotes()
         end
 
-        if not RT.farmEnabled then return end
+        -- Trial runs, freezing and picking work with the loop OFF (2.4.0): they
+        -- are about watching and learning, not fighting, and the natural way to
+        -- study an attack is to stand there and let it hit you. The hazard scan
+        -- (which also feeds the highlights, the name tags, the frozen copies and
+        -- the damage correlator's suspect list) therefore runs whenever any of
+        -- those is armed, even while farming is paused.
+        if not RT.farmEnabled then
+            if HZ.trialEnabled or HZ.freezeEnabled or HZ.pickerEnabled then
+                local character = LocalPlayer.Character
+                local liveRoot = character and character:FindFirstChild("HumanoidRootPart")
+                if liveRoot then
+                    local ok, err = xpcall(scanDamageBricks, debug.traceback, liveRoot.Position)
+                    if not ok then
+                        heavyDebugThrottled("idle_scan_error", 1.0, "FATAL",
+                            "Hazard scan (loop off) threw:\n" .. tostring(err))
+                    end
+                end
+            end
+            return
+        end
         if NAV.forceRescan or (now - lastScanClock >= CFG.enemyScanInterval) then
             NAV.forceRescan = false
             lastScanClock = now

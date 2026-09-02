@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 2.3.0
+    VERSION : 2.4.0
     BUILD   : 2026-09-01
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "2.3.0"
+local SCRIPT_VERSION = "2.4.0"
 local SCRIPT_BUILD_DATE = "2026-09-01"
-local SCRIPT_CODENAME = "Fieldnotes"
+local SCRIPT_CODENAME = "Cartography"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "2.4.0", date = "2026-09-01", notes = "Freeze Parts holds a copy of every attack on screen so a telegraph that lasts half a second can still be pointed at, and Pick Telegraph now writes straight into the Attack Book. Trial runs, freezing and picking all work with the loop OFF. Low Detail mode hides everything in the world except the part names you pick (enemies, attacks and markers always stay); collision is untouched. Waypoint paths and low-detail keep lists are now stored PER MAP across the 14 dungeons, with a map picker; the chosen map loads on execution." },
     { version = "2.3.0", date = "2026-09-01", notes = "Trial runs: with Trial Run on, every hit taken is matched to the parts that appeared around the player just before it, and those are written into a named Attack Book (what the attack and its warning look like) that drives detection from then on; panel to rename / disable / delete entries, Save writes it to the config. Projectile prediction: moving hazards are dodged along the strip they will sweep, not where they are, and escape candidates are added sideways out of their path. Enemy attacks are always highlighted now, with a billboard name tag and a predicted-path line on moving ones." },
     { version = "2.2.0", date = "2026-09-01", notes = "Recovery: when the character loiters in a 10-stud area for 2.5s while trying to move, it walks the nearest stretch of the manual path (routed through the navmesh, jumping allowed) and then returns to pursuit; re-sticking soon after walks further. Path waypoints are now reached by navmesh route, not a straight steer, and an unreachable one is skipped. Terrain: the shin-height steering probe no longer treats ramps and steps as walls (that is what pinned the bot at the foot of every incline), drops are allowed while climbs are capped at a jump, and a stall on a navmesh route hops too. Q/E can be limited to an enemy radius (button + slider + drawn radius). Own ability effects are recognised by timing against our own casts and learned by name (saved), with a Pick Own FX picker; the bot no longer dodges its own slashes. Attacks always click; the guessed remote is never fired." },
     { version = "2.1.0", date = "2026-09-01", notes = "Lag spike fix. The scanner walked Workspace:GetDescendants() and classified every part three times a second, with a full cache flush every 4s: a spike every 0.35s from startup. Replaced by a world index built once in slices and kept current by DescendantAdded/Removing, with a bounded round-robin re-check per frame. The __namecall hook allocated a table on every method call in the client (GC pressure); rewritten allocation-free, auto-removed after 3 minutes, restored on Destruct. Telegraph feed rows pooled, path node writes diffed, RespectCanCollide tested once instead of per cast, all visuals under one folder, marker clearing incremental, hitbox adornee survives respawn." },
@@ -82,6 +83,8 @@ local UI = {}
 local SM = {}
 local NAV = {}
 local HZ = {}
+-- LD = low-detail mode: the keep list and what is currently hidden.
+local LD = {}
 -- RT = loose runtime flags and handles (farmEnabled, debugLevel, connections...)
 -- that used to be bare locals. They live in a table so every module sees the
 -- same value; a bare local copied into another module would go stale.
@@ -313,6 +316,30 @@ CFG.projectileTrackWindow = 6.0     -- newly added parts are motion-tracked this
 CFG.projectileMaxSize = 14.0        -- longer than this on its longest axis is not a projectile
 CFG.hazardTagEnabled = true         -- billboard name tag on every highlighted attack
 
+-- Freeze (2.4.0). A telegraph is on screen for well under a second, which is not
+-- long enough to point at it. While Freeze is on, every detected attack is
+-- copied into a held snapshot that stays put after the real one is gone, so it
+-- can be pointed at and added to the Attack Book at leisure.
+CFG.freezeCap = 400                 -- held copies before it stops adding
+
+-- Low detail (2.4.0). Everything in the world is hidden except the parts whose
+-- names you picked, plus enemies, attacks and our own markers. Collision is
+-- untouched: hidden floor is still solid, it is only invisible.
+CFG.lowDetailBudget = 400           -- parts hidden/restored per frame while sweeping
+CFG.lowDetailKillEffects = true     -- also switch off particles, trails and beams
+
+-- The dungeons, as the config keys them. Waypoint paths and low-detail keep
+-- lists are stored per map, so one config carries every dungeon you set up.
+-- The labels are cosmetic only; correct them freely.
+local MAP_CODES = { "DT", "WO", "PI", "KC", "TU", "SP", "TC", "GH", "SS", "OO", "VC", "AT", "EF", "NL" }
+local MAP_LABELS = {
+    DT = "Desert Temple",     WO = "Winter Outpost",   PI = "Pirate Island",
+    KC = "King's Castle",     TU = "The Underworld",   SP = "Samurai Palace",
+    TC = "The Canals",        GH = "Ghastly Harbor",   SS = "Steampunk Sewers",
+    OO = "Orbital Outpost",   VC = "Volcanic Chambers", AT = "Aquatic Temple",
+    EF = "Enchanted Forest",  NL = "Northern Lands",
+}
+
 -- Runtime Variables
 RT.gameSpecificAttackMethod = nil
 RT.detectedAttackRemote = nil
@@ -484,6 +511,30 @@ HZ.damageEvents = 0
 RT.lastHealth = nil
 RT.healthConnection = nil
 
+-- Freeze: held copies of attacks, so a telegraph can be pointed at after the
+-- real one has gone. Keyed on the original (weak, so a destroyed original does
+-- not pin the entry) - the copy itself is held in the array.
+HZ.freezeEnabled = false
+HZ.frozenFolder = nil
+HZ.frozenOf = setmetatable({}, { __mode = "k" })
+HZ.frozenCount = 0
+
+-- Low detail. keepNames is what the user picked (lowercased part names, saved
+-- per map); hidden remembers what each part looked like so it can be restored.
+LD.enabled = false
+LD.keepNames = {}
+LD.hidden = {}                   -- [part] = { transparency, castShadow }
+LD.effects = {}                  -- [ParticleEmitter/Trail/Beam/...] = true
+LD.disabledEffects = {}          -- [effect] = true, switched off by us
+LD.cursor = 1                    -- round-robin position of the hide/restore sweep
+LD.sweeping = false              -- a full pass is pending (mode or keep list changed)
+LD.pickerEnabled = false
+
+-- Per-map storage. RT.mapData[code] = { waypath = {...}, keep = {...} } for
+-- every map in the config, so saving one map never drops the others.
+RT.currentMap = MAP_CODES[1]
+RT.mapData = {}
+
 -- Smallest deviation first, so steering hugs the intended heading.
 local STEER_FAN_ANGLES = { 0, 20, -20, 40, -40, 65, -65, 90, -90, 120, -120 }
 -- Relative to the root's centre: roughly shin height and roughly head height.
@@ -626,4 +677,7 @@ S.printVersionBanner = printVersionBanner
 S.setMovementState = setMovementState
 S.sliderConnections = sliderConnections
 S.getVisualRoot = getVisualRoot
+S.LD = LD
+S.MAP_CODES = MAP_CODES
+S.MAP_LABELS = MAP_LABELS
 end
