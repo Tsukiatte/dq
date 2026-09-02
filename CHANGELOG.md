@@ -11,6 +11,27 @@ file and that table in sync on every edit.
 
 ---
 
+## 2.7.3 - 2026-09-01
+The actual fix for the blank labels, and a HUD that stays in one piece.
+
+- **Row labels were being pushed out of the window, not collapsed.** 2.7.1
+  blamed `UIFlexItem` and was wrong. The real cause: `hoverable()` parented a
+  full-width invisible `TextButton` into the row to catch clicks - and a row has
+  a **horizontal `UIListLayout`**, which lays out *every* GuiObject child. The
+  hit button was `Size (1,1)` scale at `LayoutOrder 0`, so it sorted first, took
+  the entire row width, and shoved the label and the control past the right-hand
+  edge where the window clipped them.
+  The tell was there in the screenshot: captions, buttons, list entries and
+  window titles all rendered. Every one of those reaches the screen without
+  going through `row()`. A clickable row now raises `InputBegan` on itself
+  (`Active = true`), so nothing extra joins the layout.
+- **The HUD came apart in game** - footer at the bottom, stat values drawn at
+  the top-left corner of the screen. It was a bottom-anchored frame with
+  `AutomaticSize.Y` containing auto-sizing children inside a `UIListLayout`,
+  which never resolved to a stable size. Rebuilt with the design's explicit
+  geometry: 360x173, chip at y=0, stats at y=42, footer at y=145. No
+  `AutomaticSize`, no layout, nothing that can fail to converge.
+
 ## 2.7.2 - 2026-09-01
 - `flexFill` no longer reads `instance.Size` back in order to rebuild it. Every
   caller wants full height, so the height is a parameter with a sensible
