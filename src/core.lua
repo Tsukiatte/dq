@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 2.8.0
+    VERSION : 2.9.0
     BUILD   : 2026-09-01
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "2.8.0"
+local SCRIPT_VERSION = "2.9.0"
 local SCRIPT_BUILD_DATE = "2026-09-01"
-local SCRIPT_CODENAME = "Account"
+local SCRIPT_CODENAME = "Clone"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "2.9.0", date = "2026-09-02", notes = "Clone evasion, a third mode beside Legacy and Macro. A ring of player-sized volumes follows the character, each one a standing question - would anything be hitting you here? - answered continuously and shown on a pad under it, green safe, red not. When an attack lands on the character the bot steps into the best green one. Projectiles are covered without extra work: safety measures against the swept path of a moving hazard, so a volume in the line of fire goes red before the projectile arrives. Volumes, rings, radius, margin, commit time and both colours are all settings; the ring is rebuilt on a settings change and on respawn, and torn down on a mode switch or Destruct." },
     { version = "2.8.0", date = "2026-09-02", notes = "Account panel: your Roblox headshot, your name and a rank, with Logout and Detach. It opens and closes with the other windows on RightShift. It masks under Streamer Mode - a panel showing your name and your face would otherwise put both back on screen the moment you opened the GUI on stream. Rank is CFG.accountRank, a plain string for now; Logout is a placeholder that closes the interface, since there is no account system behind it yet." },
     { version = "2.7.4", date = "2026-09-02", notes = "Macro rotation actually works now. It was being recorded and stored correctly, then thrown away: the main loop fell through to releaseFacing() every frame during playback, switching the alignment rig off a microsecond after the macro switched it on. Playback now owns facing. The direction was also reconstructed with the wrong sign, which would have pointed the replay 180 degrees away - facing is stored as a look vector instead of an angle, so there is no sign convention to get wrong. Pitch is recorded too, from the torso and from the camera; only yaw is applied to the body, because a humanoid keeps its torso upright." },
     { version = "2.7.3", date = "2026-09-01", notes = "Found the real cause of the blank row labels: hoverable() parented a full-width invisible TextButton into the row to catch clicks, and a row has a horizontal UIListLayout - so the layout laid the hit button out as a list item, at full width and sorting first, pushing the label and the control off the edge where the window clipped them. A clickable row now raises InputBegan on itself, so nothing extra joins the layout. The HUD is rebuilt with explicit geometry: nested AutomaticSize inside a bottom-anchored auto-sizing frame never resolved and the stat values were being drawn at the top-left of the screen." },
@@ -96,6 +97,8 @@ local HZ = {}
 local LD = {}
 -- MC = macro recording and playback.
 local MC = {}
+-- CL = clone evasion: the ring of volumes and what each one currently thinks.
+local CL = {}
 -- RT = loose runtime flags and handles (farmEnabled, debugLevel, connections...)
 -- that used to be bare locals. They live in a table so every module sees the
 -- same value; a bare local copied into another module would go stale.
@@ -371,6 +374,23 @@ CFG.targetHpRange = 150.0
 -- Dodging can be switched off wholesale (the Telegraphs section header).
 CFG.dodgeEnabled = true
 
+-- Clone evasion (2.9.0). A ring of player-sized volumes around the character,
+-- each continuously tested against the live hazards. When something is about to
+-- hit you the bot steps into the best green one. It is the same job the Legacy
+-- escape search does, except the candidates are visible and you can watch it
+-- decide.
+CFG.cloneCount = 24              -- total volumes, spread over the rings below
+CFG.cloneRings = 2               -- inner ring at 55% of the radius, outer at 100%
+CFG.cloneRadius = 12.0
+CFG.cloneEvalInterval = 0.08     -- how often safety is re-tested (positions move every frame)
+CFG.cloneSafetyMargin = 0.5      -- extra clearance a clone must have to count as safe
+CFG.cloneMaxDrop = 12.0          -- a clone whose floor is further below this is off a ledge
+CFG.cloneMaxClimb = 6.0
+CFG.cloneCommitTime = 0.35       -- hold a chosen clone this long before reconsidering
+CFG.showClones = true
+CFG.colorCloneSafe = Color3.fromRGB(60, 220, 120)
+CFG.colorCloneDanger = Color3.fromRGB(255, 70, 70)
+
 -- Account panel (2.8.0). Rank is a plain string for now; there is no account
 -- system behind it yet.
 CFG.accountRank = "DEVELOPER"
@@ -605,6 +625,7 @@ RT.mapData = {}
 -- easy to open, copy between machines and hand to someone else.
 RT.macroData = {}
 
+-- Clone evasion state (2.9.0).
 -- Macros (2.5.0). "legacy" = the hand-placed waypoint path; "macro" = recorded
 -- runs. The dropdown at the top of the path panel picks which one is in charge
 -- when the bot has nothing to fight.
@@ -633,6 +654,16 @@ MC.playProgressTime = 0
 MC.playProgressDistance = nil
 MC.playSkips = 0
 MC.routeFolder = nil             -- drawn route of the selected macro
+
+-- Clone evasion. `nodes` is the pool: each entry is { prism, pad, offset,
+-- position, safe, penalty }. Built once when the mode is entered and reused.
+CL.active = false
+CL.folder = nil
+CL.nodes = {}
+CL.lastEvalTime = -math.huge
+CL.chosen = nil                  -- the node currently being run to
+CL.chosenAt = 0
+CL.safeCount = 0
 
 -- Smallest deviation first, so steering hugs the intended heading.
 local STEER_FAN_ANGLES = { 0, 20, -20, 40, -40, 65, -65, 90, -90, 120, -120 }
@@ -785,6 +816,7 @@ S.sliderConnections = sliderConnections
 S.getVisualRoot = getVisualRoot
 S.LD = LD
 S.MC = MC
+S.CL = CL
 S.MAP_CODES = MAP_CODES
 S.MAP_LABELS = MAP_LABELS
 end

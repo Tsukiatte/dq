@@ -557,9 +557,12 @@ local function setRecordBind(keyCode)
     if S.refreshMacroPanel then S.refreshMacroPanel() end
 end
 
+-- "legacy" | "clone" | "macro". Legacy and Clone both fight and pathfind and
+-- differ only in how they dodge; Macro replays a recording instead.
 local function setMacroMode(mode)
-    MC.mode = mode == "macro" and "macro" or "legacy"
-    if MC.mode == "legacy" then
+    MC.mode = (mode == "macro" or mode == "clone") and mode or "legacy"
+    S.setCloneActive(MC.mode == "clone")
+    if MC.mode ~= "macro" then
         if MC.playing then stopPlayback("switched to legacy waypoints") end
         if MC.recording then stopRecording() end
         clearMacroRoute()
