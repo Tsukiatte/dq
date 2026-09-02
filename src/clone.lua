@@ -16,6 +16,7 @@ local setMovementState = S.setMovementState
 local getVisualRoot = S.getVisualRoot
 local getPlayerHitboxMetrics = S.getPlayerHitboxMetrics
 local isPositionSafeFromDamageBricks = S.isPositionSafeFromDamageBricks
+local Players = S.Players
 local evaluateHazardPenaltyAtPoint = S.evaluateHazardPenaltyAtPoint
 local getRaycastExclusions = S.getRaycastExclusions
 local isPathSegmentClear = S.isPathSegmentClear
@@ -132,7 +133,7 @@ local function destroyClones()
     table.clear(CL.cells)
     CL.nodes = CL.cells
     table.clear(CL.path)
-    CL.goal = nil
+    CL.goalKey = nil
     CL.centerI, CL.centerJ = nil, nil
     CL.safeCount = 0
 end
@@ -205,7 +206,7 @@ local function buildClones()
 
         CL.cells[k] = {
             i = 0, j = 0, key = "", x = 0, z = 0, y = nil,
-            standable = false, safe = false, penalty = math.huge, depth = 0, eta = 0,
+            standable = false, safe = false, holds = false, penalty = math.huge, depth = 0, eta = 0,
             onPath = false, isGoal = false,
             pad = pad, prism = prism, halfHeight = totalHeight * 0.5,
         }
@@ -289,6 +290,7 @@ local function positionCells(root)
             if verdict then
                 cell.standable = verdict.standable
                 cell.safe = verdict.safe
+                cell.holds = verdict.holds
                 cell.penalty = verdict.penalty
             else
                 cell.standable = false
@@ -315,6 +317,9 @@ local function paintCells()
             if cell.isGoal then color = pathColor
             elseif cell.onPath then color = trailColor
             elseif not cell.safe then color = dangerColor
+            -- Safe this instant but something lands on it shortly: passable,
+            -- but not somewhere to stop. Drawn dim so the difference is visible.
+            elseif not cell.holds then color = edgeColor
             elseif cell.depth == 0 then color = edgeColor
             else color = safeColor end
             local y = cell.y or 0
@@ -346,6 +351,20 @@ local function evaluateCells(root)
     -- measuring the disc, and the disc's promise holds.
     local footprint = footprintRadius()
     local exactClearance = footprint + CFG.cloneSafetyMargin
+
+    -- Melee enemies do not announce anything: being next to one is the attack.
+    -- Collected once per pass rather than per cell.
+    local enemies = {}
+    local character = LocalPlayer.Character
+    for model in pairs(HZ.enemyModels) do
+        if model ~= character and model.Parent and not Players:GetPlayerFromCharacter(model) then
+            local part = model.PrimaryPart or model:FindFirstChild("HumanoidRootPart")
+                or model:FindFirstChildWhichIsA("BasePart")
+            if part then enemies[#enemies + 1] = part.Position end
+        end
+    end
+    local hardR = CFG.cloneEnemyRadius + footprint
+    local softR = math.max(CFG.cloneEnemySoftRadius + footprint, hardR)
     -- How long it would take to walk to a cell, so each one is judged at the
     -- moment we would actually be standing in it rather than right now. The
     -- announced attacks carry real impact times, so this is the difference
@@ -368,19 +387,45 @@ local function evaluateCells(root)
             -- whole body fits, not just the centre point.
             local travel = Vector3.new(cell.x - rootPos.X, 0, cell.z - rootPos.Z).Magnitude / speed
             cell.eta = travel
+
+            -- Enemy personal space. Inside the hard circle is simply unsafe;
+            -- between hard and soft it is allowed but expensive, so the bot
+            -- will pass through to reach somewhere better and will not choose
+            -- to stand there.
+            local enemyPenalty, tooClose = 0, false
+            for _, epos in ipairs(enemies) do
+                local d = Vector3.new(pos.X - epos.X, 0, pos.Z - epos.Z).Magnitude
+                if d < hardR then
+                    tooClose = true
+                    break
+                elseif d < softR then
+                    local t = (softR - d) / (softR - hardR)
+                    enemyPenalty = enemyPenalty + t * t * CFG.safeZonePull * 0.5
+                end
+            end
+
             -- Exact: the disc's own radius plus whatever margin you dial in,
-            -- and nothing else. Red now means "my body would be in this", not
+            -- and nothing else. Red means "my body would be in this", not
             -- "my body plus three and a half studs of hedge".
-            cell.safe = isPositionSafeFromDamageBricks(pos, nil, travel, exactClearance)
-                and true or false
-            cell.penalty = cell.safe and evaluateHazardPenaltyAtPoint(pos) or math.huge
+            local safeOnArrival = not tooClose
+                and isPositionSafeFromDamageBricks(pos, nil, travel, exactClearance)
+            -- And it must STAY safe. A cell judged only at the instant of
+            -- arrival reads as green even when something already announced
+            -- lands on it a moment later - which is precisely how the bot
+            -- walked somewhere, stopped, and died there.
+            local holds = safeOnArrival
+                and isPositionSafeFromDamageBricks(pos, nil, travel, exactClearance, CFG.cloneSafeDwell)
+            cell.safe = safeOnArrival and true or false
+            cell.holds = holds and true or false
+            cell.penalty = cell.safe and (evaluateHazardPenaltyAtPoint(pos) + enemyPenalty) or math.huge
             if cell.safe then safeCount = safeCount + 1 end
         else
             cell.safe = false
+            cell.holds = false
             cell.penalty = math.huge
         end
         CL.verdictCache[cell.key] = {
-            standable = cell.standable, safe = cell.safe, penalty = cell.penalty,
+            standable = cell.standable, safe = cell.safe, holds = cell.holds, penalty = cell.penalty,
         }
     end
     CL.safeCount = safeCount
@@ -475,17 +520,25 @@ local function search()
 end
 
 -- Cheapest to reach, then least hazardous, then deepest into safety.
+-- Two passes: somewhere that stays safe, and failing that somewhere that is
+-- at least safe on arrival. Without the fallback, a moment where every cell has
+-- something inbound would return nothing and the bot would stand still through
+-- it - the worst possible answer.
 local function bestGoal(dist)
-    local bestK, bestScore = nil, math.huge
-    for k, cell in ipairs(CL.cells) do
-        if cell.standable and cell.safe and dist[k] < math.huge then
-            local score = dist[k]
-                + (cell.penalty < math.huge and cell.penalty * CFG.clonePenaltyWeight or 0)
-                - cell.depth * CFG.cloneDepthBonus
-            if score < bestScore then bestK, bestScore = k, score end
+    local function pick(requireHolds)
+        local bestK, bestScore = nil, math.huge
+        for k, cell in ipairs(CL.cells) do
+            if cell.standable and cell.safe and dist[k] < math.huge
+                and (not requireHolds or cell.holds) then
+                local score = dist[k]
+                    + (cell.penalty < math.huge and cell.penalty * CFG.clonePenaltyWeight or 0)
+                    - cell.depth * CFG.cloneDepthBonus
+                if score < bestScore then bestK, bestScore = k, score end
+            end
         end
+        return bestK
     end
-    return bestK
+    return pick(true) or pick(false)
 end
 
 local function buildPath(parent, start, goalK)
@@ -509,18 +562,32 @@ local function runCloneEvasion(humanoid, root)
     -- Hold the goal briefly: re-picking every frame under a moving hazard makes
     -- the character stutter between two equally good regions. The PATH to it
     -- is re-planned every call, on whatever the field currently says.
+    --
+    -- The goal is held as a WORLD KEY, not as an index into the window. The
+    -- window is centred on the character and slides as it walks, so index k
+    -- means a different place a moment later - the committed goal silently
+    -- moved every time you crossed a cell boundary, which is why it would set
+    -- off, take a few steps, and then decide it had arrived somewhere it had
+    -- never been going.
     local dist, parent, start = search()
-    local goalK = CL.goal
+    local goalK = nil
+    if CL.goalKey then
+        for k, cell in ipairs(CL.cells) do
+            if cell.key == CL.goalKey then goalK = k break end
+        end
+    end
+
     local stale = not goalK
         or (now - CL.goalAt) >= CFG.cloneCommitTime
         or not CL.cells[goalK].safe
         or dist[goalK] == math.huge
     if stale then
         goalK = bestGoal(dist)
-        CL.goal = goalK
+        CL.goalKey = goalK and CL.cells[goalK].key or nil
         CL.goalAt = now
     end
     if not goalK then
+        CL.goalKey = nil
         heavyDebugThrottled("clone_none", 1.0, "Clone",
             "No green cell reachable - the attack is bigger than the grid, or every way out is walled. Widen Radius.")
         setMovementState("CLONE - no safe cell")
@@ -536,7 +603,7 @@ local function runCloneEvasion(humanoid, root)
     local goal = CL.cells[goalK]
     local rootPos = root.Position
     if #CL.path == 0 or Vector3.new(goal.x - rootPos.X, 0, goal.z - rootPos.Z).Magnitude <= 1.0 then
-        CL.goal = nil
+        CL.goalKey = nil
         setMovementState(string.format("CLONE arrived (%d/%d safe)", CL.safeCount, #CL.cells))
         return true
     end
@@ -555,7 +622,7 @@ local function runCloneEvasion(humanoid, root)
         CL.floorCache[target.key] = { y = false, t = os.clock() }
         target.standable = false
         target.safe = false
-        CL.goal = nil
+        CL.goalKey = nil
         heavyDebugThrottled("clone_wall", 1.0, "Clone",
             string.format("Cell %s is walled off; marked impassable, re-routing.", target.key))
         setMovementState("CLONE - re-routing")

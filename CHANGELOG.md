@@ -11,6 +11,38 @@ file and that table in sync on every edit.
 
 ---
 
+## 3.0.3 - 2026-09-02
+
+### Enemies get a circle of their own
+Melee enemies do not telegraph anything — being next to one **is** the attack,
+and the grid had no concept of that at all. It saw clear floor and walked the
+character into stabbing range.
+
+- **Enemy space** (11 studs): cells this close to a live enemy are unsafe.
+- **Enemy spacing** (18 studs): beyond the hard circle, standing near an enemy
+  is allowed but expensive. The bot will pass through to reach somewhere
+  better; it will not choose to stop there.
+
+### Two fixes for "walks a few steps, then stops and dies"
+Both were real, and they compounded.
+
+- **The committed goal was a window index.** The window is centred on the
+  character and slides as it walks, so index `k` means a *different world cell*
+  a moment later. Every time you crossed a cell boundary the committed goal
+  silently moved — which is exactly the observed behaviour: it sets off, takes
+  a few steps, and then believes it has arrived somewhere it was never going.
+  The goal is held as a **world key** now.
+- **A cell was judged only at the instant of arrival.** So a spot where an
+  already-announced attack lands a moment later read as perfectly green. The
+  bot walked there, stopped, and was killed by something the script already
+  knew about. A cell now has to **stay safe for `Must stay safe for` seconds
+  (1.6 by default)** to count as a destination.
+  - There is a fallback to merely-safe-on-arrival, because a moment when
+    everything has something inbound must not return *nothing* — standing still
+    is the worst available answer.
+  - Cells that are safe now but do not hold are drawn dim, so "passable but not
+    somewhere to stop" is visible rather than mysterious.
+
 ## 3.0.2 - 2026-09-02
 
 ### The grid was padding every attack far too heavily

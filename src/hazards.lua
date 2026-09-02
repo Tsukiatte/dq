@@ -678,14 +678,14 @@ end
 -- honest question - would my body overlap this - because 3.5 studs of hedge on
 -- every attack stacks, and three overlapping attacks then leave nowhere green
 -- to stand at all.
-local function isPositionSafeFromDamageBricks(position, extraClearance, atTime, exactClearance)
+local function isPositionSafeFromDamageBricks(position, extraClearance, atTime, exactClearance, dwell)
     local _, playerRadius, totalHeight = getPlayerHitboxMetrics()
     local clearance = exactClearance
         or (CFG.damageBrickClearance + playerRadius + (extraClearance or 0))
     local halfHeight = (totalHeight * 0.5) + 2.0
 
     if CFG.usePrecast and #PC.zones > 0 then
-        if not S.isPositionSafeFromPrecast(position, clearance, atTime) then
+        if not S.isPositionSafeFromPrecast(position, clearance, atTime, dwell) then
             return false
         end
     end
