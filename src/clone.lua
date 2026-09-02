@@ -20,6 +20,7 @@ local Players = S.Players
 local getRaycastExclusions = S.getRaycastExclusions
 local isPathSegmentClear = S.isPathSegmentClear
 local releaseFacing = S.releaseFacing
+local driveTo = S.driveTo
 local getThreatAt = S.getThreatAt
 local refreshThreatSources = S.refreshThreatSources
 local getThreatSlices = S.getThreatSlices
@@ -1040,9 +1041,7 @@ local function fleeBlindly(humanoid, root, reason)
 
     local target = rootPos + direction * (max(CFG.cloneGridSpacing, 0.5) * 8)
     releaseFacing(humanoid)
-    humanoid:MoveTo(Vector3.new(target.X, rootPos.Y, target.Z))
-    NAV.lastIssuedMove = target
-    NAV.driving = true
+    driveTo(humanoid, root, Vector3.new(target.X, rootPos.Y, target.Z))
     heavyDebugThrottled("clone_flee", 1.0, "Clone",
         "No usable route (" .. reason .. ") - running anyway rather than standing in it.")
     setMovementState("CLONE - running (" .. reason .. ")")
@@ -1240,9 +1239,7 @@ local function runCloneEvasion(humanoid, root)
     end
 
     releaseFacing(humanoid)
-    humanoid:MoveTo(targetPos)
-    NAV.lastIssuedMove = targetPos
-    NAV.driving = true
+    driveTo(humanoid, root, targetPos)
     setMovementState(string.format("CLONE moving, %d cell(s), heat %.0f -> %.0f",
         #CL.path, CL.cells[indexOf(0, 0)].threat or 0, goal.threat))
     return true

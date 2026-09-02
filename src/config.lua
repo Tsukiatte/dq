@@ -266,6 +266,8 @@ local function buildConfigTable()
             cloneKeepDistance = CFG.cloneKeepDistance,
             threatWeight = CFG.threatWeight,
             threatMoveAt = CFG.threatMoveAt,
+            moveMode = CFG.moveMode,
+            moveArriveRadius = CFG.moveArriveRadius,
             adaptiveLookahead = CFG.adaptiveLookahead,
             threatWallWeight = CFG.threatWallWeight,
             threatEnclosureWeight = CFG.threatEnclosureWeight,
@@ -435,6 +437,11 @@ local function applyConfigData(data)
         if combat.cloneKeepDistance ~= nil then CFG.cloneKeepDistance = combat.cloneKeepDistance == true end
         CFG.threatWeight = tonumber(combat.threatWeight) or CFG.threatWeight
         CFG.threatMoveAt = tonumber(combat.threatMoveAt) or CFG.threatMoveAt
+        local mode = combat.moveMode
+        if mode == "walk" or mode == "steer" or mode == "velocity" or mode == "tween" then
+            CFG.moveMode = mode
+        end
+        CFG.moveArriveRadius = tonumber(combat.moveArriveRadius) or CFG.moveArriveRadius
         if combat.adaptiveLookahead ~= nil then CFG.adaptiveLookahead = combat.adaptiveLookahead == true end
         CFG.threatWallWeight = tonumber(combat.threatWallWeight) or CFG.threatWallWeight
         CFG.threatEnclosureWeight = tonumber(combat.threatEnclosureWeight) or CFG.threatEnclosureWeight
@@ -838,6 +845,63 @@ local RECOMMENDED_CLONE = {
     cloneSafeDwell = 1.6, cloneCommitTime = 0.35, cloneDepthBonus = 1.5,
 }
 
+-- SIMPLE
+--
+-- The clone system has sixty-eight settings. Each one was a fair response to a
+-- specific failure, but together they interact in ways neither the code nor
+-- anyone reading it can predict - enclosure fought cover, freshness fought
+-- hysteresis, the wall pass fought the slicing. Every fix has had a decent
+-- chance of breaking something else.
+--
+-- This is the small version: exact geometry, exact timing, a precise mover, and
+-- almost nothing else. It is what a script that does this well in a few hundred
+-- lines actually contains, and it is the configuration to judge the dodging by,
+-- because when it fails there are few enough moving parts to say why.
+local function applySimpleClone()
+    -- Ground truth and precision: keep.
+    CFG.usePrecast = true
+    CFG.moveMode = "velocity"
+    CFG.moveArriveRadius = 1.2
+    CFG.threatProbeRadius = 0
+    CFG.threatMargin = 0.4
+
+    -- The field: dense, honest, and read at the time we would arrive.
+    CFG.cloneGridSpacing = 1.5
+    CFG.cloneRadius = 24
+    CFG.cloneMaxCells = 900
+    CFG.cloneEvalBudget = 900          -- no slicing: one consistent snapshot
+    CFG.threatHorizon = 4.0
+    CFG.threatCurve = 3.0
+    CFG.threatLethal = 55
+    CFG.threatMoveAt = 6
+    CFG.threatWeight = 2.6
+    CFG.threatFalloff = 7.0
+    CFG.cloneSafeDwell = 1.6
+
+    -- Enemies and walls still matter; nothing else does.
+    CFG.cloneEnemyRadius = 12
+    CFG.cloneEnemySoftRadius = 20
+    CFG.cloneKeepDistance = true
+    CFG.threatWallWeight = 60
+    CFG.threatSweepEnabled = true
+    CFG.dodgeProjectiles = true
+
+    -- Off: every heuristic that has been caught fighting another one.
+    CFG.threatWallSpread = false       -- enclosure
+    CFG.coverEnabled = false
+    CFG.escapeScanEnabled = false
+    CFG.cloneDepthBonus = 0
+    CFG.threatEnclosureWeight = 0
+    CFG.cloneFreshnessBias = 0
+    CFG.cloneGoalHysteresis = 25
+    CFG.threatFutureBias = 0.65
+    CFG.adaptiveLookahead = true
+
+    heavyDebug("Clone", "Simple mode: exact geometry, exact timing, precise movement, "
+        .. "and none of the heuristics that have been caught fighting each other. "
+        .. "If dodging fails here, there are few enough parts left to say why.")
+end
+
 local function applyRecommendedClone()
     for key, value in pairs(RECOMMENDED_CLONE) do CFG[key] = value end
     CFG.threatSweepEnabled = true
@@ -853,6 +917,7 @@ local function applyRecommendedClone()
 end
 
 S.applyRecommendedClone = applyRecommendedClone
+S.applySimpleClone = applySimpleClone
 S.setCurrentMap = setCurrentMap
 S.watchDungeonName = watchDungeonName
 S.applyDetectedMap = applyDetectedMap
