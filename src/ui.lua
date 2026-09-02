@@ -1108,6 +1108,18 @@ local function createControlUI()
         0, 4, true,
         function() return CFG.cloneSafetyMargin end, function(v) CFG.cloneSafetyMargin = v end, 6,
         "The only padding there is. A disc is green when your body plus this would not touch the attack - 0 means it just fits. Raise it if you are being grazed, but every stud here is taken off the walkable space between two attacks."))
+    track(K.slider(cloneSection.content, "Enemy space", "Studs to keep off melee enemies",
+        0, 25, true,
+        function() return CFG.cloneEnemyRadius end, function(v) CFG.cloneEnemyRadius = v end, 6.5,
+        "Melee enemies do not telegraph anything - being next to one IS the attack, so the grid marks a circle around each of them unsafe. Raise it if you are being chewed up in melee."))
+    track(K.slider(cloneSection.content, "Enemy spacing", "Discouraged out to this",
+        0, 40, true,
+        function() return CFG.cloneEnemySoftRadius end, function(v) CFG.cloneEnemySoftRadius = v end, 6.6,
+        "Beyond the hard circle, out to here, standing near an enemy is allowed but expensive. The bot will pass through to get somewhere better; it will not choose to stop there."))
+    track(K.slider(cloneSection.content, "Must stay safe for", "Seconds after arriving",
+        0, 4, true,
+        function() return CFG.cloneSafeDwell end, function(v) CFG.cloneSafeDwell = v end, 6.7,
+        "A cell counts as a destination only if nothing lands on it for this long after you get there. At 0 it judges the instant of arrival only, which is how it used to walk somewhere, stop, and be killed by an attack that was already announced."))
     track(K.slider(cloneSection.content, "Danger cost", "How much it hates crossing red",
         5, 60, false,
         function() return CFG.cloneDangerCost end, function(v) CFG.cloneDangerCost = v end, 7,

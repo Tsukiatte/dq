@@ -107,14 +107,20 @@ end
 -- when it was announced. That is the whole value of the ETA: the bot can walk
 -- across a marker that fires in 1.2 seconds to reach real safety, instead of
 -- treating every marker as an equal wall and getting cornered.
-local function isPositionSafeFromPrecast(position, clearance, atTime)
+-- `dwell` asks the question over an interval: "would I be safe there from the
+-- moment I arrive until `dwell` seconds later?" Asking about a single instant
+-- is what let the bot walk somewhere, stop, and be killed by an attack that
+-- was already announced - at the instant it arrived, the cell really was safe.
+local function isPositionSafeFromPrecast(position, clearance, atTime, dwell)
     atTime = atTime or 0
+    local from, to = atTime, atTime + (dwell or 0)
     local now = Workspace:GetServerTimeNow()
     for _, zone in ipairs(PC.zones) do
         local eta = zone.impactAt - now
-        -- Live between "we arrive before it fires" and "it has faded".
-        local arrivesBefore = eta - atTime > -CFG.precastLingerTime
-        if arrivesBefore and eta - atTime < CFG.precastHorizon then
+        -- The zone hurts during [eta, eta + linger]; we are there during
+        -- [from, to]. Danger is the two intervals overlapping.
+        if eta <= to and (eta + CFG.precastLingerTime) >= from
+            and eta < CFG.precastHorizon + to then
             local flat, vertical = distanceToZone(zone, position)
             if flat < clearance and (CFG.hazardIgnoreVertical or vertical < 14) then
                 return false, zone, eta

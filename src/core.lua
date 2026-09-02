@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 3.0.2
+    VERSION : 3.0.3
     BUILD   : 2026-09-01
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "3.0.2"
+local SCRIPT_VERSION = "3.0.3"
 local SCRIPT_BUILD_DATE = "2026-09-01"
 local SCRIPT_CODENAME = "Ground truth"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "3.0.3", date = "2026-09-02", notes = "Enemies get a circle of their own: melee does not telegraph, being next to one IS the attack, so cells within Enemy space are unsafe and cells out to Enemy spacing are expensive. Two fixes for the dithering. The committed goal was a window INDEX, but the window is centred on the character and slides as it walks, so the goal silently moved to a different place every time you crossed a cell boundary - it is a world key now. And a cell was judged only at the instant of arrival, so somewhere an announced attack would land a moment later read as green: the bot walked there, stopped, and died. A cell must now stay safe for Must stay safe for seconds after arrival to count as a destination, with a fallback to merely-safe so a moment with something inbound everywhere never returns nothing." },
     { version = "3.0.2", date = "2026-09-02", notes = "The grid was padding every attack by 3.5 studs beyond the body, because it borrowed CFG.damageBrickClearance from the Legacy escape - which commits to one dash, where a fat hedge is cheap. On a dense grid that padding stacks, and three overlapping attacks left nowhere green to stand. Red now means your body would actually be in it, plus only the Safety margin you dial in. The footprint is measured from your body parts rather than GetExtentsSize, so a big cosmetic or held weapon no longer inflates it, and it is re-measured on a timer and carried in the grid signature - it used to be sampled once at build, so the only thing that ever corrected it was dying. Fixed the flicker: a window shift blanked every verdict and repainted before the next evaluation, and at 1.5 stud spacing you cross a cell about every 0.075s against an 0.08s interval, so it blanked on nearly every frame you moved." },
     { version = "3.0.1", date = "2026-09-02", notes = "Three fixes to 3.0.0, all found from one in-game log. RT.connections never existed: the dungeonName watcher threw on it, which also meant the ability-remote hook below it never ran at all. The precast readout was rendered once at build and never again, so it read zero however many attacks had gone past. And the payload handler dropped anything it could not read without a word, so 'Listening' and 'nothing is arriving' looked identical - it now counts every payload, prints the first three key by key, and finds the shape name even if the compressed key is not the one we asked for." },
     { version = "3.0.0", date = "2026-09-02", notes = "The script stops guessing what an attack is and listens to the game tell it. ReplicatedStorage.modules.PrecastHitbox broadcasts every ground attack on a BridgeNet2 bridge with its exact shape, position, and delayUntilAttack, so time to impact is arithmetic and each clone-grid cell is now judged at the moment you would arrive there rather than right now. 238 enemy attack names and 293 of our own are read from the game as tables, which is the mine-or-theirs question the appearance scorer used to guess. Safe-spot bosses are handled: the markers that mean STAND HERE are attractors, where before the dodge walked you out of the only survivable circle. The map follows Workspace.dungeonName, enemies are scanned from Workspace.enemies, and our own casts come from the abilityCast remote rather than animation watching. Removed: freeze, trial-run damage learning, and the recommendation queue - all three existed to work around not knowing what an attack was." },
@@ -479,6 +480,13 @@ CFG.colorClonePath = Color3.fromRGB(80, 170, 255)
 -- Disc diameter as a multiple of the character's real footprint (2.15.1).
 CFG.cloneDiscScale = 1.0
 CFG.cloneMaxFootprint = 3.0      -- studs; a cosmetic cannot inflate past this
+-- Melee enemies do not telegraph. Standing next to one is simply fatal, so the
+-- grid gives every live enemy a circle of its own.
+CFG.cloneEnemyRadius = 11.0
+CFG.cloneEnemySoftRadius = 18.0  -- beyond the hard circle, discouraged not forbidden
+-- A cell has to STAY safe this long after arrival, not merely be safe at the
+-- instant of arrival. Standing still is a decision too.
+CFG.cloneSafeDwell = 1.6
 CFG.cloneFootprintRefresh = 0.5  -- seconds between re-measuring the character
 CFG.colorCloneSafe = Color3.fromRGB(60, 220, 120)
 CFG.colorCloneDanger = Color3.fromRGB(255, 70, 70)
@@ -781,6 +789,9 @@ CL.footprintCheckedAt = -math.huge
 -- Last verdict per world cell, so a window shift can carry the answer over
 -- instead of blanking it. See the flicker note in clone.lua.
 CL.verdictCache = {}
+-- The committed goal, as a WORLD key rather than a window index: the window
+-- slides as you walk, so an index means somewhere different a moment later.
+CL.goalKey = nil
 
 -- Hand-drawn zones. `defs` is what gets saved (a signature plus a shape);
 -- `live` is [decoration part] = the volume currently following it.
