@@ -104,9 +104,15 @@ local function refreshSources()
                 -- the body a soft ring out to the standoff is a preference,
                 -- below the move threshold, so it fights from there.
                 local hard = getEnemyExtent(model) + 1
+                local hub = DG.hubs[model]
+                if not hub then
+                    hub = { times = {}, lastSpawn = -math.huge, period = nil, rate = 0, fire = nil }
+                    DG.hubs[model] = hub
+                end
                 DG.enemies[#DG.enemies + 1] = {
                     x = pos.X, y = pos.Y, z = pos.Z, vx = vx, vz = vz,
                     hard = hard, soft = getEnemyStandoff(model) + CFG.dodgeEnemySoftWidth,
+                    model = model, hub = hub,
                 }
             end
         end
@@ -129,6 +135,63 @@ local function refreshSources()
                 DG.moverSet[part] = true
             end
         end
+    end
+
+    -- Hubs (4.10.0): an enemy that long line attacks pass through. The
+    -- Midgardian Champion fires beams two at a time through its own
+    -- position; at melee standoff the character stands where they all
+    -- cross, and two crossing beams cannot be cleared in the telegraph. Each
+    -- new line part whose axis passes near an enemy is counted once. The
+    -- rate over the last ten seconds and the interval between volleys give
+    -- decide() a radial cost and an approach gate.
+    for _, part in ipairs(HZ.detected) do
+        if not DG.hubSeen[part] then
+            local size = part.Size
+            local L = max(size.X, size.Z)
+            if L >= CFG.dodgeHubLineLength then
+                DG.hubSeen[part] = true
+                local cf = part.CFrame
+                local axis = size.X >= size.Z and cf.RightVector or cf.LookVector
+                axis = Vector3.new(axis.X, 0, axis.Z)
+                if axis.Magnitude > 0.01 then
+                    axis = axis.Unit
+                    local p = part.Position
+                    local t = HZ.spawnTimes[part] or clock
+                    local model = part:FindFirstAncestorOfClass("Model")
+                    local fire = model and RT.armDelays[string.lower(model.Name)] or nil
+                    for i = 1, #DG.enemies do
+                        local e = DG.enemies[i]
+                        local rel = Vector3.new(e.x - p.X, 0, e.z - p.Z)
+                        local along = rel:Dot(axis)
+                        local perp = (rel - axis * along).Magnitude
+                        if perp <= CFG.dodgeHubTolerance and abs(along) <= L * 0.5 + 5 then
+                            local hub = e.hub
+                            -- Lines within a third of a second are one volley.
+                            if t - hub.lastSpawn > 0.3 then
+                                if hub.lastSpawn > -math.huge then
+                                    local interval = t - hub.lastSpawn
+                                    if interval < 30 then
+                                        hub.period = hub.period and (hub.period * 0.7 + interval * 0.3) or interval
+                                    end
+                                end
+                                hub.lastSpawn = t
+                            end
+                            hub.times[#hub.times + 1] = t
+                            if fire and fire > 0 then hub.fire = fire end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    for _, hub in pairs(DG.hubs) do
+        local times = hub.times
+        local cutoff = clock - 10
+        local n = 0
+        for i = #times, 1, -1 do
+            if times[i] < cutoff then table.remove(times, i) else n = n + 1 end
+        end
+        hub.rate = n / 10
     end
 end
 
@@ -439,6 +502,48 @@ local function decide(root, humanoid)
     local approachWeight = CFG.dodgeApproachWeight
     local moveAt = CFG.dodgeMoveAt
 
+    -- The radial cost around each hub: the chance a random line through the
+    -- hub covers a spot falls off as width over the circumference at that
+    -- distance, times how often lines come, over the time we would stand
+    -- there. Melee standoff sits deep inside it; the field pushes the
+    -- character out to where a volley is a nuisance rather than a certainty.
+    local hubs = {}
+    for i = 1, #DG.enemies do
+        local e = DG.enemies[i]
+        if e.hub and e.hub.rate >= CFG.dodgeHubMinRate then hubs[#hubs + 1] = e end
+    end
+    local hubWeight, hubWidth = CFG.dodgeHubWeight, CFG.dodgeHubLineWidth
+    local function hubCost(x, z)
+        local c = 0
+        for i = 1, #hubs do
+            local e = hubs[i]
+            local dx, dz = x - e.x, z - e.z
+            local d = sqrt(dx * dx + dz * dz)
+            if d < 4 then d = 4 end
+            c = c + hubWeight * e.hub.rate * (hubWidth / (pi * d)) * dwell
+        end
+        return c
+    end
+
+    -- Going in to a hub is allowed only when there is time to get there and
+    -- back out before the next volley fires: the last volley's time, the
+    -- observed period, and the lines' learned arming delay say when that is.
+    if approach and #hubs > 0 then
+        local target = NAV.cachedEnemy
+        local hub = DG.hubs[target]
+        if hub and hub.rate >= CFG.dodgeHubMinRate and hub.period then
+            local ax, az = approach.X - rx, approach.Z - rz
+            local approachTime = max(sqrt(ax * ax + az * az) - preferred, 0) / speed
+            local nextFire = hub.lastSpawn + hub.period + (hub.fire or CFG.dodgeHubFireGuess)
+            if os.clock() + approachTime + CFG.dodgeHubExit > nextFire then
+                approach = nil
+                DG.hubHold = true
+            else
+                DG.hubHold = false
+            end
+        end
+    end
+
     -- Five samples along the line from here to (rx+ox, rz+oz): three on the
     -- way, two once there, each at the moment it would actually happen. The
     -- score is half the worst of them and half the average - a spot hit at one
@@ -500,7 +605,7 @@ local function decide(root, humanoid)
         local worst, graded, raw = score(off.x, off.z, off.dist)
 
         c.x, c.z, c.dist, c.danger = cx, cz, off.dist, worst
-        local cost = graded + off.dist * distCost
+        local cost = graded + off.dist * distCost + hubCost(cx, cz)
         -- A change of direction costs; a reversal costs the most. Not while
         -- something is on you: then the shortest way out is the only way
         -- out, and keeping a heading was what walked the character round
@@ -616,7 +721,7 @@ local function decide(root, humanoid)
             target = nil
             DG.targetReason = "line closed"
         elseif best then
-            local stillCost = graded + d * distCost
+            local stillCost = graded + d * distCost + hubCost(target.X, target.Z)
             if approach then
                 local ax, az = target.X - approach.X, target.Z - approach.Z
                 stillCost = stillCost + approachWeight * max(0, sqrt(ax * ax + az * az) - preferred)
@@ -639,7 +744,7 @@ local function decide(root, humanoid)
         end
         if inRange then
             DG.target = nil
-            DG.targetReason = "safe here"
+            DG.targetReason = DG.hubHold and "safe here (hub, holding out)" or "safe here"
             return
         end
         -- A held box that just won the hysteresis stays held; dropping it here
@@ -652,7 +757,7 @@ local function decide(root, humanoid)
             return
         end
         -- Hysteresis for the approach too, or the box creeps a stud at a time.
-        local hereCost = 0
+        local hereCost = hubCost(rx, rz)
         if approach then
             local ax, az = rx - approach.X, rz - approach.Z
             hereCost = approachWeight * max(0, sqrt(ax * ax + az * az) - preferred)
