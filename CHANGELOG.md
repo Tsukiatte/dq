@@ -11,6 +11,17 @@ file and that table in sync on every edit.
 
 ---
 
+## 2.7.2 - 2026-09-01
+- `flexFill` no longer reads `instance.Size` back in order to rebuild it. Every
+  caller wants full height, so the height is a parameter with a sensible
+  default. One less thing to get wrong, and it stops the smoke runner tripping
+  over its own `Size` stub (which returns a Vector3, so `.Y` was a number).
+- **Tooling: `build.py` runs the smoke test itself and fails on it.**
+  `smoke.py` always did exit non-zero; the 2.7.1 push slipped through because
+  the command piped it to `grep`, so the chain took *grep's* exit status and
+  grep had happily matched the word "ERROR". Folding smoke into `build.py`
+  removes the opportunity to invoke it wrongly.
+
 ## 2.7.1 - 2026-09-01
 Fixes for the 2.7.0 interface, all three found from in-game screenshots.
 

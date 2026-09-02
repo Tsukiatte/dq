@@ -1,5 +1,7 @@
 """Bundles src/*.lua (in load order) into DungeonAutofarm.lua, one loadstring-able file.
 
+Runs check.py first and smoke.py last; a failure in either means no bundle ships.
+
     python tools/build.py
 
 Runs tools/check.py first and refuses to build if it fails, so the bundle can never
@@ -64,6 +66,15 @@ def main():
         print("BUNDLE DOES NOT PARSE:", err)
         return 1
     print("bundle parses OK")
+
+    # And it must survive a startup run. This lives here rather than being a
+    # separate command because a separate command can be invoked wrongly - a
+    # broken build shipped once because the caller piped smoke.py into grep and
+    # took grep's exit status.
+    smoke = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "smoke.py")])
+    if smoke.returncode != 0:
+        print("SMOKE FAILED - the bundle does not start. Not shipping this.")
+        return 1
     return 0
 
 

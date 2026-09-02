@@ -137,9 +137,12 @@ end
 -- was already 0. Explicit arithmetic is one line, needs no guessing about how
 -- flex distributes, and cannot fail silently: a wrong `reserve` gives a label
 -- that is slightly the wrong width, not an invisible one.
-local function flexFill(instance, reserve)
+local function flexFill(instance, reserve, heightScale, heightOffset)
     if not reserve then return false end
-    instance.Size = UDim2.new(1, -reserve, instance.Size.Y.Scale, instance.Size.Y.Offset)
+    -- Height is passed in rather than read back off the instance: every caller
+    -- wants full height, and reading Size just to rebuild it was one more thing
+    -- to get wrong.
+    instance.Size = UDim2.new(1, -reserve, heightScale or 1, heightOffset or 0)
     return true
 end
 
