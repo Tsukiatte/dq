@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 3.6.1
+    VERSION : 3.6.2
     BUILD   : 2026-09-01
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "3.6.1"
+local SCRIPT_VERSION = "3.6.2"
 local SCRIPT_BUILD_DATE = "2026-09-01"
 local SCRIPT_CODENAME = "Actuator"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "3.6.2", date = "2026-09-02", notes = "Why steer and velocity both stood still: nothing was disabling Roblox's default control module. It calls Humanoid:Move every frame from input - with no keys held that is Move(zero) - on RenderStepped, BEFORE physics, while ours lands on Heartbeat after. Its stop is what physics sees. MoveTo survived only because it is a separate persistent mechanism. Tween is the default now, because writing the CFrame is the one path the control module cannot argue with, and it is what a script that tweens to a marker is doing. It is capped to the distance the character could actually have walked this frame, so the speed a server sees is ordinary walking speed, and each step is raycast so it never passes through anything - clipping through a wall is the one genuinely conspicuous thing about moving this way and it is now impossible. The Move-based modes take the player controls while they run and hand them straight back." },
     { version = "3.6.1", date = "2026-09-02", notes = "Fixes the regression 3.6.0 shipped. The new velocity mover wrote the horizontal velocity and then called Humanoid:Move(Vector3.zero) on the very next line - and Move(zero) is an instruction to BRAKE, which the Humanoid re-applies every physics step. The two fought and the Humanoid always wins, so the character stood still in the middle of attacks. Both must be told the same direction; then the Humanoid handles animation, footing and slopes while the direct write removes the acceleration ramp. The default is now steer, which is plain Humanoid:Move with a direction: it still fixes the arrival tolerance and the re-planning that made MoveTo miss, and it cannot stall because it is the Humanoid driving itself. And a watchdog - any mode that is asked to move and produces no movement for a second falls back to walk, so a mover bug can never again strand the character inside an attack." },
     { version = "3.6.0", date = "2026-09-02", notes = "Every dodge was issued as Humanoid:MoveTo, and that is most of why the dodging looked broken however good the decision was. MoveTo accelerates for about a quarter of a second, arrives only within roughly two studs, and re-plans on every call - so in a three-stud gap between two beams it arrives late and off the mark. Standing in the middle of attacks, stopping at the edge of one instead of going around, and scraping along walls are all descriptions of an actuator failing rather than a chooser failing. Movement is now selectable: walk is the old MoveTo, steer uses Humanoid:Move, velocity writes the horizontal assembly velocity directly for instant direction changes and exact arrival while physics still applies, and tween steps the root CFrame for stud-exact movement that ignores collision. Velocity is the default. Also added Simple mode: the clone system has sixty-eight settings and they have repeatedly been caught fighting each other, so Simple turns off every heuristic that has done so and leaves exact geometry, exact timing and precise movement." },
     { version = "3.5.2", date = "2026-09-02", notes = "The shuffling on the spot with clear ground in sight had three causes and they compounded. Goal choice took the plain argmin, so two near-equal cells traded places as the field updated and the bot took a step toward each in turn; a new goal must now beat the held one by a margin. A full A* ran EVERY FRAME - sixty times a second - against a goal that changes a few times a second, so the route wobbled and MoveTo was re-issued at a slightly different first step each time; the path is reused between plans now and only rebuilt when the goal moves, the window slides, the next step goes lethal, or a short interval elapses. And since 3.2.0 only a slice of the grid is re-measured per pass, so cells carry answers of different ages - a stale cell that looks wonderful wins, gets refreshed, turns out terrible, and another stale cell wins instead. Measurement age is now a cost in the score." },
@@ -557,10 +558,16 @@ CFG.escapeMargin = 12            -- heat it must beat the local best by to bothe
 -- three-stud gap between beams means arriving late and off the mark. Most of
 -- what looks like bad decisions is that.
 --   walk | steer | velocity | tween
--- steer by default: Humanoid:Move with a direction. It has no arrival
--- tolerance and no re-planning, which is most of what was wrong with MoveTo,
--- and it cannot stall because it is the Humanoid driving itself.
-CFG.moveMode = "steer"
+-- tween by default. It is the only mode the default control module cannot
+-- overrule: Move() and velocity writes both go through the Humanoid, and
+-- Roblox's control script calls Move(zero) every frame from input on
+-- RenderStepped, before physics, so it wins over anything we set on Heartbeat.
+-- Writing the CFrame skips the Humanoid entirely, which is exactly why a script
+-- that tweens to a marker has precision the Humanoid API cannot give it.
+CFG.moveMode = "tween"
+-- Take the player's controls while using a Move-based mode, and hand them back
+-- the moment it stops.
+CFG.moveTakeControls = true
 CFG.moveArriveRadius = 1.2       -- studs; MoveTo's own tolerance is nearer 2
 
 CFG.cloneGoalHysteresis = 45     -- a new goal must beat the held one by this
@@ -913,6 +920,7 @@ RT.blurEffect = nil
 RT.frameDelta = 1 / 60
 RT.moverProgressPos = nil
 RT.moverProgressAt = nil
+RT.controlsDisabled = false
 -- Which windows are pinned, by name. Pinned windows stay on screen after the
 -- interface is closed, so a readout you want while playing does not cost you
 -- the whole GUI.
