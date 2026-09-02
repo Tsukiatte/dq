@@ -78,9 +78,12 @@ local function watchHealth(character)
         local last = RT.lastHealth
         RT.lastHealth = health
         if not last or health >= last then return end
-        -- Health is tracked for the low-health branch. It used to also drive
-        -- the damage correlator that taught the Attack Book; the game now
-        -- announces its own attacks, so there is nothing to infer from a hit.
+        -- Every hit names what was next to you, and teaches detection the
+        -- name if it did not already know it.
+        if S.recordHit then
+            local damage = last - health
+            task.defer(S.recordHit, damage)
+        end
     end)
 end
 

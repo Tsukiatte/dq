@@ -263,6 +263,8 @@ local function buildConfigTable()
             dodgeManual = CFG.dodgeManual,
             dodgeShowField = CFG.dodgeShowField,
             dodgeShowTarget = CFG.dodgeShowTarget,
+            dodgeShowRange = CFG.dodgeShowRange,
+            dodgeCornerCost = CFG.dodgeCornerCost,
             attackMethod = CFG.attackMethod,
             autoClickEnabled = CFG.autoClickEnabled,
             clickAtCursor = CFG.clickAtCursor,
@@ -387,10 +389,10 @@ local function applyConfigData(data)
         for _, key in ipairs({ "dodgeInterval", "dodgeReach", "dodgeRings", "dodgeRays", "dodgeProbe",
             "dodgeMargin", "dodgeShoulder", "dodgeLead", "dodgeLinger", "dodgeDwell", "dodgeMoveAt",
             "dodgeHysteresis", "dodgeDistanceCost", "dodgeEnemyRadius", "dodgeEnemySoft",
-            "dodgeMaxClimb", "dodgeMaxDrop" }) do
+            "dodgeMaxClimb", "dodgeMaxDrop", "dodgeCornerCost" }) do
             CFG[key] = tonumber(combat[key]) or CFG[key]
         end
-        for _, key in ipairs({ "dodgeManual", "dodgeShowField", "dodgeShowTarget" }) do
+        for _, key in ipairs({ "dodgeManual", "dodgeShowField", "dodgeShowTarget", "dodgeShowRange" }) do
             if combat[key] ~= nil then CFG[key] = combat[key] == true end
         end
         if combat.attackMethod == "auto" or combat.attackMethod == "tool" or combat.attackMethod == "click" then
@@ -769,7 +771,7 @@ local RECOMMENDED_DODGE = {
     dodgeLead = 1.2, dodgeLinger = 0.35, dodgeDwell = 1.2,
     dodgeMoveAt = 0.15, dodgeHysteresis = 0.12, dodgeDistanceCost = 0.008,
     dodgeEnemyRadius = 12, dodgeEnemySoft = 20,
-    dodgeMaxClimb = 3.0, dodgeMaxDrop = 10.0, dodgeRayBudget = 12,
+    dodgeMaxClimb = 3.0, dodgeMaxDrop = 10.0, dodgeRayBudget = 12, dodgeCornerCost = 0.35,
     moveMode = "tween", moveArriveRadius = 1.2,
 }
 

@@ -314,17 +314,38 @@ local function decide(root, humanoid)
     params.FilterDescendantsInstances = getRaycastExclusions(nil)
 
     local best, bestFallback = nil, nil
+    local bestCost = math.huge
     local checked = 0
     for _, idx in ipairs(order) do
         local c = cands[idx]
+        -- Costs only ever go UP from here (the corner penalty adds), so once
+        -- the next candidate's base cost cannot beat the best adjusted cost
+        -- already found, nothing after it can either.
+        if best and c.cost >= bestCost then break end
         checked = checked + 1
         local y = floorAt(c.x, c.z, ry, params)
         if y and abs(y - ry) <= CFG.dodgeMaxClimb + 0.1 and y > ry - CFG.dodgeMaxDrop then
             c.y = y
             if walkable(rootPos, c.x, y, c.z, params) then
                 c.valid = true
-                best = c
-                break
+                -- Room beyond: a spot with a wall right behind it is a pocket.
+                -- Continuing to flee from there is impossible, so it costs in
+                -- proportion to how little room there is past it. This is what
+                -- stops the character reversing into a corner or a prop and
+                -- staying there.
+                local dx, dz = c.x - rx, c.z - rz
+                local len = sqrt(dx * dx + dz * dz)
+                local adjusted = c.cost
+                if len > 0.01 and CFG.dodgeCornerCost > 0 then
+                    local dir = Vector3.new(dx / len, 0, dz / len)
+                    local hit = Workspace:Raycast(Vector3.new(c.x, y + 1.5, c.z), dir * CFG.dodgeReach, params)
+                    if hit then
+                        local room = (hit.Position - Vector3.new(c.x, y + 1.5, c.z)).Magnitude
+                        adjusted = adjusted + CFG.dodgeCornerCost * (1 - room / CFG.dodgeReach)
+                    end
+                end
+                c.adjusted = adjusted
+                if adjusted < bestCost then best, bestCost = c, adjusted end
             elseif not bestFallback then
                 bestFallback = c
             end
@@ -342,7 +363,7 @@ local function decide(root, humanoid)
         local T = d / speed
         local still = max(dangerAt(target.X, ry, target.Z, T), dangerAt(target.X, ry, target.Z, T + dwell))
         local stillCost = still + d * distCost
-        if still < CFG.dodgeMoveAt and best and best.cost > stillCost - CFG.dodgeHysteresis then
+        if still < CFG.dodgeMoveAt and best and (best.adjusted or best.cost) > stillCost - CFG.dodgeHysteresis then
             best = nil    -- the current box wins
         elseif still >= CFG.dodgeMoveAt then
             DG.target = nil
@@ -385,7 +406,7 @@ end
 -- ------------------------------------------------------------ visuals
 local function destroyVisuals()
     if DG.folder then DG.folder:Destroy() end
-    DG.folder, DG.box, DG.discs = nil, nil, {}
+    DG.folder, DG.box, DG.ring, DG.discs = nil, nil, nil, {}
 end
 
 local function buildVisuals()
@@ -405,6 +426,20 @@ local function buildVisuals()
     box.Transparency = 1
     box.Parent = folder
     DG.box = box
+
+    -- The search range: the ring the outer candidates sit on. Seeing it is
+    -- how you tell "it could not find anywhere" from "it was not looking far
+    -- enough".
+    local ring = Instance.new("Part")
+    ring.Name = "Range"
+    ring.Shape = Enum.PartType.Cylinder
+    ring.Size = Vector3.new(0.08, CFG.dodgeReach * 2, CFG.dodgeReach * 2)
+    ring.Anchored, ring.CanCollide, ring.CanQuery, ring.CanTouch, ring.CastShadow = true, false, false, false, false
+    ring.Material = Enum.Material.ForceField
+    ring.Color = CFG.colorDodgeTarget
+    ring.Transparency = 1
+    ring.Parent = folder
+    DG.ring = ring
 
     DG.discs = {}
     for i = 1, #DG.offsets do
@@ -431,6 +466,17 @@ local function paint(root)
             box.Transparency = 0.35
         else
             box.Transparency = 1
+        end
+    end
+    local ring = DG.ring
+    if ring and ring.Parent then
+        if CFG.dodgeShowRange then
+            local want = CFG.dodgeReach * 2
+            if abs(ring.Size.Y - want) > 0.01 then ring.Size = Vector3.new(0.08, want, want) end
+            ring.CFrame = CFrame.new(root.Position.X, root.Position.Y - 2.4, root.Position.Z) * UPRIGHT
+            ring.Transparency = 0.82
+        else
+            ring.Transparency = 1
         end
     end
     if #DG.discs ~= #DG.offsets then buildVisuals() end

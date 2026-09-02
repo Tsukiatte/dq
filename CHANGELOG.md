@@ -11,6 +11,58 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.1.0 - 2026-09-02 - "Ground truth, all the way down"
+
+### Most attacks were dropped one line after being detected
+3.4.0 made classification structural, so the **invisible `hitBox`** that
+actually damages you became a candidate. Then, in `scanDamageBricks`, the
+per-frame loop had its own gate:
+
+```lua
+if instance.Parent and instance.Transparency < CFG.telegraphTransparencyCutoff
+```
+
+It threw the `hitBox` out of `HZ.detected` **every frame**, regardless of what
+classification had decided. Only the visible `precast` survived. So the red disc
+showed, the precast faded, and the damage volume underneath — the pool that
+grows twice, the yellow disc, the purple beam — was never dodged at all. Every
+one of this level's attack names was already in the table; nothing was
+*missed*, it was *discarded*.
+
+Parts the game says are attacks are now stamped `HZ.groundTruth` at
+classification and exempt from that gate. The gate still applies to the
+appearance-scoring fallback, where a faded telegraph really has resolved.
+
+### Body parts were hazards
+`LeftHand 50.7s`, `MeshPart 29.8s`, `Glow 29.8s` — creature body parts tracked
+as attacks for a minute at a time. The creature check looked only at the
+**nearest** Model, so a hand inside an Accessory's Model or a glow inside a gear
+Model slipped through to the appearance scorer. `insideCreature` walks every
+ancestor now. A creature's own `hitBox` still counts; nothing else inside a
+creature does.
+
+### Every hit names its culprit
+On any drop in health, everything within `hitSearchRadius` is ranked by
+distance and written into the capture — tagged `known`, `body`, `map` or
+`UNKNOWN`. The nearest thing that is not ours, not the map and not a creature's
+body is the culprit, and **if detection did not know it, its model name is
+learned** on the spot. The old trial-run learner did this and was removed when
+the name tables arrived; the tables turned out incomplete for exactly the
+attacks that matter, and a hit is the one signal appearance cannot fake. The
+Attacks panel shows the last culprit.
+
+### Reversing into corners
+The dodge now charges extra for a spot with a wall right behind it: one ray
+from the candidate in the direction of flight, and a **Corner penalty** in
+proportion to how little room lies beyond. A pocket you cannot keep fleeing
+from is not a refuge. Candidates are still checked cheapest-first and the loop
+stops as soon as no later base cost can beat the best adjusted one, so it costs
+about one extra raycast per decision.
+
+### Show search range
+A ring at `Reach`, so nowhere-was-safe and it-was-not-looking-far-enough stop
+looking the same.
+
 ## 4.0.0 - 2026-09-02 - "The box"
 
 The dodge is rebuilt from scratch around the shape of the thing that actually

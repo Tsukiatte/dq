@@ -493,6 +493,19 @@ local function looksLikeProjectile(part, now)
     return longest >= 0.5 and longest <= CFG.projectileMaxSize
 end
 
+-- Any ancestor Model with a Humanoid, up to the world. The nearest Model is
+-- not enough: a hand inside an Accessory's Model, a glow inside a gear Model,
+-- both sit two levels below the creature that owns them.
+local function insideCreature(part)
+    local node = part.Parent
+    for _ = 1, 8 do
+        if not node or node == Workspace then return false end
+        if node:IsA("Model") and node:FindFirstChildOfClass("Humanoid") then return true end
+        node = node.Parent
+    end
+    return false
+end
+
 local function isDamageBrick(part)
     if not part:IsA("BasePart") then return false end
 
@@ -517,7 +530,19 @@ local function isDamageBrick(part)
     -- missed with hammerBotHit.hitBox and spinBotSpin.hitBox among them -
     -- both names sitting in the table, never reached.
     -- =====================================================================
-    local structural = isAttackStructure(part)
+    local lname = string.lower(part.Name)
+    if insideCreature(part) then
+        -- A creature's own hitBox is its swing and counts. Everything else
+        -- inside a creature is a body part - LeftHand, MeshPart, Glow - and
+        -- was reaching the appearance scorer whenever it sat inside a nested
+        -- gear Model, because the old check looked only at the nearest Model.
+        if ATTACK_PARTS[lname] then
+            if HZ.ownParts[part] or isOwnedByPlayerOrTeammate(part) then return false end
+            return true
+        end
+        return false
+    end
+    local structural = ATTACK_PARTS[lname] ~= nil and part:FindFirstAncestorOfClass("Model") ~= nil
     if structural or isKnownEnemyAttack(part) then
         -- Still ours if we own it: our own abilities are built the same way.
         if HZ.ownParts[part] then return false end
@@ -573,10 +598,7 @@ local function isDamageBrick(part)
         return record.enabled ~= false
     end
 
-    local ancestorModel = part:FindFirstAncestorOfClass("Model")
-    if ancestorModel and ancestorModel:FindFirstChildOfClass("Humanoid") then
-        return false
-    end
+    if insideCreature(part) then return false end
 
     -- Learned names outrank the heuristics below, including the CanCollide and
     -- map-geometry filters that were causing the missed hitboxes.
@@ -1685,6 +1707,78 @@ local function diagnosePart(part, verdict)
         describeAncestry(part))
 end
 
+-- =========================================================================
+-- HIT ATTRIBUTION (4.1.0)
+--
+-- Every time health drops, look at what is within reach and write it down -
+-- and if the nearest thing that is not ours, not the map and not a creature's
+-- body is unknown to detection, learn its name. The old trial-run learner did
+-- something like this and was removed when the name tables arrived; the tables
+-- turned out to be incomplete for exactly the attacks that matter, so a hit is
+-- once again the one signal appearance cannot fake.
+-- =========================================================================
+local function recordHit(damage)
+    local character = LocalPlayer.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    local now = os.clock()
+
+    local params = OverlapParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = { character, RT.visualRoot }
+    local ok, parts = pcall(function()
+        return Workspace:GetPartBoundsInRadius(root.Position, CFG.hitSearchRadius, params)
+    end)
+    if not ok or not parts then return end
+
+    local origin = root.Position
+    local ranked = {}
+    for _, part in ipairs(parts) do
+        if part:IsA("BasePart") and not isOwnedByPlayerOrTeammate(part)
+            and not isKnownOwnEffect(part) and not HZ.ownParts[part] then
+            local body = insideCreature(part) and not ATTACK_PARTS[string.lower(part.Name)]
+            local scenery = isMapGeometry(part)
+            ranked[#ranked + 1] = {
+                part = part,
+                distance = (part.Position - origin).Magnitude,
+                body = body, scenery = scenery,
+                known = HZ.groundTruth[part] == true or HZ.learnedNames[string.lower(part.Name)] == true,
+            }
+        end
+    end
+    table.sort(ranked, function(a, b) return a.distance < b.distance end)
+
+    local lines = { string.format("HIT  -%.0f  at %s", damage, os.date("%H:%M:%S")) }
+    local culprit = nil
+    for i = 1, math.min(#ranked, 8) do
+        local r = ranked[i]
+        local p = r.part
+        local tag = r.known and "known" or (r.body and "body" or (r.scenery and "map" or "UNKNOWN"))
+        lines[#lines + 1] = string.format("     %-8s %5.1f studs  %-30s %-12s anc %s",
+            tag, r.distance, string.sub(p.Name, 1, 30), p.ClassName, describeAncestry(p))
+        if not culprit and not r.body and not r.scenery then culprit = r end
+    end
+
+    if culprit and not culprit.known and now - HZ.lastHitAt >= CFG.hitLearnCooldown then
+        -- Learn the model that hurt us, not the generic part inside it.
+        local p = culprit.part
+        local model = p:FindFirstAncestorOfClass("Model")
+        local name = string.lower((model and model ~= Workspace) and model.Name or p.Name)
+        if not GENERIC_PART_NAMES[name] and not NEVER_OWN[name] and not HZ.learnedNames[name] then
+            HZ.learnedNames[name] = true
+            lines[#lines + 1] = "     LEARNED '" .. name .. "' as an attack"
+            heavyDebug("Hit", string.format("Took %.0f damage next to '%s', which detection did not know. Learned it.", damage, name))
+            if S.refreshNameLists then S.refreshNameLists() end
+        end
+    end
+    HZ.lastHitAt = now
+    HZ.lastHitName = culprit and culprit.part.Name or (ranked[1] and ranked[1].part.Name) or "nothing nearby"
+
+    for _, l in ipairs(lines) do HZ.hitLog[#HZ.hitLog + 1] = l end
+    while #HZ.hitLog > 240 do table.remove(HZ.hitLog, 1) end
+    if S.refreshHitPanel then S.refreshHitPanel() end
+end
+
 local function saveAttackLog()
     if type(writefile) ~= "function" then return false, "no file access in this executor" end
     local header = {
@@ -1694,7 +1788,10 @@ local function saveAttackLog()
         "attack is the interesting case: everything needed to explain the miss is on it.",
         string.rep("-", 150),
     }
-    local body = table.concat(header, "\n") .. "\n" .. table.concat(HZ.diagnoseLines, "\n")
+    local body = table.concat(header, "\n") .. "\n"
+        .. "WHAT WAS NEXT TO YOU EACH TIME YOU TOOK DAMAGE\n"
+        .. table.concat(HZ.hitLog, "\n") .. "\n" .. string.rep("-", 150) .. "\n"
+        .. table.concat(HZ.diagnoseLines, "\n")
     local ok, err = pcall(function() writefile(CFG.diagnoseFile, body) end)
     if ok then
         heavyDebug("Capture", string.format("Wrote %d parts to %s.", HZ.diagnoseCount, CFG.diagnoseFile))
@@ -1733,6 +1830,11 @@ local function classifyPoolPart(part, now)
     if #ZN.defs > 0 and not part:GetAttribute("DQZone") then ensureZoneFor(part) end
 
     local verdict = maybeTelegraph and isDamageBrick(part)
+    if verdict and (isAttackStructure(part) or isKnownEnemyAttack(part)) then
+        HZ.groundTruth[part] = true
+    else
+        HZ.groundTruth[part] = nil
+    end
     if CFG.diagnoseAttacks then diagnosePart(part, verdict) end
     setCandidate(part, verdict, now)
     if CFG.showWalls then
@@ -2215,8 +2317,14 @@ local function scanDamageBricks(rootPosition)
     for _, instance in ipairs(HZ.candidates) do
         -- Transparency is re-tested per frame, not per catalog refresh, so a
         -- telegraph that fades mid-cycle stops being dodged immediately.
+        -- A fully faded telegraph has resolved - unless the game itself says
+        -- this part is an attack. The hitBox that actually damages you is
+        -- created at Transparency 1 and stays there, and this gate was
+        -- throwing it out every frame after classification had correctly let
+        -- it in: the precast showed, the precast faded, and the damage volume
+        -- underneath was never dodged at all.
         if instance.Parent
-            and instance.Transparency < CFG.telegraphTransparencyCutoff
+            and (HZ.groundTruth[instance] or instance.Transparency < CFG.telegraphTransparencyCutoff)
             and not isOwnedByPlayerOrTeammate(instance) then
             if not HZ.recentParts[instance] then updateMotion(instance, now) end
             local closestPoint = hazardClosestPoint(instance, rootPosition)
@@ -2518,6 +2626,7 @@ local function watchOwnAbilityRemotes()
 end
 
 S.watchOwnAbilityRemotes = watchOwnAbilityRemotes
+S.recordHit = recordHit
 S.saveAttackLog = saveAttackLog
 S.clearAttackLog = clearAttackLog
 S.volumeClosestPoint = volumeClosestPoint
