@@ -11,6 +11,44 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.8.0 - 2026-09-02 - "Gone means gone"
+
+### Attacks that stayed red after they finished
+Four or five seconds of red after an attack had visibly finished - the hammer
+bots' most of all, and most of the Steampunk boss's - and the character
+guided itself along them like invisible walls. In `updateArming`:
+
+- The precast's darkest transparency was tracked **only while pending**, so
+  anything that armed the moment it appeared (live-from-spawn attacks, which
+  a pulsing or fast-brightening precast produces via `armMinDelay`) never had
+  a minimum to compare its fade against, never counted as over, and stood
+  until the game's Debris deleted the Model. Tracked always now.
+- Expiry follows the game's own rule: an attack is **over when everything
+  visible about it has faded to transparent or been removed** (after having
+  been visible), or when its **hitBox is gone** while the rest lingers for
+  effects. No longer tied to how, or whether, it armed.
+- Attacks split across sibling Models (`crossShuriken/hitBoxes` beside
+  `crossShuriken/precasts`) borrow the parent's visuals and precast.
+- `PrimaryPart` anchors are never hazards, and neither is decoration inside a
+  Model that has a hitBox (the ball's core, a cog's teeth). The 4x1x2 anchor
+  at the centre of every attack was a five-stud hot spot.
+
+### Diagonal stairs
+Every forward probe (segment test, waypoint step, idle path step) now runs
+its hit through `hitBlocksWalking`, the step-versus-wall classifier the
+direct steerer already had: a surface facing up is floor, and a lip under
+`maxStepHeight` (2.4) is stepped onto. The shin-height probe added in 4.5.1
+for the pillar plinth had been reading every stair riser as a wall, steering
+the character diagonally up each flight.
+
+### Found reading
+- The mover watchdog **rewrote `moveMode` to `walk`** after one second of no
+  movement - which a cornered character always produces - so the tween you
+  chose silently became walk for the rest of the session. It borrows walk
+  for three seconds now (`RT.moverFallbackUntil`) and hands back.
+- The wall-stall sidestep kept its anchor across ticks it did not run, so it
+  could fire a sidestep and a hop on the first tick of a new path.
+
 ## 4.7.0 - 2026-09-02 - "Steampunk knows too"
 
 `src/northern.lua` is now `src/bossevents.lua`: one listener per map remote,

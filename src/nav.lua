@@ -182,6 +182,9 @@ end
 local SEGMENT_PROBE_HEIGHT = Vector3.new(0, 2.8, 0)
 local SHIN_PROBE_HEIGHT = Vector3.new(0, -1.5, 0)   -- about a stud and a half above the floor
 local SEGMENT_SIDE_OFFSETS = { 0, 0, 0 }
+-- Defined further down (it needs castSolid); declared here because the
+-- segment test below is the first thing that asks it.
+local hitBlocksWalking
 
 local function isPathSegmentClear(fromPosition, toPosition, enemy)
     local flatDelta = Vector3.new(toPosition.X - fromPosition.X, 0, toPosition.Z - fromPosition.Z)
@@ -207,11 +210,18 @@ local function isPathSegmentClear(fromPosition, toPosition, enemy)
     sideOffsets[2] = clearanceOffset
     sideOffsets[3] = -clearanceOffset
 
+    -- A hit is a wall only if it is wall-like. A staircase rises a stud a
+    -- step, and a horizontal ray at any height meets a riser within a few
+    -- studs on the way up; treating that as a wall is what walked the
+    -- character diagonally up every flight, steering round steps it could
+    -- simply climb. The same test the direct steerer uses decides.
+    local feetY = fromPosition.Y - 3.0
     for i = 1, 3 do
         local origin = fromPosition + SEGMENT_PROBE_HEIGHT + (side * sideOffsets[i])
         local destination = toPosition + SEGMENT_PROBE_HEIGHT + (side * sideOffsets[i])
         local hit = Workspace:Raycast(origin, destination - origin, params)
-        if hit and hit.Instance and hit.Instance.CanCollide then
+        if hit and hit.Instance and hit.Instance.CanCollide
+            and hitBlocksWalking(hit, direction, feetY, exclusions) then
             return false
         end
     end
@@ -221,7 +231,8 @@ local function isPathSegmentClear(fromPosition, toPosition, enemy)
         local origin = fromPosition + SHIN_PROBE_HEIGHT
         local destination = toPosition + SHIN_PROBE_HEIGHT
         local hit = Workspace:Raycast(origin, destination - origin, params)
-        if hit and hit.Instance and hit.Instance.CanCollide then
+        if hit and hit.Instance and hit.Instance.CanCollide
+            and hitBlocksWalking(hit, direction, feetY, exclusions) then
             return false
         end
     end
@@ -765,7 +776,7 @@ end
 -- lip no taller than a step (checked by looking DOWN from head height just past
 -- the hit) is something the humanoid steps onto. Tall walls are still caught -
 -- by the head-height probe, which is unaffected.
-local function hitBlocksWalking(hit, heading, feetY, exclusions)
+hitBlocksWalking = function(hit, heading, feetY, exclusions)
     if hit.Normal.Y >= CFG.walkableNormalY then return false end
     if hit.Position.Y - feetY > CFG.maxStepHeight then return true end
     local past = hit.Position + heading * 0.75
@@ -1366,9 +1377,14 @@ local function updatePursuitMovement(enemy, humanoid, root, enemyRoot)
         if wpDist > 1.5 then
             local probe = math.min(wpDist, CFG.wallProbeDistance)
             local excl = getRaycastExclusions(enemy)
-            -- Chest and shin. The plinth of a pillar is below the chest ray.
-            if castSolid(root.Position + Vector3.new(0, 1.5, 0), toWp.Unit * probe, excl)
-                or castSolid(root.Position - Vector3.new(0, 1.5, 0), toWp.Unit * probe, excl) then
+            local dir = toWp.Unit
+            local feetY = getFeetY(root)
+            -- Chest and shin. The plinth of a pillar is below the chest ray;
+            -- a stair riser is below it too, and is a step, not a wall.
+            local high = castSolid(root.Position + Vector3.new(0, 1.5, 0), dir * probe, excl)
+            local low = castSolid(root.Position - Vector3.new(0, 1.5, 0), dir * probe, excl)
+            if (high and hitBlocksWalking(high, dir, feetY, excl))
+                or (low and hitBlocksWalking(low, dir, feetY, excl)) then
                 moveGoal = steerTowards(root, waypoint.Position, enemy)
                 NAV.needsRecompute = true
             end
@@ -1379,7 +1395,12 @@ local function updatePursuitMovement(enemy, humanoid, root, enemyRoot)
         -- moving, sidestep - alternating sides - and hop, then let the path
         -- recompute from the new spot. This is the wall the character was
         -- found standing into.
-        if not NAV.wpStallAnchor or (root.Position - NAV.wpStallAnchor).Magnitude >= 1.0 then
+        -- The anchor is only meaningful while this branch runs every tick.
+        -- Left over from a walk that ended a while ago it fired a sidestep
+        -- and a hop on the first tick of the next path.
+        local stale = not NAV.wpStallTick or now - NAV.wpStallTick > 0.3
+        NAV.wpStallTick = now
+        if stale or not NAV.wpStallAnchor or (root.Position - NAV.wpStallAnchor).Magnitude >= 1.0 then
             NAV.wpStallAnchor = root.Position
             NAV.wpStallTime = now
         elseif now - NAV.wpStallTime >= CFG.wallStallTime then
@@ -1570,7 +1591,9 @@ local function walkTowardPoint(humanoid, root, point)
             local wpDist = toWp.Magnitude
             if wpDist > 1.5 then
                 local probe = math.min(wpDist, CFG.wallProbeDistance)
-                if castSolid(rootPos + Vector3.new(0, 1.5, 0), toWp.Unit * probe, getRaycastExclusions(nil)) then
+                local excl = getRaycastExclusions(nil)
+                local hit = castSolid(rootPos + Vector3.new(0, 1.5, 0), toWp.Unit * probe, excl)
+                if hit and hitBlocksWalking(hit, toWp.Unit, getFeetY(root), excl) then
                     moveGoal = steerTowards(root, moveGoal, nil)
                     route.needsRecompute = true
                 end
