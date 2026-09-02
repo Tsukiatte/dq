@@ -1893,15 +1893,37 @@ local function recordHit(damage)
     HZ.lastHitAt = now
     HZ.lastHitName = culprit and culprit.part.Name or (ranked[1] and ranked[1].part.Name) or "nothing nearby"
 
-    -- The nearest known attack that was on us learns its window from this.
-    -- Late-bound; defined further down.
+    -- Which known attack did this? Not simply the nearest: a beam that
+    -- appeared a fifth of a second ago through where we stand is nearer than
+    -- the one that has been burning us for a second, and blaming it taught
+    -- every beam to be live from 0.2s, which made the whole arena walls.
+    -- Score: the part encloses us; it is old enough to have fired; it is
+    -- armed and not over; its learned window covers this moment. Ties to the
+    -- nearest. Late-bound; defined further down.
     if S.noteAttackHit then
-        for i = 1, math.min(#ranked, 8) do
+        local _, playerRadius = getPlayerHitboxMetrics()
+        local best, bestScore = nil, -1
+        for i = 1, math.min(#ranked, 12) do
             local r = ranked[i]
             if r.known and r.distance <= CFG.hitAttributeRadius then
-                S.noteAttackHit(r.part)
-                break
+                local st = HZ.armState[r.part]
+                local age = st and (now - st.spawn) or 99
+                local score = 0
+                if r.distance <= playerRadius + 0.5 then score = score + 2 end
+                if age >= CFG.armMinDelay then score = score + 1 end
+                if st and st.armedAt and not st.doneAt then score = score + 1 end
+                if st then
+                    local span = RT.armSpans[st.name]
+                    if span and age >= span.first - 0.3 and age <= span.last + CFG.armAssumedLinger then score = score + 2 end
+                end
+                if score > bestScore then best, bestScore = r, score end
             end
+        end
+        if best then
+            local st = HZ.armState[best.part]
+            lines[#lines + 1] = string.format("     BLAMED %s (%s) at age %.1fs, score %d",
+                best.part.Name, st and st.name or "?", st and (now - st.spawn) or -1, bestScore)
+            S.noteAttackHit(best.part)
         end
     end
 
