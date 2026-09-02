@@ -11,6 +11,35 @@ file and that table in sync on every edit.
 
 ---
 
+## 3.5.2 - 2026-09-02
+
+### Shuffling on the spot with clear ground in sight
+Three causes, and they compounded.
+
+**1. Goal choice had no hysteresis.** `bestGoal` took the plain argmin every
+time it re-picked. Two near-equal cells trade places as the field updates, and
+the bot takes a step toward each in turn — which is the shuffle. A new goal must
+now beat the held one by **`cloneGoalHysteresis`** before it can take over. The
+held goal is still dropped instantly if it turns lethal.
+
+**2. A full A\* ran every frame.** Sixty times a second, against a goal that
+changes a few times a second. Even with the destination fixed, the route wobbled
+as heat shifted and `MoveTo` was re-issued at a slightly different first step
+each frame. The path is now **reused between plans** and rebuilt only when the
+goal moves, the window slides, the next step goes lethal, or
+`clonePathInterval` (0.12s) elapses. Reached cells are dropped off the front so
+a reused path advances rather than steering back at the step behind.
+
+**3. The field carries answers of different ages.** Since 3.2.0 only a slice of
+the grid is re-measured per pass — so a stale cell that looks wonderful wins,
+gets refreshed, turns out to be terrible, and some other stale cell wins
+instead. That oscillation is pure measurement lag, nothing to do with the
+danger. **Age is now a cost** in the goal score.
+
+The third is the one I would not have found without the screenshot: it is a
+direct consequence of the slicing added for performance, and it only shows up as
+behaviour, never as a wrong number.
+
 ## 3.5.1 - 2026-09-02
 
 Two bugs in the day-old cover code, both found by watching a clip of the

@@ -348,6 +348,7 @@ local function positionCells(root)
                 cell.baseThreat = verdict.baseThreat or huge
                 cell.baseThreatLater = verdict.baseThreatLater or huge
                 cell.h0, cell.h1, cell.h2 = verdict.h0, verdict.h1, verdict.h2
+                cell.measuredAt = verdict.measuredAt or 0
             else
                 cell.standable = false
                 cell.safe = false
@@ -578,6 +579,9 @@ local function evaluateCells(root)
             and not blocked
         cell.standable = standable
         cell.measured = true
+        -- When this answer was taken. Only a slice is refreshed per pass, so
+        -- the goal chooser has to know which answers are old.
+        cell.measuredAt = now
 
         -- Ground you cannot simply walk onto is a threat, not a wall. A ledge
         -- within jump range is reachable, just expensive: a jump mid-fight is a
@@ -619,6 +623,7 @@ local function evaluateCells(root)
         end
         CL.verdictCache[cell.key] = {
             standable = cell.standable, safe = cell.safe, holds = cell.holds,
+            measuredAt = cell.measuredAt,
             threat = cell.threat, threatLater = cell.threatLater,
             baseThreat = cell.baseThreat, baseThreatLater = cell.baseThreatLater,
             h0 = cell.h0, h1 = cell.h1, h2 = cell.h2,
@@ -945,6 +950,7 @@ end
 -- so distance is only a tie-break against heat, never the other way round.
 local function bestGoal(root)
     local rootPos = root.Position
+    local now = os.clock()
     local bestK, bestScore = nil, math.huge
     for k, cell in ipairs(CL.cells) do
         if cell.standable then
@@ -957,10 +963,21 @@ local function bestGoal(root)
             local score = expected * CFG.threatWeight
                 + travel * 0.35
                 - cell.depth * CFG.cloneDepthBonus
+
+            -- Only a slice of the grid is re-measured each pass, so cells carry
+            -- answers of different ages. A stale cell that looks wonderful is
+            -- the commonest cause of the goal flip-flopping: it wins, gets
+            -- refreshed, turns out to be terrible, and some other stale cell
+            -- wins instead. Age is a cost.
+            local age = now - (cell.measuredAt or 0)
+            if age > CFG.cloneEvalInterval * 3 then
+                score = score + CFG.cloneFreshnessBias
+            end
+
             if score < bestScore then bestK, bestScore = k, score end
         end
     end
-    return bestK
+    return bestK, bestScore
 end
 
 local function buildPath(parent, start, goalK)
@@ -1074,11 +1091,24 @@ local function runCloneEvasion(humanoid, root)
     -- exit - you are never in the hottest place for long.
     local saturated = CL.safeCount == 0
     local commit = saturated and 0 or CFG.cloneCommitTime
-    local stale = not goalK
-        or (now - CL.goalAt) >= commit
-        or CL.cells[goalK].threat >= CFG.threatLethal
-    if stale then
-        goalK = bestGoal(root)
+    -- Forced off the current goal only when it is genuinely no longer viable;
+    -- otherwise the held goal is defended by hysteresis below.
+    local forced = not goalK or CL.cells[goalK].threat >= CFG.threatLethal
+    local due = forced or (now - CL.goalAt) >= commit
+
+    if due then
+        local candidate, candidateScore = bestGoal(root)
+        -- A NEW goal has to be meaningfully better than the one being held.
+        -- Taking the argmin every time meant two near-equal cells traded places
+        -- as the field updated and the bot walked a step towards each in turn,
+        -- which is the shuffling on the spot.
+        if candidate and not forced and goalK
+            and candidateScore > (CL.goalScore or huge) - CFG.cloneGoalHysteresis then
+            candidate = goalK
+            candidateScore = CL.goalScore
+        end
+        goalK = candidate
+        CL.goalScore = candidateScore or huge
         -- If the whole window is hot, the least bad cell in it is usually the
         -- corner we are already stuck in. Look further out and aim at the rim.
         if saturated and goalK then
@@ -1108,22 +1138,45 @@ local function runCloneEvasion(humanoid, root)
         return fleeBlindly(humanoid, root, "nowhere to stand")
     end
 
-    -- Lethal cells are impassable; if that leaves no route, run it again with
-    -- them merely expensive. Being cornered is not a reason to stand still.
-    local parent, startK = astar(goalK, false)
-    if not parent and CFG.threatDesperate then
-        parent, startK = astar(goalK, true)
-        heavyDebugThrottled("clone_desperate", 1.0, "Clone",
-            "Every route out crosses something lethal; taking the coolest one rather than standing still.")
-    end
-    if not parent then
-        buildPath(nil, nil, nil)
-        paintCells()
-        return fleeBlindly(humanoid, root, "no route out")
+    -- The path is REUSED between plans. A full A* was running every frame -
+    -- sixty times a second - against a goal that only changes a few times a
+    -- second, so the route wobbled frame to frame as the heat shifted and
+    -- MoveTo was re-issued at a slightly different first step each time. That
+    -- is visible as stutter even when the destination never moved.
+    --
+    -- Path cells are window indices and the window slides as we walk, so a
+    -- shift invalidates them just as it does the goal.
+    local windowMoved = CL.pathCenterI ~= CL.centerI or CL.pathCenterJ ~= CL.centerJ
+    local needPath = windowMoved
+        or #CL.path == 0
+        or (now - CL.pathAt) >= CFG.clonePathInterval
+        or not CL.cells[goalK].isGoal
+    if not needPath then
+        -- Or if the step we are about to take has gone lethal underneath us.
+        local nextK = CL.path[1]
+        if nextK and CL.cells[nextK].threat >= CFG.threatLethal then needPath = true end
     end
 
-    buildPath(parent, startK, goalK)
-    paintCells()
+    if needPath then
+        -- Lethal cells are impassable; if that leaves no route, run it again
+        -- with them merely expensive. Being cornered is not a reason to stand
+        -- still.
+        local parent, startK = astar(goalK, false)
+        if not parent and CFG.threatDesperate then
+            parent, startK = astar(goalK, true)
+            heavyDebugThrottled("clone_desperate", 1.0, "Clone",
+                "Every route out crosses something lethal; taking the coolest one rather than standing still.")
+        end
+        if not parent then
+            buildPath(nil, nil, nil)
+            paintCells()
+            return fleeBlindly(humanoid, root, "no route out")
+        end
+        buildPath(parent, startK, goalK)
+        CL.pathAt = now
+        CL.pathCenterI, CL.pathCenterJ = CL.centerI, CL.centerJ
+        paintCells()
+    end
 
     local goal = CL.cells[goalK]
     if #CL.path == 0 or Vector3.new(goal.x - rootPos.X, 0, goal.z - rootPos.Z).Magnitude <= 1.0 then
