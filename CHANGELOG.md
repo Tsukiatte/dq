@@ -11,6 +11,29 @@ file and that table in sync on every edit.
 
 ---
 
+## 3.2.6 - 2026-09-02
+
+### The window is a circle
+The corners of a square window are its **furthest** cells — 1.4 times the
+radius — which made them simultaneously the least useful ground in the grid and
+the most expensive to path to. They were a quarter of the total work.
+
+| | reach | cells |
+|---|---|---|
+| square (was) | 21 studs | 841 |
+| circle, same reach | 21 studs | 613 — **73% of the work** |
+| circle, same budget | **24 studs** | 797 |
+
+So it is either a quarter cheaper or three studs further-sighted, and further
+sight is worth a great deal given how often being cornered came down to not
+seeing past the grid.
+
+The cell array stays square, because the indexing is arithmetic and a ragged
+array would cost more than it saved. The corners are simply never active: never
+measured, never drawn, never routed through. And because they are never
+*measured*, they cannot be mistaken for walls by the edge-warming pass — the
+same trap that produced the drifting yellow circles in 3.2.4.
+
 ## 3.2.5 - 2026-09-02
 
 ### Every boss attack in the game was missing

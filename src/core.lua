@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 3.2.5
+    VERSION : 3.2.6
     BUILD   : 2026-09-01
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "3.2.5"
+local SCRIPT_VERSION = "3.2.6"
 local SCRIPT_BUILD_DATE = "2026-09-01"
 local SCRIPT_CODENAME = "Thrift"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "3.2.6", date = "2026-09-02", notes = "The pathfinding window is a circle rather than a square. The corners of a square are its furthest cells - 1.4 times the radius - so they were the least useful ground in the grid and the most expensive to path to, and they were a quarter of the total work. Dropping them costs nothing and buys about three more studs of sight for the same cell budget: 24 studs instead of 21 at the default. The cell array stays square because the indexing is arithmetic; the corners are simply never active, never measured, never drawn and never routed through - and because they are never measured they cannot be mistaken for walls by the edge pass." },
     { version = "3.2.5", date = "2026-09-02", notes = "Every boss attack in the game was missing from the name table. Bosses keep their attacks in a subfolder of their own - enemyProjectiles.Steampunk.bossCannonBeam and so on - and the table was built from top-level children only, then dropped Folders to avoid picking up gear, which threw away 111 attack models. Rebuilt recursively from both dumps: 519 names, up from 238. Every one of those models is built the same way, a PrimaryPart plus a hitBox and a precast, so those two names now catch attacks from bosses nobody has dumped. Two fixes for being cornered. The grid only sees about twenty studs, so boxed in with attacks filling all of it the clear ground was invisible and the bot settled for the least bad corner; when the whole window is hot it now samples bearings well beyond the grid and heads for the coolest. And the ordinary stuck detector is switched off while dodging, so nothing at all was watching for the character being wedged between a wall and an enemy - it now hops, drops the goal and marks the obstruction impassable." },
     { version = "3.2.4", date = "2026-09-02", notes = "The drifting yellow circles were the wall-edge pass treating cells the slicing had not reached yet as if they were walls. Since 3.2.0 only a slice of the grid is measured per pass, so after every window shift most cells are simply unknown - and each freshly measured cell next to one was being given edge heat of 21, which is 38 percent of lethal and lands exactly in the yellow band. It now only counts neighbours that have actually been measured and found impassable. Separately, heights were compared against the root part centre rather than the floor underfoot, and the root sits about three studs up: Step height 2.5 really described a rise of five and a half, so the slider said one thing and the grid did another. It measures from the floor now." },
     { version = "3.2.3", date = "2026-09-02", notes = "The basic attack no longer needs the mouse. The weapon is a Tool whose Activated event the server handles, and Tool:Activate() raises that same event straight from the client - no cursor involved, so there is nothing to press by accident and nothing to fight the player over. Auto uses it whenever a weapon is equipped and falls back to a click otherwise; Tool only never touches the mouse at all. And when a click IS used it goes to the middle of the viewport rather than wherever the cursor happens to be resting, which is what made the bot press buttons. Allow auto-clicking is the off switch." },
@@ -910,6 +911,9 @@ CL.progressPos = nil
 CL.progressAt = 0
 CL.escapeDir = nil
 CL.escapeAt = 0
+-- Indices of the cells inside the circle. The array stays square because the
+-- indexing is arithmetic; the corners are simply never active.
+CL.activeCells = {}
 CL.searchGen = 0
 -- Last verdict per world cell, so a window shift can carry the answer over
 -- instead of blanking it. See the flicker note in clone.lua.
