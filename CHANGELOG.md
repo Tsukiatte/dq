@@ -11,6 +11,40 @@ file and that table in sync on every edit.
 
 ---
 
+## 3.1.1 - 2026-09-02
+
+### A projectile is a line, not a place
+A moving hazard heated only the square it currently occupied, so the ground
+**in front of an oncoming shot read as perfectly cool** and the bot walked into
+it. It now heats the whole corridor it is about to sweep:
+
+- The point is projected onto the line of travel. Behind the projectile is the
+  one safe place to be, and is left cool.
+- Heat is weighted by **whether it arrives there about when you would** — the
+  same urgency curve as an announced attack, so a corridor a shot reaches in
+  three seconds is warm and one it reaches as you get there is lethal.
+- **Slow drifters count.** `threatSweepMinSpeed` is 3 studs/sec against the
+  sidestep reflex's 12: a tornado ambling across the floor still owns the
+  ground in front of it, even though it is far too slow to be worth
+  sidestepping.
+
+### It could not walk away from things
+The bigger one. Entering evasion at all was still decided by the **old binary
+test**:
+
+```lua
+local inHazard = CFG.dodgeEnabled and not isPositionSafeFromDamageBricks(...)
+```
+
+So a square at heat 40 — visibly orange, halfway to lethal — was called "safe",
+the bot skipped the dodge branch entirely, and went off to pursue an enemy
+straight through it. **The heat field was being computed and then ignored for
+the one decision that actually matters.**
+
+In Clone mode the gate is now the field itself: any heat at or above **Move at
+heat** (6 of 100, deliberately low) means relocate. Legacy keeps the binary
+test, which is the right model for how Legacy dodges.
+
 ## 3.1.0 - 2026-09-02 - "Heat"
 
 Safety stops being a yes or no. It is now **heat**: a number from 0 to 100, at

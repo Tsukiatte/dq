@@ -262,6 +262,9 @@ local function buildConfigTable()
             cloneSafeDwell = CFG.cloneSafeDwell,
             cloneKeepDistance = CFG.cloneKeepDistance,
             threatWeight = CFG.threatWeight,
+            threatMoveAt = CFG.threatMoveAt,
+            threatSweepEnabled = CFG.threatSweepEnabled,
+            threatSweepTime = CFG.threatSweepTime,
             threatLethal = CFG.threatLethal,
             threatHorizon = CFG.threatHorizon,
             threatFalloff = CFG.threatFalloff,
@@ -404,6 +407,9 @@ local function applyConfigData(data)
         CFG.cloneSafeDwell = tonumber(combat.cloneSafeDwell) or CFG.cloneSafeDwell
         if combat.cloneKeepDistance ~= nil then CFG.cloneKeepDistance = combat.cloneKeepDistance == true end
         CFG.threatWeight = tonumber(combat.threatWeight) or CFG.threatWeight
+        CFG.threatMoveAt = tonumber(combat.threatMoveAt) or CFG.threatMoveAt
+        CFG.threatSweepTime = tonumber(combat.threatSweepTime) or CFG.threatSweepTime
+        if combat.threatSweepEnabled ~= nil then CFG.threatSweepEnabled = combat.threatSweepEnabled == true end
         CFG.threatLethal = tonumber(combat.threatLethal) or CFG.threatLethal
         CFG.threatHorizon = tonumber(combat.threatHorizon) or CFG.threatHorizon
         CFG.threatFalloff = tonumber(combat.threatFalloff) or CFG.threatFalloff
