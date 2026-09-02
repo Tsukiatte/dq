@@ -525,6 +525,11 @@ local function isDamageBrick(part)
     -- .projectiles / .abilities, so "is this mine or theirs" is a lookup, not
     -- a guess. See game/GAME_NOTES.md.
     if isKnownOwnEffect(part) then return false end
+    -- Workspace.vfxPool holds the player's own hit effects (Ability Attack Hit,
+    -- Melee Attack V1..V3), pooled and reused. Their parts carry generic names
+    -- like "Part", so nothing else would catch them, and the bot was fleeing
+    -- from its own ability the moment it landed.
+    if RT.vfxPool and part:IsDescendantOf(RT.vfxPool) then return false end
     -- A safe-spot marker is the opposite of a hazard: it is where you must
     -- stand. Treating it as damage would drive the bot out of the one survivable
     -- circle on the floor.
@@ -565,7 +570,15 @@ local function isDamageBrick(part)
     if not telegraphShaped and isMapGeometry(part) then return false end
 
     local parent = part.Parent
-    if not parent or parent == Workspace then return false end
+    if not parent then return false end
+
+    -- A part parented straight to Workspace used to be rejected outright, on
+    -- the theory that real attacks live inside a model. This game does the
+    -- opposite: PrecastHitbox does `Part.Parent = workspace` literally, and so
+    -- do the boss beams. That one line was vetoing precisely the things most
+    -- worth seeing. Loose parts now fall through to the appearance test, which
+    -- is what it was there to approximate in the first place.
+    if parent == Workspace then return telegraphShaped end
 
     local parentName = string.lower(parent.Name)
 
@@ -1663,7 +1676,17 @@ local function stopWorldIndex()
     HZ.indexBuild = nil
 end
 
+-- The pool exists from map load; finding it once beats an ancestor walk per
+-- part per frame.
+local function findVfxPool()
+    RT.vfxPool = Workspace:FindFirstChild("vfxPool")
+    if RT.vfxPool then
+        heavyDebug("Own", "Found Workspace.vfxPool; our own hit effects will not be dodged.")
+    end
+end
+
 local function startWorldIndex()
+    findVfxPool()
     stopWorldIndex()
     table.clear(HZ.enemyModels)
     table.clear(HZ.billboards)

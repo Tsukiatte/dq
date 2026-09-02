@@ -11,6 +11,44 @@ file and that table in sync on every edit.
 
 ---
 
+## 3.0.4 - 2026-09-02
+
+### One line was hiding most of the attacks
+`isDamageBrick` had this, near the top of its heuristics:
+
+```lua
+if not parent or parent == Workspace then return false end
+```
+
+The theory was that a real attack lives inside a model, and a part loose in
+Workspace is scenery. **This game does the exact opposite.** `PrecastHitbox`
+does `Part.Parent = workspace` literally, and the boss beams do the same — so
+that single line was vetoing precisely the things most worth seeing, which is
+why whole attacks read as clear green floor.
+
+Loose parts now fall through to the appearance test, which is what the rule was
+a crude approximation of anyway.
+
+### It was dodging its own ability
+`Workspace.vfxPool` holds the player's own pooled hit effects — `Ability Attack
+Hit`, `Melee Attack V1`..`V3`. Their parts carry generic names like `Part`, so
+neither the name tables nor the own-effect timing caught them, and the bot fled
+from its own ability the moment it landed (the parts labelled `Part >> 155 st/s`
+at odd heights). Anything under that pool is ours.
+
+### Defaults
+Retuned now that the footprint is measured from the body rather than including
+cosmetics, so these are honest numbers rather than compensation:
+
+| setting | was | now |
+|---|---|---|
+| Disc size | 1.0 (needed halving) | **1.0**, and correct |
+| Safety margin | 0.5 | **0.75** |
+| Depth bonus | 1.0 | **1.5** — prefer open ground |
+| Enemy space / spacing | 11 / 18 | **12 / 20** |
+| Must stay safe for | 1.6 | 1.6 |
+| Spacing / cells | 1.5 / 900 | 1.5 / 900 |
+
 ## 3.0.3 - 2026-09-02
 
 ### Enemies get a circle of their own
