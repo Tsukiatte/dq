@@ -239,6 +239,10 @@ local function buildConfigTable()
             renderHazards = RT.renderHazardsEnabled,
             renderHitbox = RT.renderHitboxEnabled,
             showWalls = CFG.showWalls,
+            panelAutofarm = CFG.panelAutofarm,
+            panelRoutes = CFG.panelRoutes,
+            panelAccount = CFG.panelAccount,
+            panelConfigs = CFG.panelConfigs,
             debugLevel = RT.debugLevel,
         },
         streamer = {
@@ -283,27 +287,11 @@ local function saveConfig()
 end
 
 -- Returns applied, message. Widgets are refreshed by the caller, which owns them.
-local function loadConfig()
-    if not hasFileAccess() then
-        return false, "no file access in this executor"
-    end
-
-    local exists = false
-    pcall(function() exists = isfile(CONFIG_FILE) end)
-    if not exists then
-        return false, "no saved config yet"
-    end
-
-    local data
-    local ok, err = pcall(function()
-        data = game:GetService("HttpService"):JSONDecode(readfile(CONFIG_FILE))
-    end)
-
-    if not ok or type(data) ~= "table" then
-        heavyDebug("Config", "Load failed: " .. tostring(err))
-        return false, "config file unreadable"
-    end
-
+-- The apply half of a config load, split out (2.10.0) so a stored profile can
+-- be applied without a file read behind it: loadConfig reads the file and hands
+-- the decoded table here, and the Configs panel hands it one it already had.
+-- Returns whether Streamer Mode should come up enabled.
+local function applyConfigData(data)
     local combat = data.combat
     if type(combat) == "table" then
         CFG.attackRange = tonumber(combat.attackRange) or CFG.attackRange
@@ -357,6 +345,10 @@ local function loadConfig()
         if visuals.renderHazards ~= nil then RT.renderHazardsEnabled = visuals.renderHazards == true end
         if visuals.renderHitbox ~= nil then RT.renderHitboxEnabled = visuals.renderHitbox == true end
         if visuals.showWalls ~= nil then CFG.showWalls = visuals.showWalls == true end
+        if visuals.panelAutofarm ~= nil then CFG.panelAutofarm = visuals.panelAutofarm == true end
+        if visuals.panelRoutes ~= nil then CFG.panelRoutes = visuals.panelRoutes == true end
+        if visuals.panelAccount ~= nil then CFG.panelAccount = visuals.panelAccount == true end
+        if visuals.panelConfigs ~= nil then CFG.panelConfigs = visuals.panelConfigs == true end
         RT.debugLevel = tonumber(visuals.debugLevel) or RT.debugLevel
     end
     -- Enemy attacks are always highlighted since 2.3.0; an older config that
@@ -474,8 +466,142 @@ local function loadConfig()
     for _ in pairs(RT.mapData) do mapCount = mapCount + 1 end
     heavyDebug("Config", string.format("Loaded map %s of %d stored.", RT.currentMap, mapCount))
 
+    return streamer and streamer.enabled == true
+end
+
+-- =========================================================================
+-- NAMED CONFIGS (2.10.0)
+--
+-- A saved config is a full snapshot of buildConfigTable() under a name, in its
+-- own file. The working config is still DungeonAutofarm_config.json and still
+-- autoloads; these are the ones you keep deliberately - a setup per dungeon, a
+-- careful one and a reckless one, whatever you like.
+-- =========================================================================
+
+local function saveConfigStore()
+    if not hasFileAccess() then return false, "no file access in this executor" end
+    local ok, err = pcall(function()
+        local payload = { version = SCRIPT_VERSION, configs = RT.configs }
+        writefile(CFG.configFile, game:GetService("HttpService"):JSONEncode(payload))
+    end)
+    if ok then
+        heavyDebug("Config", string.format("Wrote %d saved config(s) to %s.", #RT.configs, CFG.configFile))
+        return true
+    end
+    heavyDebug("Config", "Config store save failed: " .. tostring(err))
+    return false, tostring(err)
+end
+
+local function loadConfigStore()
+    if not hasFileAccess() then return false end
+    local exists = false
+    pcall(function() exists = isfile(CFG.configFile) end)
+    if not exists then return false end
+
+    local data
+    local ok = pcall(function()
+        data = game:GetService("HttpService"):JSONDecode(readfile(CFG.configFile))
+    end)
+    if not ok or type(data) ~= "table" or type(data.configs) ~= "table" then
+        heavyDebug("Config", "Config store unreadable; starting with none.")
+        return false
+    end
+
+    table.clear(RT.configs)
+    for _, entry in ipairs(data.configs) do
+        if type(entry) == "table" and type(entry.name) == "string" and type(entry.data) == "table" then
+            table.insert(RT.configs, {
+                name = entry.name,
+                savedAt = tonumber(entry.savedAt) or 0,
+                data = entry.data,
+            })
+        end
+    end
+    heavyDebug("Config", string.format("Loaded %d saved config(s).", #RT.configs))
+    return true
+end
+
+-- Saving under a name that already exists overwrites it, which is what you
+-- want when you are tuning one setup rather than accumulating near-duplicates.
+local function saveNamedConfig(name)
+    name = tostring(name):gsub("^%s+", ""):gsub("%s+$", "")
+    if name == "" then return false, "give it a name" end
+
+    local snapshot = { name = name, savedAt = os.time(), data = buildConfigTable() }
+    for i, entry in ipairs(RT.configs) do
+        if entry.name == name then
+            RT.configs[i] = snapshot
+            saveConfigStore()
+            heavyDebug("Config", string.format("Overwrote saved config '%s'.", name))
+            if S.refreshConfigPanel then S.refreshConfigPanel() end
+            return true
+        end
+    end
+    table.insert(RT.configs, snapshot)
+    saveConfigStore()
+    heavyDebug("Config", string.format("Saved config '%s'.", name))
+    if S.refreshConfigPanel then S.refreshConfigPanel() end
+    return true
+end
+
+local function loadNamedConfig(index)
+    local entry = RT.configs[index]
+    if not entry then return false end
+    local wantsStreamer = applyConfigData(entry.data)
+    heavyDebug("Config", string.format("Loaded saved config '%s'.", entry.name))
+    if S.refreshAllWidgets then S.refreshAllWidgets() end
+    if S.refreshPathPanel then S.refreshPathPanel() end
+    if S.refreshMacroPanel then S.refreshMacroPanel() end
+    if S.refreshMapPanel then S.refreshMapPanel() end
+    if S.refreshAttackBookPanel then S.refreshAttackBookPanel() end
+    return true, wantsStreamer
+end
+
+local function deleteNamedConfig(index)
+    local entry = table.remove(RT.configs, index)
+    if not entry then return false end
+    saveConfigStore()
+    heavyDebug("Config", string.format("Deleted saved config '%s'.", entry.name))
+    if S.refreshConfigPanel then S.refreshConfigPanel() end
+    return true
+end
+
+local function renameNamedConfig(index, name)
+    local entry = RT.configs[index]
+    if not entry then return false end
+    name = tostring(name):gsub("^%s+", ""):gsub("%s+$", "")
+    if name == "" then return false end
+    entry.name = name
+    saveConfigStore()
+    if S.refreshConfigPanel then S.refreshConfigPanel() end
+    return true
+end
+
+local function loadConfig()
+    if not hasFileAccess() then
+        return false, "no file access in this executor"
+    end
+
+    local exists = false
+    pcall(function() exists = isfile(CONFIG_FILE) end)
+    if not exists then
+        return false, "no saved config yet"
+    end
+
+    local data
+    local ok, err = pcall(function()
+        data = game:GetService("HttpService"):JSONDecode(readfile(CONFIG_FILE))
+    end)
+
+    if not ok or type(data) ~= "table" then
+        heavyDebug("Config", "Load failed: " .. tostring(err))
+        return false, "config file unreadable"
+    end
+
+    local wantsStreamer = applyConfigData(data)
+    loadConfigStore()
     heavyDebug("Config", "Loaded from " .. CONFIG_FILE)
-    return true, streamer and streamer.enabled == true
+    return true, wantsStreamer
 end
 
 local function syncStreamerToggleWidget()
@@ -487,6 +613,11 @@ end
 S.loadConfig = loadConfig
 S.saveConfig = saveConfig
 S.setCurrentMap = setCurrentMap
+S.saveNamedConfig = saveNamedConfig
+S.loadNamedConfig = loadNamedConfig
+S.deleteNamedConfig = deleteNamedConfig
+S.renameNamedConfig = renameNamedConfig
+S.loadConfigStore = loadConfigStore
 S.saveMacroFile = saveMacroFile
 S.loadMacroFile = loadMacroFile
 S.syncCurrentMapToStore = syncCurrentMapToStore

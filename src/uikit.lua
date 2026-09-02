@@ -466,6 +466,41 @@ local function toggle(parent, text, get, set, order, explain)
     return { row = r, render = render }
 end
 
+-- A square toggle, for switching whole modules on and off. Deliberately a
+-- different shape from the pill: a pill reads as a setting, and these are not
+-- settings - they decide whether a thing exists on screen at all. On takes the
+-- accent gradient, off greys out.
+local function squareToggle(parent, text, get, set, order, explain)
+    local r, _, _ = row(parent, text, order, nil, 32)
+    local hit = hoverable(r, true)
+
+    local box = Instance.new("Frame")
+    box.Name = "Box"
+    box.BackgroundColor3 = Color3.new(1, 1, 1)
+    box.BorderSizePixel = 0
+    box.Size = UDim2.fromOffset(24, 24)
+    box.LayoutOrder = 2
+    box.Parent = r
+    corner(box, Theme.RadiusMd)
+    local boxStroke = stroke(box, Theme.Hairline, 1)
+    local grad = accentGradient(box, 45)
+
+    local function render()
+        local on = get() and true or false
+        grad.Enabled = on
+        box.BackgroundColor3 = on and Color3.new(1, 1, 1) or Theme.SurfaceField
+        boxStroke.Color = on and Theme.AccentMid or Theme.Hairline
+        boxStroke.Transparency = on and 1 or 0
+    end
+    render()
+    hit.onClick(function()
+        set(not get())
+        render()
+    end)
+    tip(r, explain)
+    return { row = r, render = render }
+end
+
 -- Slider: label + description, then an 18px track whose fill carries the
 -- readout on its right edge, so the number always sits on the accent.
 local function slider(parent, text, desc, minVal, maxVal, isFloat, get, set, order, explain)
@@ -1392,7 +1427,7 @@ S.UIKit = {
     accentGradient = accentGradient, bodyGradient = bodyGradient, shadow = shadow,
     ensureTip = ensureTip, tip = tip, hideTip = hideTip,
     chevron = chevron, row = row, hoverable = hoverable,
-    toggle = toggle, slider = slider, dropdown = dropdown, numberBox = numberBox,
+    toggle = toggle, squareToggle = squareToggle, slider = slider, dropdown = dropdown, numberBox = numberBox,
     colorRow = colorRow, button = button, buttonRow = buttonRow,
     textField = textField, list = list, listEntry = listEntry, iconButton = iconButton,
     window = window, section = section, separator = separator, segmented = segmented,
