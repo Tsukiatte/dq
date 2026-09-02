@@ -1902,7 +1902,12 @@ local function recordHit(damage)
         -- got learned this way.
         -- No index timestamp means it was here before we were: older still.
         local old = HZ.seenAt[p] == nil or now - HZ.seenAt[p] > 20
-        if not marker and not old and not GENERIC_PART_NAMES[name] and not NEVER_OWN[name] and not HZ.learnedNames[name] then
+        -- A big anchored part sitting directly under Workspace is a trigger
+        -- volume or the map, whatever was next to us: FirstPart, 217 studs
+        -- a side, kept getting learned by a hit taken inside it.
+        local size = p.Size
+        local static = p.Anchored and (p.Parent == Workspace or size.X >= 40 or size.Y >= 40 or size.Z >= 40)
+        if not marker and not old and not static and not GENERIC_PART_NAMES[name] and not NEVER_OWN[name] and not HZ.learnedNames[name] then
             HZ.learnedNames[name] = true
             lines[#lines + 1] = "     LEARNED '" .. name .. "' as an attack"
             heavyDebug("Hit", string.format("Took %.0f damage next to '%s', which detection did not know. Learned it.", damage, name))
