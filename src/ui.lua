@@ -12,11 +12,13 @@ local HZ = S.HZ
 local LD = S.LD
 local MC = S.MC
 local CL = S.CL
+local ZN = S.ZN
 local K = S.UIKit
 local T = S.UIKit.Theme
 local LocalPlayer = S.LocalPlayer
 local Players = S.Players
 local RunService = S.RunService
+local Lighting = S.Lighting
 local UserInputService = S.UserInputService
 local heavyDebug = S.heavyDebug
 local setMovementState = S.setMovementState
@@ -46,6 +48,9 @@ local setLowDetailEnabled = S.setLowDetailEnabled
 local refreshLowDetail = S.refreshLowDetail
 local clearKeepList = S.clearKeepList
 local removeAttackRecord = S.removeAttackRecord
+local addZoneDef = S.addZoneDef
+local removeZoneDef = S.removeZoneDef
+local clearZonePreview = S.clearZonePreview
 local clearAttackBook = S.clearAttackBook
 local invalidateAttackBook = S.invalidateAttackBook
 local describeRecord = S.describeRecord
@@ -184,6 +189,9 @@ local function destructScript()
     setStreamerEnabled(false)
 
     -- Everything drawn in the world lives under this one folder.
+    -- The blur lives in Lighting, outside our own GUI, so it has to be taken
+    -- out by hand or it stays on the player's screen after we are gone.
+    if RT.blurEffect then RT.blurEffect:Destroy() RT.blurEffect = nil end
     if RT.visualRoot then RT.visualRoot:Destroy() RT.visualRoot = nil end
     if RT.scriptGui then RT.scriptGui:Destroy() RT.scriptGui = nil end
 
@@ -393,6 +401,11 @@ end
 -- The control windows
 -- =========================================================================
 local function createControlUI()
+    -- Forward declarations. The Attacks panel is built before the Telegraphs
+    -- section but shares its pickers, so both refresh functions have to exist
+    -- as locals before either half refers to the other - otherwise the earlier
+    -- reference silently binds to a global and does nothing.
+    local syncPickerButtons, syncAttackButtons
     local playerGui = LocalPlayer:WaitForChild("PlayerGui")
     local oldGui = playerGui:FindFirstChild("DungeonAutofarmUI")
     if oldGui then oldGui:Destroy() end
@@ -408,6 +421,30 @@ local function createControlUI()
     gui:SetAttribute("BuildDate", SCRIPT_BUILD_DATE)
     RT.scriptGui = gui
     K.ensureTip(gui)
+
+    -- The world behind the interface. The dim is a sheet in this ScreenGui at
+    -- a ZIndex below the windows; the blur is a Lighting effect, which only
+    -- touches the 3D view and never the GUI drawn on top of it.
+    local dim = Instance.new("Frame")
+    dim.Name = "Dim"
+    dim.BackgroundColor3 = Color3.new(0, 0, 0)
+    dim.BackgroundTransparency = 1
+    dim.BorderSizePixel = 0
+    dim.Size = UDim2.fromScale(1, 1)
+    dim.Visible = false
+    dim.ZIndex = 1
+    dim.Parent = gui
+
+    if RT.blurEffect then RT.blurEffect:Destroy() end
+    RT.blurEffect = nil
+    pcall(function()
+        local blur = Instance.new("BlurEffect")
+        blur.Name = "DungeonAutofarmBlur"
+        blur.Size = 0
+        blur.Enabled = false
+        blur.Parent = Lighting
+        RT.blurEffect = blur
+    end)
 
     buildHud(gui)
 
@@ -441,6 +478,12 @@ local function createControlUI()
         name = "Configs", title = "Configs", width = 310, height = 360,
         position = place(716, 214, 310, 360), visible = false,
         info = "Saved setups. Each one is a complete snapshot of every setting, kept in its own file so it survives between sessions.",
+    })
+
+    local attacks = K.window(gui, {
+        name = "Attacks", title = "Attacks", width = 330, height = 560,
+        position = place(1040, 300, 330, 560), visible = false,
+        info = "Everything about this map's attacks: freeze them so you can point at one, add it to the book, and draw a hazard around a decoration that only announces one.",
     })
 
     local modules = K.window(gui, {
@@ -526,6 +569,102 @@ local function createControlUI()
     end, "There is no account system yet, so this only closes the interface. It is here for when there is one.")
     accountButtons.add("Detach", "danger", destructScript,
         "Unload the script completely: stops both loops, puts the world back the way it was and removes the interface.")
+
+    -- ------------------------------------------------------------------
+    -- Attacks: this map's book, the pickers, and the zone tools.
+    -- ------------------------------------------------------------------
+    local attackMapValues = {}
+    for _, code in ipairs(MAP_CODES) do
+        table.insert(attackMapValues, { value = code, label = code .. "  -  " .. (MAP_LABELS[code] or code) })
+    end
+    local attackMapDropdown = track(K.dropdown(attacks.body, "Map", attackMapValues,
+        function() return RT.currentMap end,
+        function(code)
+            setCurrentMap(code)
+            refreshAllWidgets()
+            if S.refreshPathPanel then S.refreshPathPanel() end
+            if S.refreshMacroPanel then S.refreshMacroPanel() end
+            if S.refreshMapPanel then S.refreshMapPanel() end
+            S.refreshAttackBookPanel()
+            S.refreshZonePanel()
+        end, 1,
+        "The attack book and the drawn zones below belong to this dungeon. Switching here switches everything else too."))
+
+    K.caption(attacks.body,
+        "An attack only exists on screen for a fraction of a second. Freeze holds a copy of every one that appears so you can take your time pointing at it.", 2)
+
+    local attackPickers = K.buttonRow(attacks.body, 3)
+    local freezeButton2, pickButton2, zoneButton
+    syncAttackButtons = function()
+        local pickOn = HZ.pickerEnabled and not HZ.ownPickerEnabled and not LD.pickerEnabled and not ZN.pickerEnabled
+        local zoneOn = HZ.pickerEnabled and ZN.pickerEnabled
+        freezeButton2.BackgroundColor3 = HZ.freezeEnabled and Color3.fromRGB(90, 190, 255) or T.SurfaceElement
+        freezeButton2.TextColor3 = HZ.freezeEnabled and T.TextOnAccent or T.TextPrimary
+        pickButton2.BackgroundColor3 = pickOn and T.AccentMid or T.SurfaceElement
+        pickButton2.TextColor3 = pickOn and T.TextOnAccent or T.TextPrimary
+        zoneButton.BackgroundColor3 = zoneOn and T.AccentMid or T.SurfaceElement
+        zoneButton.TextColor3 = zoneOn and T.TextOnAccent or T.TextPrimary
+    end
+    freezeButton2 = attackPickers.add("Freeze", "ghost", function()
+        setFreezeEnabled(not HZ.freezeEnabled)
+        syncAttackButtons()
+        syncPickerButtons()
+    end, "Hold a still copy of every attack that appears, so a telegraph that lasts half a second can be pointed at.")
+    pickButton2 = attackPickers.add("Select attack", "ghost", function()
+        local on = not (HZ.pickerEnabled and not HZ.ownPickerEnabled and not LD.pickerEnabled and not ZN.pickerEnabled)
+        setTelegraphPickerEnabled(on, "telegraph")
+        syncAttackButtons()
+        syncPickerButtons()
+    end, "Click an attack - or a frozen copy of one - to add it to this map's Attack Book.")
+    zoneButton = attackPickers.add("Draw zone", "ghost", function()
+        local on = not (HZ.pickerEnabled and ZN.pickerEnabled)
+        setTelegraphPickerEnabled(on, "zone")
+        syncAttackButtons()
+        syncPickerButtons()
+    end, "Press on a decoration that announces an attack, drag outwards to size a hazard around it, release. Every copy of that decoration then carries one.")
+
+    local shapeDropdown = track(K.dropdown(attacks.body, "Zone shape", {
+        { value = "circle" }, { value = "square" },
+    }, function() return ZN.draftShape end, function(v) ZN.draftShape = v end, 4,
+        "The shape drawn by the next drag. Circle suits a shockwave, square suits a floor tile."))
+
+    K.caption(attacks.body, "This map's attack book", 5)
+    local attackList = K.list(attacks.body, 190, 6)
+    local attackButtons = K.buttonRow(attacks.body, 7)
+
+    K.caption(attacks.body, "Zones drawn on this map", 8)
+    local zoneList = K.list(attacks.body, 130, 9)
+    local zoneButtons = K.buttonRow(attacks.body, 10)
+
+    S.refreshZonePanel = function()
+        if not zoneList.Parent then return end
+        for _, child in ipairs(zoneList:GetChildren()) do
+            if child:IsA("GuiObject") then child:Destroy() end
+        end
+        if #ZN.defs == 0 then
+            local l = K.label(zoneList, "None. Arm Draw zone, press on a warning decoration and drag outwards.", "captionSub", 1)
+            l.Size = UDim2.new(1, 0, 0, 32)
+            l.TextWrapped = true
+            return
+        end
+        for i, def in ipairs(ZN.defs) do
+            local row = K.listEntry(zoneList, def.name,
+                string.format("%s, %.0f studs%s", def.shape, def.radius,
+                    def.parentName ~= "" and (" - in " .. def.parentName) or ""), i, 1, 40)
+            K.iconButton(row.actions, "delete", function()
+                removeZoneDef(i)
+            end, 1, "Remove this zone. Every volume it placed goes with it.")
+        end
+    end
+    S.refreshZonePanel()
+
+    zoneButtons.add("Save map data", "accent", function()
+        local ok, err = saveConfig()
+        setMovementState(ok and ("saved " .. RT.currentMap) or ("save failed: " .. tostring(err)))
+    end, "Write this map's attack book and zones to the config, so they are there next time you execute.")
+    zoneButtons.add("Clear zones", "danger", function()
+        for i = #ZN.defs, 1, -1 do removeZoneDef(i) end
+    end, "Remove every zone drawn on this map.")
 
     -- ------------------------------------------------------------------
     -- Configs: save the whole setup under a name, as many as you like.
@@ -796,7 +935,7 @@ local function createControlUI()
 
     local pickers = K.buttonRow(telegraphs.content, 6)
     local pickTelegraphButton, pickOwnButton, freezeButton
-    local function syncPickerButtons()
+    syncPickerButtons = function()
         local telegraphOn = HZ.pickerEnabled and not HZ.ownPickerEnabled and not LD.pickerEnabled
         local ownOn = HZ.pickerEnabled and HZ.ownPickerEnabled
         local keepOn = HZ.pickerEnabled and LD.pickerEnabled
@@ -881,12 +1020,15 @@ local function createControlUI()
     table.insert(cloneSections, cloneSection)
     K.caption(cloneSection.content,
         "Each volume is the size of your character. A moving hazard turns one red before it arrives, because safety is measured against where the projectile is going, not where it is now.", 1)
+    track(K.toggle(cloneSection.content, "Manual run (no autofarm)",
+        function() return CFG.cloneManual end, function(v) CFG.cloneManual = v end, 15,
+        "The ring dodges for you and nothing else runs: no target hunting, no pursuit, no waypoints. You drive, it pulls you out of attacks."))
     track(K.slider(cloneSection.content, "Volumes", "How many candidate positions",
-        8, 48, false,
+        8, CFG.cloneMaxVolumes, false,
         function() return CFG.cloneCount end, function(v) CFG.cloneCount = v end, 2,
         "More volumes means finer choice and more raycasts. 24 is the default."))
     track(K.slider(cloneSection.content, "Rings", "Spread over this many circles",
-        1, 3, false,
+        1, CFG.cloneMaxRings, false,
         function() return CFG.cloneRings end, function(v) CFG.cloneRings = v end, 3,
         "Two rings give a near option and a far one, and interleave so there are no spokes with gaps between them."))
     track(K.slider(cloneSection.content, "Radius", "How far out the outer ring sits",
@@ -914,13 +1056,11 @@ local function createControlUI()
     -- ------------------------------------------------------------------
     -- Attack Book
     -- ------------------------------------------------------------------
-    local bookSection = K.section(autofarm.body, "Attack Book", nextOrder(),
-        "What the trial runs and your picks have taught it. Each entry is a description of one attack.")
-    table.insert(legacySections, bookSection)
-    K.caption(bookSection.content,
-        "Rename by typing. OFF means it is found but not dodged. Entries learned from inside a creature model are its swing hitbox, and start OFF.", 1)
-    local bookList = K.list(bookSection.content, 200, 2)
-    local bookButtons = K.buttonRow(bookSection.content, 3)
+    -- The Attack Book lives in the Attacks panel (it is per map, and it
+    -- belongs with the pickers that fill it). These are the widgets it uses.
+    local bookList = attackList
+    local bookButtons = attackButtons
+    K.caption(attacks.body, "", 11)
 
     S.refreshAttackBookPanel = function()
         if not bookList.Parent then return end
@@ -986,7 +1126,8 @@ local function createControlUI()
         local ok, err = saveConfig()
         setMovementState(ok and "attack book saved" or ("save failed: " .. tostring(err)))
     end, "Write the Attack Book, and everything else, to the config file.")
-    bookButtons.add("Clear all", "danger", clearAttackBook, "Forget every learned attack.")
+    bookButtons.add("Clear all", "danger", clearAttackBook,
+        "Forget every attack learned on this map.")
     S.refreshAttackBookPanel()
 
     -- ------------------------------------------------------------------
@@ -1049,6 +1190,22 @@ local function createControlUI()
         function() return CFG.colorMacro end,
         function(c) CFG.colorMacro = c renderMacroRoute(MC.playIndex) end, 14,
         "Colour of that route."))
+    track(K.slider(overlays.content, "Background blur", "While the interface is open",
+        0, 32, false,
+        function() return CFG.guiBlur end,
+        function(v)
+            CFG.guiBlur = v
+            if RT.blurEffect then
+                RT.blurEffect.Size = v
+                RT.blurEffect.Enabled = v > 0 and autofarm.frame.Visible
+            end
+        end, 17,
+        "Blurs the game behind the windows so the interface reads clearly. 0 turns it off."))
+    track(K.slider(overlays.content, "Background dim", "While the interface is open",
+        0, 0.8, true,
+        function() return CFG.guiDim end,
+        function(v) CFG.guiDim = v if S.setPanelsOpen then S.setPanelsOpen(autofarm.frame.Visible) end end, 18,
+        "Darkens the game behind the windows. 0 turns it off."))
     track(K.toggle(overlays.content, "HUD",
         function() return CFG.showHud end, function(v) CFG.showHud = v end, 15,
         "The panel in the bottom-left corner. It is the only thing on screen with the GUI closed."))
@@ -1606,10 +1763,17 @@ local function createControlUI()
     -- Open and close
     -- ------------------------------------------------------------------
     local function setOpen(open)
+        dim.Visible = open and CFG.guiDim > 0
+        dim.BackgroundTransparency = 1 - CFG.guiDim
+        if RT.blurEffect then
+            RT.blurEffect.Enabled = open and CFG.guiBlur > 0
+            RT.blurEffect.Size = CFG.guiBlur
+        end
         autofarm.frame.Visible = open and CFG.panelAutofarm
         routes.frame.Visible = open and CFG.panelRoutes
         account.frame.Visible = open and CFG.panelAccount
         configs.frame.Visible = open and CFG.panelConfigs
+        attacks.frame.Visible = open and CFG.panelAttacks
         modules.frame.Visible = open
         if not open then K.hideTip() end
     end
@@ -1629,11 +1793,15 @@ local function createControlUI()
         function() return CFG.panelAccount end,
         function(v) CFG.panelAccount = v setOpen(true) end,
         "Your account card, and Detach.")
-    panelToggle("Configs", 5,
+    panelToggle("Attacks", 5,
+        function() return CFG.panelAttacks end,
+        function(v) CFG.panelAttacks = v setOpen(true) end,
+        "This map's attack book, the pickers, and the zone drawing tools.")
+    panelToggle("Configs", 6,
         function() return CFG.panelConfigs end,
         function(v) CFG.panelConfigs = v setOpen(true) end,
         "Saved setups.")
-    panelToggle("HUD", 6,
+    panelToggle("HUD", 7,
         function() return CFG.showHud end,
         function(v) CFG.showHud = v end,
         "The panel in the bottom-left corner. Unlike the rest it stays on screen with the interface closed - it is the only thing that does.")

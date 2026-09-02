@@ -1067,43 +1067,47 @@ local function list(parent, height, order)
 end
 
 -- One list entry: title / meta on the left, actions on the right.
--- `actionCount` sizes the text column when UIFlexItem is unavailable.
-local function listEntry(parent, title, meta, order, actionCount)
+-- One list entry: title over meta on the left, actions on the right.
+--
+-- Explicit positions, no inner layout. This used to be a horizontal list
+-- holding a frame that held a vertical list, and nested auto-layout has now
+-- mangled two different things in this GUI (the HUD came apart, row labels were
+-- pushed off screen). Two labels and a row of icons do not need a layout engine
+-- to place them.
+local function listEntry(parent, title, meta, order, actionCount, height)
+    local n = actionCount or 2
+    local actionsWidth = n * 24 + math.max(n - 1, 0) * 2
+    local h = height or 46
+
     local e = Instance.new("Frame")
     e.Name = "Entry"
     e.BackgroundColor3 = Theme.SurfaceElement
     e.BorderSizePixel = 0
-    e.Size = UDim2.new(1, 0, 0, 46)
+    e.Size = UDim2.new(1, 0, 0, h)
     e.LayoutOrder = order or 1
+    e.ClipsDescendants = true
     e.Parent = parent
     corner(e, Theme.RadiusSm)
     stroke(e, Theme.Hairline, 1)
-    pad(e, 0, 8, 0, 10)
-    hlist(e, Theme.GapMd)
 
-    local text = Instance.new("Frame")
-    text.Name = "Text"
-    text.BackgroundTransparency = 1
-    text.Size = UDim2.new(1, -60, 1, 0)
-    text.LayoutOrder = 1
-    text.Parent = e
-    vlist(text, 0)
-    local n = actionCount or 2
-    flexFill(text, Theme.GapMd + n * 24 + math.max(n - 1, 0) * 2)
+    local textWidth = -(10 + actionsWidth + 16)
 
-    local titleLabel = label(text, title, "rowEntry", 1)
-    titleLabel.Size = UDim2.new(1, 0, 0, 16)
+    local titleLabel = label(e, title, "rowEntry", 1)
+    titleLabel.Position = UDim2.fromOffset(10, 5)
+    titleLabel.Size = UDim2.new(1, textWidth, 0, 17)
     titleLabel.TextTruncate = Enum.TextTruncate.AtEnd
-    local metaLabel = label(text, meta or "", "monoMeta", 2)
-    metaLabel.Size = UDim2.new(1, 0, 0, 12)
+
+    local metaLabel = label(e, meta or "", "monoMeta", 2)
+    metaLabel.Position = UDim2.fromOffset(10, 24)
+    metaLabel.Size = UDim2.new(1, textWidth, 0, 14)
     metaLabel.TextTruncate = Enum.TextTruncate.AtEnd
 
     local actions = Instance.new("Frame")
     actions.Name = "Actions"
     actions.BackgroundTransparency = 1
-    actions.AutomaticSize = Enum.AutomaticSize.X
-    actions.Size = UDim2.new(0, 0, 1, 0)
-    actions.LayoutOrder = 2
+    actions.AnchorPoint = Vector2.new(1, 0.5)
+    actions.Position = UDim2.new(1, -8, 0.5, 0)
+    actions.Size = UDim2.fromOffset(actionsWidth, 24)
     actions.Parent = e
     hlist(actions, 2)
 

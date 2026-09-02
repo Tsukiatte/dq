@@ -33,6 +33,8 @@ local MC = S.MC
 local MAP_LABELS = S.MAP_LABELS
 local refreshLowDetail = S.refreshLowDetail
 local serializeMacros = S.serializeMacros
+local serializeZones = S.serializeZones
+local loadZones = S.loadZones
 local loadMacros = S.loadMacros
 
 local CONFIG_FILE = "DungeonAutofarm_config.json"
@@ -76,6 +78,15 @@ local function syncCurrentMapToStore()
     for name in pairs(LD.keepNames) do
         table.insert(keep, name)
     end
+    -- The Attack Book and the hand-drawn zones are properties of a dungeon
+     -- too: what hurts you in Ghastly Harbor is not what hurts you in the
+     -- Underworld, and a book shared across all fourteen would be a book full
+     -- of entries that never match.
+    local book = {}
+    for _, record in ipairs(HZ.attackBook) do table.insert(book, record) end
+    RT.attackData[RT.currentMap] = book
+    RT.zoneData[RT.currentMap] = serializeZones()
+
     RT.mapData[RT.currentMap] = { waypath = waypath, keep = keep }
     -- Macros are bulky and live in their own file; the map store only carries
     -- the light data.
@@ -160,10 +171,19 @@ local function applyMapFromStore(code)
 
     local macroCount = loadMacros(RT.macroData[code])
 
+    table.clear(HZ.attackBook)
+    for _, record in ipairs(RT.attackData[code] or {}) do
+        table.insert(HZ.attackBook, record)
+    end
+    S.invalidateAttackBook()
+    local zoneCount = loadZones(RT.zoneData[code])
+
     local keepCount = 0
     for _ in pairs(LD.keepNames) do keepCount = keepCount + 1 end
-    heavyDebug("Map", string.format("%s (%s): %d waypoint(s), %d macro(s), %d kept part name(s).",
-        code, MAP_LABELS[code] or code, #NAV.waypath, macroCount, keepCount))
+    heavyDebug("Map", string.format(
+        "%s (%s): %d waypoint(s), %d macro(s), %d attack(s), %d zone(s), %d kept name(s).",
+        code, MAP_LABELS[code] or code, #NAV.waypath, macroCount,
+        #HZ.attackBook, zoneCount, keepCount))
 end
 
 -- The map picker. Checks the current map in, then the requested one out.
@@ -225,6 +245,7 @@ local function buildConfigTable()
             cloneRadius = CFG.cloneRadius,
             cloneSafetyMargin = CFG.cloneSafetyMargin,
             cloneCommitTime = CFG.cloneCommitTime,
+            cloneManual = CFG.cloneManual,
             showClones = CFG.showClones,
             macroLoop = CFG.macroLoop,
             macroShowRoute = CFG.macroShowRoute,
@@ -243,6 +264,9 @@ local function buildConfigTable()
             panelRoutes = CFG.panelRoutes,
             panelAccount = CFG.panelAccount,
             panelConfigs = CFG.panelConfigs,
+            panelAttacks = CFG.panelAttacks,
+            guiBlur = CFG.guiBlur,
+            guiDim = CFG.guiDim,
             debugLevel = RT.debugLevel,
         },
         streamer = {
@@ -262,6 +286,8 @@ local function buildConfigTable()
         attackBook = HZ.attackBook,
         currentMap = RT.currentMap,
         maps = maps,
+        attacksByMap = RT.attackData,
+        zonesByMap = RT.zoneData,
     }
 end
 
@@ -330,6 +356,7 @@ local function applyConfigData(data)
         CFG.cloneSafetyMargin = tonumber(combat.cloneSafetyMargin) or CFG.cloneSafetyMargin
         CFG.cloneCommitTime = tonumber(combat.cloneCommitTime) or CFG.cloneCommitTime
         if combat.showClones ~= nil then CFG.showClones = combat.showClones == true end
+        if combat.cloneManual ~= nil then CFG.cloneManual = combat.cloneManual == true end
         if combat.macroLoop ~= nil then CFG.macroLoop = combat.macroLoop == true end
         if combat.macroShowRoute ~= nil then CFG.macroShowRoute = combat.macroShowRoute == true end
         if type(combat.macroRecordBind) == "string" then
@@ -349,6 +376,9 @@ local function applyConfigData(data)
         if visuals.panelRoutes ~= nil then CFG.panelRoutes = visuals.panelRoutes == true end
         if visuals.panelAccount ~= nil then CFG.panelAccount = visuals.panelAccount == true end
         if visuals.panelConfigs ~= nil then CFG.panelConfigs = visuals.panelConfigs == true end
+        if visuals.panelAttacks ~= nil then CFG.panelAttacks = visuals.panelAttacks == true end
+        CFG.guiBlur = tonumber(visuals.guiBlur) or CFG.guiBlur
+        CFG.guiDim = tonumber(visuals.guiDim) or CFG.guiDim
         RT.debugLevel = tonumber(visuals.debugLevel) or RT.debugLevel
     end
     -- Enemy attacks are always highlighted since 2.3.0; an older config that
@@ -402,6 +432,19 @@ local function applyConfigData(data)
         end
     end
 
+    table.clear(RT.attackData)
+    if type(data.attacksByMap) == "table" then
+        for code, list in pairs(data.attacksByMap) do
+            if MAP_LABELS[code] and type(list) == "table" then RT.attackData[code] = list end
+        end
+    end
+    table.clear(RT.zoneData)
+    if type(data.zonesByMap) == "table" then
+        for code, list in pairs(data.zonesByMap) do
+            if MAP_LABELS[code] and type(list) == "table" then RT.zoneData[code] = list end
+        end
+    end
+
     if type(data.attackBook) == "table" then
         table.clear(HZ.attackBook)
         for _, record in ipairs(data.attackBook) do
@@ -411,8 +454,15 @@ local function applyConfigData(data)
             end
         end
         S.invalidateAttackBook()
-        if #HZ.attackBook > 0 then
-            heavyDebug("Config", string.format("Restored %d attack book entries.", #HZ.attackBook))
+        -- Pre-2.11 configs kept ONE book for every dungeon. Adopt it into
+        -- whichever map the config names rather than dropping it, and let the
+        -- user move entries about from there.
+        if #HZ.attackBook > 0 and not RT.attackData[RT.currentMap] then
+            local adopted = {}
+            for _, record in ipairs(HZ.attackBook) do table.insert(adopted, record) end
+            RT.attackData[RT.currentMap] = adopted
+            heavyDebug("Config", string.format(
+                "Adopted %d pre-2.11 attack book entries into map %s.", #adopted, RT.currentMap))
         end
     end
 
