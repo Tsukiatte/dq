@@ -11,6 +11,46 @@ file and that table in sync on every edit.
 
 ---
 
+## 3.1.2 - 2026-09-02
+
+### A delayed attack should be green until it nearly lands
+It wasn't. The squared urgency ramp reached lethal **a full second before
+impact**:
+
+| time to impact | squared (was) | cubed (now) |
+|---|---|---|
+| 2.0s | 25 | 12 |
+| 1.5s | 39 | 24 |
+| 1.0s | **56 — lethal** | 42 |
+| 0.7s | 68 | **56 — lethal** |
+| 0.0s | 100 | 100 |
+
+That difference matters more than it looks. Reaching lethal early turns every
+marker into a **wall**, and when several attacks overlap and no square is ever
+truly safe, walls everywhere means **no route at all** — which is exactly the
+situation where the bot froze. A gradient always leaves somewhere to flow to.
+
+**Ramp sharpness** is adjustable; 3 is the new default.
+
+### Following the gradient
+Two changes that make "keep moving to lower heat" the actual behaviour:
+
+- **Goal choice now weights the heat where you *will* be** over the heat where
+  you land (`Trust the future`, 0.65). A square that is cool on arrival and hot
+  a moment later is a trap, not a destination — it was being scored the same as
+  one that stays cool.
+- **When nothing is safe, it stops committing.** Holding a destination for a
+  third of a second is the wrong shape of decision when the field changes
+  faster than that. Saturated, it re-picks every pass and flows downhill, so it
+  is never in the hottest place for long.
+
+### The ramp is readable now
+Nine bands — dark green, deep green, green, yellow-green, light yellow, dark
+yellow, orange, red, deep red — built from the three colours in the panel so
+the pickers still mean something. **Quantised into discrete steps** rather than
+blended: across several hundred discs a continuous ramp turns to mush, and the
+edge between cooler and hotter ground is the thing you actually need to see.
+
 ## 3.1.1 - 2026-09-02
 
 ### A projectile is a line, not a place

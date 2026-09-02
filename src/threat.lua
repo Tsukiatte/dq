@@ -68,8 +68,13 @@ end
 --   about to land                 -> most
 --   a long way off                -> almost nothing
 --
--- Squared so the ramp is gentle far out and steep near impact: this is the
--- shape that produces the green-to-orange-to-red gradient rather than a wall.
+-- The exponent (CFG.threatCurve) sets how long it stays cool before turning.
+-- This matters more than it looks. A delayed attack genuinely is harmless until
+-- shortly before it lands, so it should read green for most of its wind-up and
+-- then redden hard. At squared it went lethal a full second early, which turned
+-- every marker into a wall - and when several attacks overlap and no square is
+-- ever truly safe, walls everywhere means no route, while a gradient always
+-- leaves somewhere to flow to.
 local function urgency(timeToImpact)
     if timeToImpact <= 0 then
         -- Landing now, or within the window where it still hurts.
@@ -77,7 +82,7 @@ local function urgency(timeToImpact)
     end
     if timeToImpact >= CFG.threatHorizon then return 0 end
     local t = 1 - (timeToImpact / CFG.threatHorizon)
-    return t * t
+    return t ^ CFG.threatCurve
 end
 
 -- ------------------------------------------------------------------ queries
