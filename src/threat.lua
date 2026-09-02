@@ -165,8 +165,17 @@ end
 -- projectile and safe marker twice over. The sources are the same; only the
 -- time sample differs, so one pass computes both. Halves the dominant cost of
 -- the whole system.
-local function getThreatPair(position, timeA, timeB)
-    local totalA, totalB = 0, 0
+-- Heat at a point, at THREE moments, in a single walk over the threat sources.
+--
+-- Three rather than two so the A* can interpolate for any arrival time along a
+-- route. Sampling at a cell's straight-line ETA is not the same question as
+-- "what will it be when I actually get there having gone round two things on
+-- the way" - and the second is the one that decides whether a path is survivable.
+--
+-- The geometry per source is computed once and only the time weighting is
+-- evaluated three times, so the third slice is nearly free.
+local function getThreatSlices(position, timeA, timeB, timeC)
+    local totalA, totalB, totalC = 0, 0, 0
     local px, py, pz = position.X, position.Y, position.Z
     local reach, halfHeight, now = ctxReach, ctxHalfHeight, ctxNow
     local ignoreVertical = CFG.hazardIgnoreVertical
@@ -178,7 +187,8 @@ local function getThreatPair(position, timeA, timeB)
             local eta = zone.impactAt - now
             local wA = urgency(eta - timeA)
             local wB = urgency(eta - timeB)
-            if wA > 0 or wB > 0 then
+            local wC = urgency(eta - timeC)
+            if wA > 0 or wB > 0 or wC > 0 then
                 local depth, vertical
                 if zone.shape == "Circle" then
                     local c = zone.position
@@ -201,6 +211,7 @@ local function getThreatPair(position, timeA, timeB)
                     if share then
                         totalA = totalA + THREAT_LETHAL * wA * share
                         totalB = totalB + THREAT_LETHAL * wB * share
+                        totalC = totalC + THREAT_LETHAL * wC * share
                     end
                 end
             end
@@ -225,6 +236,7 @@ local function getThreatPair(position, timeA, timeB)
                     local heat = THREAT_LETHAL * share
                     totalA = totalA + heat
                     totalB = totalB + heat
+                    totalC = totalC + heat
                 end
             end
         end
@@ -259,6 +271,7 @@ local function getThreatPair(position, timeA, timeB)
                             local halfWindow = max(width / speed, 0.05)
                             totalA = totalA + THREAT_LETHAL * passHeat(arrive - timeA, halfWindow) * edge
                             totalB = totalB + THREAT_LETHAL * passHeat(arrive - timeB, halfWindow) * edge
+                            totalC = totalC + THREAT_LETHAL * passHeat(arrive - timeC, halfWindow) * edge
                         end
                     end
                 end
@@ -285,6 +298,7 @@ local function getThreatPair(position, timeA, timeB)
             end
             totalA = totalA + heat
             totalB = totalB + heat
+            totalC = totalC + heat
         end
     end
 
@@ -302,10 +316,17 @@ local function getThreatPair(position, timeA, timeB)
         if not inside then
             totalA = totalA + THREAT_LETHAL
             totalB = totalB + THREAT_LETHAL
+            totalC = totalC + THREAT_LETHAL
         end
     end
 
-    return totalA, totalB
+    return totalA, totalB, totalC
+end
+
+-- Two-time form, for callers that do not need the third slice.
+local function getThreatPair(position, timeA, timeB)
+    local a, b = getThreatSlices(position, timeA, timeB, timeB)
+    return a, b
 end
 
 -- Single-time query, for callers that only need one sample.
@@ -325,6 +346,30 @@ local function refreshThreatSources()
             local part = model.PrimaryPart or model:FindFirstChild("HumanoidRootPart")
                 or model:FindFirstChildWhichIsA("BasePart")
             if part then TH.enemyPositions[#TH.enemyPositions + 1] = part.Position end
+        end
+    end
+
+    -- The dominant source of danger, for the cover test: whatever is throwing
+    -- the most at us. A radial burst has a centre, and that centre is what you
+    -- need something solid between yourself and.
+    TH.origin = nil
+    local bestScore = huge
+    local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+    if rootPart then
+        local here = rootPart.Position
+        for _, epos in ipairs(TH.enemyPositions) do
+            local d = (epos - here).Magnitude
+            if d < bestScore then bestScore, TH.origin = d, epos end
+        end
+        -- An announced attack that is about to land outranks a distant enemy:
+        -- it is the thing actually filling the floor.
+        local soonest = huge
+        for _, zone in ipairs(PC.zones) do
+            local eta = zone.impactAt - Workspace:GetServerTimeNow()
+            if eta > 0 and eta < soonest and eta < CFG.threatHorizon then
+                soonest = eta
+                TH.origin = zone.position or (zone.cframe and zone.cframe.Position)
+            end
         end
     end
 
@@ -433,6 +478,7 @@ end
 TH.LETHAL = THREAT_LETHAL
 S.getThreatAt = getThreatAt
 S.getThreatPair = getThreatPair
+S.getThreatSlices = getThreatSlices
 S.prepareThreatPass = prepareThreatPass
 S.refreshThreatSources = refreshThreatSources
 S.calculateDodgeForce = calculateDodgeForce

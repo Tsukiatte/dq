@@ -1183,6 +1183,13 @@ local function createControlUI()
         0.5, 6, true,
         function() return CFG.cloneStepHeight end, function(v) CFG.cloneStepHeight = v end, 6.85,
         "How far up a Roblox humanoid steps without jumping. Anything above this is charged Wall threat."))
+    track(K.toggle(cloneSection.content, "Use cover",
+        function() return CFG.coverEnabled end, function(v) CFG.coverEnabled = v end, 6.86,
+        "Put something solid between you and where the attack is coming from. When a radial burst fills the arena there is no open safe ground at all, and a pillar is the answer - the grid used to see those only as obstacles to route around."))
+    track(K.slider(cloneSection.content, "Cover value", "How much of the danger it removes",
+        0, 1, true,
+        function() return CFG.coverRelief end, function(v) CFG.coverRelief = v end, 6.87,
+        "A discount, not a bonus: cover removes this share of the heat rather than inventing safety, so a covered spot standing in a pool of fire is still a bad idea."))
     track(K.toggle(cloneSection.content, "Prefer open ground",
         function() return CFG.threatWallSpread end, function(v) CFG.threatWallSpread = v end, 6.9,
         "Cells inherit a share of the heat around them, so a green pocket ringed by red reads hot - it is a trap, somewhere you can stand right now with nowhere to go the moment it closes. Walls count as heat too, so corners are included. This is what makes the bot strafe into the open instead of backing into a corner."))
