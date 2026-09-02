@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 3.0.4
+    VERSION : 3.0.5
     BUILD   : 2026-09-01
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "3.0.4"
+local SCRIPT_VERSION = "3.0.5"
 local SCRIPT_BUILD_DATE = "2026-09-01"
 local SCRIPT_CODENAME = "Ground truth"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "3.0.5", date = "2026-09-02", notes = "Attacks built from hundreds of meshes no longer melt the frame. A dense group of parts under one model collapses into the single box it effectively is - nobody threads between the meshes of a lava pool - so the safety tests run against a handful of volumes rather than every part, and highlights and name tags are capped to the nearest few instead of drawing three hundred BillboardGuis. Chasing also keeps its distance now: the grid drew a circle around every enemy and called it unsafe, then the pursuit walked straight through it into melee using its own smaller stand-off, so the dodge kept its distance and the chase gave it back. Attack reach scales with the stand-off so it does not close the gap merely to swing." },
     { version = "3.0.4", date = "2026-09-02", notes = "One line was hiding most attacks: isDamageBrick rejected any part parented straight to Workspace, on the theory that a real attack lives inside a model. This game does the opposite - PrecastHitbox does Part.Parent = workspace literally, and so do the boss beams - so that veto was throwing away exactly what mattered. Loose parts fall through to the appearance test now. Workspace.vfxPool holds the player OWN pooled hit effects under generic names like Part, which is why the bot fled from its own ability the moment it landed; anything in that pool is ours. Defaults retuned now that the footprint is measured honestly: disc scale back to 1.0, safety margin 0.75, depth bonus 1.5, enemy space 12 and 20." },
     { version = "3.0.3", date = "2026-09-02", notes = "Enemies get a circle of their own: melee does not telegraph, being next to one IS the attack, so cells within Enemy space are unsafe and cells out to Enemy spacing are expensive. Two fixes for the dithering. The committed goal was a window INDEX, but the window is centred on the character and slides as it walks, so the goal silently moved to a different place every time you crossed a cell boundary - it is a world key now. And a cell was judged only at the instant of arrival, so somewhere an announced attack would land a moment later read as green: the bot walked there, stopped, and died. A cell must now stay safe for Must stay safe for seconds after arrival to count as a destination, with a fallback to merely-safe so a moment with something inbound everywhere never returns nothing." },
     { version = "3.0.2", date = "2026-09-02", notes = "The grid was padding every attack by 3.5 studs beyond the body, because it borrowed CFG.damageBrickClearance from the Legacy escape - which commits to one dash, where a fat hedge is cheap. On a dense grid that padding stacks, and three overlapping attacks left nowhere green to stand. Red now means your body would actually be in it, plus only the Safety margin you dial in. The footprint is measured from your body parts rather than GetExtentsSize, so a big cosmetic or held weapon no longer inflates it, and it is re-measured on a timer and carried in the grid signature - it used to be sampled once at build, so the only thing that ever corrected it was dying. Fixed the flicker: a window shift blanked every verdict and repainted before the next evaluation, and at 1.5 stud spacing you cross a cell about every 0.075s against an 0.08s interval, so it blanked on nearly every frame you moved." },
@@ -345,6 +346,11 @@ CFG.projectileLookahead = 1.2
 CFG.projectileTrackWindow = 6.0     -- newly added parts are motion-tracked this long
 CFG.projectileMaxSize = 14.0        -- longer than this on its longest axis is not a projectile
 CFG.hazardTagEnabled = true         -- billboard name tag on every highlighted attack
+-- Some attacks are built from hundreds of small meshes. Tested and drawn one by
+-- one they cost more than the whole rest of the script put together, so a dense
+-- group is collapsed into the one box it effectively is.
+CFG.hazardClusterMin = 6            -- parts under one model before it becomes a box
+CFG.maxHazardOverlays = 28          -- highlights and name tags drawn at once
 
 -- long enough to point at it. While Freeze is on, every detected attack is
 -- copied into a held snapshot that stays put after the real one is gone, so it
@@ -485,6 +491,10 @@ CFG.cloneMaxFootprint = 3.0      -- studs; a cosmetic cannot inflate past this
 -- grid gives every live enemy a circle of its own.
 CFG.cloneEnemyRadius = 12.0
 CFG.cloneEnemySoftRadius = 20.0  -- beyond the hard circle, discouraged not forbidden
+-- Chasing obeys the same circle the grid draws. Without this the dodge kept its
+-- distance and the pursuit immediately walked back into melee, which on a high
+-- tier is one tap.
+CFG.cloneKeepDistance = true
 -- A cell has to STAY safe this long after arrival, not merely be safe at the
 -- instant of arrival. Standing still is a decision too.
 CFG.cloneSafeDwell = 1.6
@@ -591,6 +601,9 @@ HZ.seenAt = {}
 HZ.manualParts = {}
 -- Live safe-spot markers: the places a boss says you MUST stand.
 HZ.safeZones = {}
+-- What the safety tests actually iterate: single parts, plus one box for each
+-- dense cluster. Rebuilt with HZ.detected.
+HZ.volumes = {}
 -- Lowercased part names learned from picks, so later spawns of the same attack
 -- are caught automatically instead of needing a click each time.
 HZ.learnedNames = {}

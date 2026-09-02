@@ -11,6 +11,36 @@ file and that table in sync on every edit.
 
 ---
 
+## 3.0.5 - 2026-09-02
+
+### Attacks made of hundreds of meshes no longer melt the frame
+One attack in this game can be several hundred MeshParts. Tested one by one
+that is *cells x parts* distance computations per evaluation — a 17x17 grid
+against 300 parts is **86,000** — and drawn one by one it is **300
+BillboardGuis**, which is what actually freezes the picture.
+
+- **Dense clusters collapse to a box.** A model with `hazardClusterMin` parts or
+  more (6) becomes the single bounding volume it effectively is. Nobody threads
+  between the meshes of a lava pool, so the per-part precision was buying
+  nothing and costing everything.
+- **Sparse groups and loose parts are left alone**, because there the gaps
+  between parts are real and worth keeping.
+- **Overlays are capped** to the nearest `maxHazardOverlays` (28). The far ones
+  are not what is about to hit you, and the same pass cleans up anything that
+  drops off the list.
+
+### It walked into melee anyway
+The grid drew a circle around every enemy and called it unsafe — and then the
+chase walked straight through it, because `getStandOffPosition` used
+`CFG.safeDistance` (8) and knew nothing about the grid. The dodge kept its
+distance and the pursuit immediately gave it back, which on a high tier is one
+tap.
+
+- **Keep distance while chasing** (on by default): the chase stops at the same
+  `Enemy space` circle the grid draws.
+- **Attack reach scales with it**, so the bot does not close the gap purely so
+  it can swing.
+
 ## 3.0.4 - 2026-09-02
 
 ### One line was hiding most of the attacks

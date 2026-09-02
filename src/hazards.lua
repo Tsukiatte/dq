@@ -691,6 +691,10 @@ end
 -- honest question - would my body overlap this - because 3.5 studs of hedge on
 -- every attack stacks, and three overlapping attacks then leave nowhere green
 -- to stand at all.
+-- Defined with the volume builder further down; declared here because the
+-- two safety tests below are what use it.
+local volumeClosestPoint
+
 local function isPositionSafeFromDamageBricks(position, extraClearance, atTime, exactClearance, dwell)
     local _, playerRadius, totalHeight = getPlayerHitboxMetrics()
     local clearance = exactClearance
@@ -703,9 +707,9 @@ local function isPositionSafeFromDamageBricks(position, extraClearance, atTime, 
         end
     end
 
-    for _, part in ipairs(HZ.detected) do
-        if part.Parent then
-            local closest = hazardClosestPoint(part, position)
+    for _, volume in ipairs(HZ.volumes) do
+        if not volume.part or volume.part.Parent then
+            local closest = volumeClosestPoint(volume, position)
             local horizontalDist = Vector2.new(position.X - closest.X, position.Z - closest.Z).Magnitude
             local verticalBlocked = CFG.hazardIgnoreVertical or math.abs(position.Y - closest.Y) < halfHeight
 
@@ -754,15 +758,15 @@ local function evaluateHazardPenaltyAtPoint(pos)
     local effectivePreemptive = CFG.preemptiveClearance + playerRadius
     local halfHeight = (totalHeight * 0.5) + 2.0
 
-    for _, part in ipairs(HZ.detected) do
-        if part.Parent then
-            local closest = hazardClosestPoint(part, pos)
+    for _, volume in ipairs(HZ.volumes) do
+        if not volume.part or volume.part.Parent then
+            local closest = volumeClosestPoint(volume, pos)
             local horizontalDist = Vector2.new(pos.X - closest.X, pos.Z - closest.Z).Magnitude
             local verticalBlocked = CFG.hazardIgnoreVertical or math.abs(pos.Y - closest.Y) < halfHeight
 
             if horizontalDist < effectivePreemptive and verticalBlocked then
                 local depth = (effectivePreemptive - horizontalDist) / effectivePreemptive
-                local spawnTime = HZ.spawnTimes[part] or now
+                local spawnTime = volume.spawn or (volume.part and HZ.spawnTimes[volume.part]) or now
                 local age = math.clamp(now - spawnTime, 0.1, 4.0)
 
                 local ageWeight = (1.0 + age * 4.5) ^ 2
@@ -821,7 +825,28 @@ end
 
 -- Always on (2.3.0): every detected enemy attack is highlighted, tagged with its
 -- name, and - if it is moving - drawn with the path it is predicted to sweep.
+-- Nearest N only. Three hundred BillboardGuis is what actually freezes the
+-- frame, and the far ones are not what you are about to be hit by.
+local function overlayShortlist()
+    local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    local list = HZ.detected
+    if not root or #list <= CFG.maxHazardOverlays then return list end
+
+    local origin = root.Position
+    local scored = table.create(#list)
+    for i, part in ipairs(list) do
+        scored[i] = { part = part, d = (part.Position - origin).Magnitude }
+    end
+    table.sort(scored, function(a, b) return a.d < b.d end)
+    local out = table.create(CFG.maxHazardOverlays)
+    for i = 1, CFG.maxHazardOverlays do out[i] = scored[i].part end
+    return out
+end
+
 local function updateHazardHighlights()
+    -- Nearest few only. Anything drawn last frame and not in the list is
+    -- cleaned up by the same pass, so this shrinks as well as caps.
+    local shortlist = overlayShortlist()
     if not HZ.highlightsFolder or not HZ.highlightsFolder.Parent then
         HZ.highlightsFolder = Instance.new("Folder")
         HZ.highlightsFolder.Name = "HazardHighlights"
@@ -833,7 +858,7 @@ local function updateHazardHighlights()
 
     -- Set lookup instead of a table.find per child, which made cleanup O(n*m).
     local activeSet = {}
-    for _, part in ipairs(HZ.detected) do
+    for _, part in ipairs(shortlist) do
         activeSet[part] = true
     end
 
@@ -850,7 +875,7 @@ local function updateHazardHighlights()
         end
     end
 
-    for _, part in ipairs(HZ.detected) do
+    for _, part in ipairs(shortlist) do
         if part.Parent then
             local debugId = part:GetDebugId()
             local velocity = getHazardMotion(part)
@@ -1993,6 +2018,73 @@ end
 -- the world index above, not here. This function only does the cheap per-frame
 -- work: filter the catalogued telegraphs down to the ones actually in range
 -- and still active.
+local rebuildHazardVolumes
+
+-- =========================================================================
+-- HAZARD VOLUMES
+--
+-- A single attack in this game can be several hundred MeshParts. Tested one by
+-- one that is (cells x parts) distance computations per evaluation - a 17x17
+-- grid against 300 parts is 86,000 - and drawn one by one it is 300
+-- BillboardGuis, which is what actually freezes the frame.
+--
+-- A dense cluster of parts under one model is, for dodging purposes, one solid
+-- volume: nobody threads between the meshes of a lava pool. So a model with
+-- enough parts collapses to its bounding box and is tested once. Sparse groups
+-- and loose parts are left alone, because there the gaps are real and worth
+-- keeping.
+-- =========================================================================
+volumeClosestPoint = function(volume, position)
+    if volume.part then return hazardClosestPoint(volume.part, position) end
+    local c, h = volume.center, volume.half
+    return Vector3.new(
+        math.clamp(position.X, c.X - h.X, c.X + h.X),
+        math.clamp(position.Y, c.Y - h.Y, c.Y + h.Y),
+        math.clamp(position.Z, c.Z - h.Z, c.Z + h.Z))
+end
+
+rebuildHazardVolumes = function()
+    local groups, loose = {}, {}
+    for _, part in ipairs(HZ.detected) do
+        local model = part:FindFirstAncestorOfClass("Model")
+        if model then
+            local g = groups[model]
+            if not g then g = {} groups[model] = g end
+            g[#g + 1] = part
+        else
+            loose[#loose + 1] = part
+        end
+    end
+
+    local volumes = {}
+    local function addPart(part) volumes[#volumes + 1] = { part = part } end
+
+    for _, parts in pairs(groups) do
+        if #parts >= CFG.hazardClusterMin then
+            local lo, hi, spawn = nil, nil, math.huge
+            for _, part in ipairs(parts) do
+                local pos, half = part.Position, part.Size * 0.5
+                local a, b = pos - half, pos + half
+                if lo then
+                    lo = Vector3.new(math.min(lo.X, a.X), math.min(lo.Y, a.Y), math.min(lo.Z, a.Z))
+                    hi = Vector3.new(math.max(hi.X, b.X), math.max(hi.Y, b.Y), math.max(hi.Z, b.Z))
+                else
+                    lo, hi = a, b
+                end
+                spawn = math.min(spawn, HZ.spawnTimes[part] or math.huge)
+            end
+            volumes[#volumes + 1] = {
+                center = (lo + hi) * 0.5, half = (hi - lo) * 0.5,
+                spawn = spawn < math.huge and spawn or nil, count = #parts,
+            }
+        else
+            for _, part in ipairs(parts) do addPart(part) end
+        end
+    end
+    for _, part in ipairs(loose) do addPart(part) end
+    HZ.volumes = volumes
+end
+
 local function scanDamageBricks(rootPosition)
     local now = os.clock()
     rebuildCatalogArrays()
@@ -2017,6 +2109,7 @@ local function scanDamageBricks(rootPosition)
         end
     end
     HZ.detected = found
+    rebuildHazardVolumes()
 
     if UI.damageBrickCountLabel then
         UI.damageBrickCountLabel.Text = "Telegraphs Active: " .. tostring(#found)

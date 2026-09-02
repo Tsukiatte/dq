@@ -1112,6 +1112,9 @@ local function createControlUI()
         0, 25, true,
         function() return CFG.cloneEnemyRadius end, function(v) CFG.cloneEnemyRadius = v end, 6.5,
         "Melee enemies do not telegraph anything - being next to one IS the attack, so the grid marks a circle around each of them unsafe. Raise it if you are being chewed up in melee."))
+    track(K.toggle(cloneSection.content, "Keep distance while chasing",
+        function() return CFG.cloneKeepDistance end, function(v) CFG.cloneKeepDistance = v end, 6.45,
+        "Chasing stops at the same circle the grid draws around enemies, instead of closing to melee. Without it the dodge keeps its distance and the pursuit immediately gives it back, which on a high tier is one tap."))
     track(K.slider(cloneSection.content, "Enemy spacing", "Discouraged out to this",
         0, 40, true,
         function() return CFG.cloneEnemySoftRadius end, function(v) CFG.cloneEnemySoftRadius = v end, 6.6,

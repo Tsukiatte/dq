@@ -257,6 +257,10 @@ local function buildConfigTable()
             cloneSafetyMargin = CFG.cloneSafetyMargin,
             cloneCommitTime = CFG.cloneCommitTime,
             cloneManual = CFG.cloneManual,
+            cloneEnemyRadius = CFG.cloneEnemyRadius,
+            cloneEnemySoftRadius = CFG.cloneEnemySoftRadius,
+            cloneSafeDwell = CFG.cloneSafeDwell,
+            cloneKeepDistance = CFG.cloneKeepDistance,
             cloneGridSpacing = CFG.cloneGridSpacing,
             cloneMaxCells = CFG.cloneMaxCells,
             cloneDangerCost = CFG.cloneDangerCost,
@@ -389,6 +393,10 @@ local function applyConfigData(data)
         CFG.cloneCommitTime = tonumber(combat.cloneCommitTime) or CFG.cloneCommitTime
         if combat.showClones ~= nil then CFG.showClones = combat.showClones == true end
         if combat.cloneManual ~= nil then CFG.cloneManual = combat.cloneManual == true end
+        CFG.cloneEnemyRadius = tonumber(combat.cloneEnemyRadius) or CFG.cloneEnemyRadius
+        CFG.cloneEnemySoftRadius = tonumber(combat.cloneEnemySoftRadius) or CFG.cloneEnemySoftRadius
+        CFG.cloneSafeDwell = tonumber(combat.cloneSafeDwell) or CFG.cloneSafeDwell
+        if combat.cloneKeepDistance ~= nil then CFG.cloneKeepDistance = combat.cloneKeepDistance == true end
         CFG.cloneGridSpacing = tonumber(combat.cloneGridSpacing) or CFG.cloneGridSpacing
         CFG.cloneMaxCells = tonumber(combat.cloneMaxCells) or CFG.cloneMaxCells
         CFG.cloneDangerCost = tonumber(combat.cloneDangerCost) or CFG.cloneDangerCost

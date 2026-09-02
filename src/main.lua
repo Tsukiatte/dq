@@ -208,7 +208,13 @@ local function attackEnemy(enemy)
     end
 
     local flatOffset = Vector3.new(root.Position.X - enemyRoot.Position.X, 0, root.Position.Z - enemyRoot.Position.Z)
-    if flatOffset.Magnitude <= CFG.attackRange and RT.farmEnabled and not RT.destroyed and RT.gameSpecificAttackMethod then
+    -- Reach has to cover the stand-off distance, otherwise the bot would walk
+    -- back into melee purely so it could swing.
+    local reach = CFG.attackRange
+    if CFG.cloneKeepDistance and CL.active then
+        reach = math.max(reach, CFG.cloneEnemyRadius + 2)
+    end
+    if flatOffset.Magnitude <= reach and RT.farmEnabled and not RT.destroyed and RT.gameSpecificAttackMethod then
         RT.gameSpecificAttackMethod(enemy)
     end
 end
