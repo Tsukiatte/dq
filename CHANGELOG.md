@@ -11,6 +11,16 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.9.2 - 2026-09-02
+
+Found on the first run in the Studio test harness: `updateHazardHighlights`
+keyed adornments with the debug-id API, which needs plugin permissions in
+Studio and threw every tick - after the scan built its volumes and *before*
+the dodge decided. The dodge never ran once and the character stood in beams
+reporting `dangerHere 0`. Parts are keyed with a weak-table counter now, and
+the highlight and telegraph-feed renderers run under `pcall`: nothing
+cosmetic can take the dodge down again.
+
 ## 4.9.1 - 2026-09-02
 
 ### The seven-second delay
