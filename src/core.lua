@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 2.7.0
+    VERSION : 2.7.1
     BUILD   : 2026-09-01
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "2.7.0"
+local SCRIPT_VERSION = "2.7.1"
 local SCRIPT_BUILD_DATE = "2026-09-01"
 local SCRIPT_CODENAME = "Kitbuilt"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "2.7.1", date = "2026-09-01", notes = "Fixed the 2.7.0 interface: every row label rendered blank because UIFlexItem Fill was applied to labels whose base width was already 100%, so the flex pass had negative slack and collapsed them to nothing (the buttons were fine, their base width was 0). Flex is gone; widths are explicit arithmetic. Also fixed the HUD title chip collapsing to a bare accent line (nested automatic sizing inside a clipping frame) and the Status row reading 'Movement: Movement: ...'." },
     { version = "2.7.0", date = "2026-09-01", notes = "The interface is rebuilt from the Figma kit: two accordion windows plus an always-on HUD in the bottom-left, hover tooltips on everything after a second, and a Legacy/Macro island at the top that hides whichever system is not in charge. Every overlay is now switchable and recolourable, targeting gained lowest/highest HP modes and dodging a master switch. Macros record your FACING as well as your position, save to any map you pick from a dropdown into their own DungeonAutofarm_macros.json, and can be played back per map. Fixed: the record keybind stopped working after the first recording because starting one disconnected the listener it shared." },
     { version = "2.6.0", date = "2026-09-01", notes = "Macros are a top-level mode with their own panel and their own button, no longer nested inside the waypoint editor. Recording now switches the free-fly editor OFF: a macro is recorded from your ordinary first-person camera, and a detached camera would capture a route the character never walked. Switching the idle mode to Macros disables the editor for the same reason." },
     { version = "2.5.1", date = "2026-09-01", notes = "Fixed: the macro Record and Bind buttons were unreachable. The Route panel was only opened by the Edit Path button, which also threw the camera into free-fly and paused the loop - so the only way to reach the recorder was to hijack the camera first, which is exactly what makes recording impossible. Opening the panel and arming the free-fly editor are now separate buttons." },
@@ -690,9 +691,11 @@ end
 
 -- Mirrors the current movement decision onto the UI so the state is readable
 -- in-game without tailing the console.
+-- The HUD's Status row. No "Movement:" prefix any more: the row it writes into
+-- is already labelled, and the prefix was showing up twice.
 local function setMovementState(text)
     if UI.movementStateLabel then
-        UI.movementStateLabel.Text = "Movement: " .. text
+        UI.movementStateLabel.Text = text
     end
 end
 

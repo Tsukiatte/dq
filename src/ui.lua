@@ -198,7 +198,8 @@ local function buildHud(parent)
     hud.BackgroundTransparency = 1
     hud.AnchorPoint = Vector2.new(0, 1)
     hud.Position = UDim2.new(0, 20, 1, -20)
-    hud.Size = UDim2.fromOffset(360, 173)
+    hud.Size = UDim2.fromOffset(360, 0)
+    hud.AutomaticSize = Enum.AutomaticSize.Y
     hud.ZIndex = 2
     hud.Parent = parent
     K.vlist(hud, T.GapMd)
@@ -208,8 +209,7 @@ local function buildHud(parent)
     chip.Name = "TitleChip"
     chip.BackgroundColor3 = Color3.new(1, 1, 1)
     chip.BorderSizePixel = 0
-    chip.AutomaticSize = Enum.AutomaticSize.X
-    chip.Size = UDim2.fromOffset(0, 34)
+    chip.Size = UDim2.fromOffset(326, 34)
     chip.ClipsDescendants = true
     chip.LayoutOrder = 1
     chip.ZIndex = 3
@@ -230,19 +230,21 @@ local function buildHud(parent)
     chipAccent.Parent = chip
     K.accentGradient(chipAccent, 0)
 
-    local function chipText(text, style, order)
+    -- Explicit widths across the chip's 302px of content: title, rule, user,
+    -- rule, fps. Nested automatic sizing is what collapsed this in 2.7.0.
+    local function chipText(text, style, order, width)
         local l = K.label(chip, text, style, order)
-        l.AutomaticSize = Enum.AutomaticSize.X
-        l.Size = UDim2.fromOffset(0, 20)
+        l.Size = UDim2.fromOffset(width, 20)
+        l.TextTruncate = Enum.TextTruncate.AtEnd
         l.ZIndex = 4
         return l
     end
-    local nameLabel = chipText("dqr autofarm", "windowChip", 1)
-    chipText("|", "captionKey", 2).TextColor3 = T.TextMuted
-    local userLabel = chipText("...", "rowStat", 3)
+    chipText("dqr autofarm", "windowChip", 1, 110)
+    chipText("|", "captionKey", 2, 4).TextColor3 = T.TextMuted
+    local userLabel = chipText("...", "rowStat", 3, 106)
     userLabel.TextColor3 = T.TextSub
-    chipText("|", "captionKey", 4).TextColor3 = T.TextMuted
-    local fpsLabel = chipText("fps: --", "monoStat", 5)
+    chipText("|", "captionKey", 4, 4).TextColor3 = T.TextMuted
+    local fpsLabel = chipText("fps: --", "monoStat", 5, 52)
 
     -- Stats panel.
     local stats = Instance.new("Frame")
@@ -294,7 +296,7 @@ local function buildHud(parent)
 
         local key = K.label(r, name, "rowStat", 1)
         key.ZIndex = 4
-        K.flexFill(key, 120)
+        K.flexFill(key, 150)
         local value = K.label(r, "--", "monoStat", 2)
         value.Size = UDim2.new(0, 0, 1, 0)
         value.AutomaticSize = Enum.AutomaticSize.X
@@ -304,7 +306,7 @@ local function buildHud(parent)
     end
     local statusValue = statRow("Status", 1)
     local targetValue = statRow("Target", 2)
-    local worldValue = statRow("Enemies", 3)
+    local worldValue = statRow("World", 3)
 
     -- Footer.
     local footer = Instance.new("Frame")

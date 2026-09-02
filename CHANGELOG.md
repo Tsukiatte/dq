@@ -11,6 +11,30 @@ file and that table in sync on every edit.
 
 ---
 
+## 2.7.1 - 2026-09-01
+Fixes for the 2.7.0 interface, all three found from in-game screenshots.
+
+- **Every row label rendered blank.** `flexFill` added a `UIFlexItem` in Fill
+  mode to the label, but the label's base width was already 100%. Flex *grows*
+  an item from its base size, so the pass had negative slack to distribute and
+  collapsed the labels to nothing. The buttons were unaffected because their
+  base width was 0 - which is exactly the tell: TextButtons and list entries
+  showed their text, every `label()` inside a `row()` did not.
+  Flex is gone. Widths are explicit arithmetic against the `reserve` each call
+  site already passed. A wrong `reserve` now gives a label that is slightly the
+  wrong width rather than an invisible one, which is the failure mode worth
+  having in code that cannot be tested outside the game.
+- **The HUD title chip collapsed to a bare accent line.** The chip and its five
+  labels were all `AutomaticSize.X` inside a `ClipsDescendants` frame - nested
+  automatic sizing that never resolved. Fixed widths now, totalling the design's
+  326px chip.
+- **The HUD Status row read "Movement: Movement: ...".** `setMovementState`
+  prefixed the text, and it now writes into a row that is already labelled
+  Status. The prefix is gone.
+- The HUD frame sizes to its contents, so a taller stats panel can no longer
+  push the footer off the bottom of the screen. Third stat row relabelled World
+  (it carries enemies / telegraphs / playtime).
+
 ## 2.7.0 - 2026-09-01 - "Kitbuilt"
 The interface, rebuilt from the Figma kit, plus the macro follow-ups.
 
