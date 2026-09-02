@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 4.9.4
+    VERSION : 4.9.5
     BUILD   : 2026-09-02
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "4.9.4"
+local SCRIPT_VERSION = "4.9.5"
 local SCRIPT_BUILD_DATE = "2026-09-02"
 local SCRIPT_CODENAME = "Learn from the hit"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "4.9.5", date = "2026-09-02", notes = "Every hit in the capture now records what the dodge believed at that instant - its danger reading, its reason, whether it had a box, whether it was waiting for a gap or holding pursuit, and the HUD status. From the Studio harness: the hit rate against the recreated Midgardian Champion fell from about ten a minute to five after 4.9.4, and the remaining hits need to be explained one by one rather than tuned away." },
     { version = "4.9.4", date = "2026-09-02", notes = "From the Studio harness, three things the real Northern Lands fight also has. The 217-stud invisible cube around the boss arena was being learned as an attack after a hit - the age guard used the index timestamp, and parts present before the script started never get one - which put the whole fight inside danger; nothing arena-sized is an attack now, and a part with no timestamp counts as old. The 14 passive-beam Models parked at the arena centre, never shown and never moved, read as live for the whole fight - a permanent wall through the middle; a ground-truth Model that has shown nothing, not moved and not hit us for ten seconds is dormant, and moving, showing, a hitBox change or a hit wakes it as a fresh spawn. And the enemy attack name table held generic names - meshpart, ball, wave, ice - that matched map geometry; they are gone, and structure still catches the attacks." },
     { version = "4.9.3", date = "2026-09-02", notes = "Blame, from the Studio harness: a hit was credited to the nearest known attack, and a beam that appeared a fifth of a second ago through where we stand is nearer than the one that has been burning us for a second. That taught every beam to be live from 0.2 seconds and made the whole arena walls. Attribution now scores candidates - the part encloses us, it is old enough to have fired, it is armed and not over, its learned window covers this moment - and the capture line says who was blamed and why." },
     { version = "4.9.2", date = "2026-09-02", notes = "Found in the Studio test harness on the first run: the highlight renderer keyed its adornments with the debug-id API, which needs plugin permissions there and threw every tick - after the scan had built its volumes and before the dodge decided, so the dodge never ran once and the character stood in beams reporting no danger. Parts are keyed with a weak-table counter now, and the highlight and telegraph-feed renderers are walled off in pcall: nothing cosmetic can take the dodge down again." },

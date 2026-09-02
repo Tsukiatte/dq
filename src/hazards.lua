@@ -1867,6 +1867,17 @@ local function recordHit(damage)
     table.sort(ranked, function(a, b) return a.distance < b.distance end)
 
     local lines = { string.format("HIT  -%.0f  at %s", damage, os.date("%H:%M:%S")) }
+    -- What the dodge believed at this instant. A hit taken while it reported
+    -- no danger is a detection problem; while waiting for a gap, a field
+    -- problem; while pursuing, a gating problem. The line says which.
+    do
+        local DG = S.DG
+        if DG then
+            lines[#lines + 1] = string.format("     DODGE  danger=%.2f  reason=%s  target=%s  gapWait=%s  pursuitBlocked=%s  status=%s",
+                DG.dangerHere or -1, tostring(DG.targetReason), DG.target and "yes" or "no",
+                tostring(DG.gapWait), tostring(DG.pursuitBlocked), tostring("?"))
+        end
+    end
     local culprit = nil
     for i = 1, math.min(#ranked, 8) do
         local r = ranked[i]
