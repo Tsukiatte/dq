@@ -11,6 +11,46 @@ file and that table in sync on every edit.
 
 ---
 
+## 3.3.0 - 2026-09-02 - "Open ground"
+
+### Attack capture — so misses stop being guesswork
+A place file says what exists in `ReplicatedStorage`. It does **not** say what a
+part is named, parented or shaped when it actually spawns during a fight, and
+`Workspace.enemies` was empty in both dumps. I have now diagnosed missed attacks
+by inference from a static snapshot twice and been wrong twice.
+
+**Record what spawns** logs every part that appears near you — name, class,
+size, transparency, collision, material, colour, velocity, full ancestry — along
+with **what this script decided about it**. **Save capture** writes it beside
+your config.
+
+The misses are the whole point: a part judged harmless appears in no other log,
+which is exactly the case that needs explaining. One fight recorded tells me
+more than any number of dumps.
+
+### Enclosure — stop backing into corners
+A green pocket ringed by red is a **trap**: somewhere you can stand right now
+with nowhere to go the moment it closes. Cells now inherit a share of the heat
+around them, sampled both immediately and at **Escape range** (6 studs), so:
+
+- An enclosed pocket reads hotter than open ground of equal local safety.
+- **Walls count as heat**, so corners are included — the old "avoid wall edges"
+  rule is now a special case of one general one rather than a separate rule.
+
+The effect is that the bot strafes into the open rather than reversing into a
+dead end that happens to be green.
+
+Assigned from a stored base, never accumulated, and unmeasured neighbours are
+skipped rather than counted as walls — both traps this sliced field has already
+sprung once each.
+
+### Adaptive lookahead
+Taken from the standalone heatmap prototype, which scales its prediction window
+inversely with the agent's speed. Every horizon here was a fixed constant
+regardless of `WalkSpeed`, so a crawling character got the same warning time as
+a sprinting one. Horizons now stretch as speed drops (square root, so halving
+speed widens the window ~40% rather than doubling it).
+
 ## 3.2.6 - 2026-09-02
 
 ### The window is a circle

@@ -654,6 +654,25 @@ local function createControlUI()
     S.refreshPrecastPanel()
 
     K.caption(attacks.body,
+        "If an attack is going unnoticed, record a fight and send the file. A place file says what exists in storage; this says what actually spawned, what it was called, and what the script decided about it.", 7.5)
+    track(K.toggle(attacks.body, "Record what spawns",
+        function() return CFG.diagnoseAttacks end,
+        function(v)
+            CFG.diagnoseAttacks = v
+            if v then S.clearAttackLog() end
+        end, 7.6,
+        "Log every part that appears near you, whether or not it was treated as an attack. The misses are the point: a part judged harmless is invisible in every other log, and that is exactly the case that needs explaining."))
+    local captureRow = K.buttonRow(attacks.body, 7.7)
+    captureRow.add("Save capture", "accent", function()
+        local ok, err = S.saveAttackLog()
+        setMovementState(ok and ("wrote " .. CFG.diagnoseFile) or ("capture failed: " .. tostring(err)))
+    end, "Write the recording to a file next to your config. Run a fight with recording on, then press this and send me the file.")
+    captureRow.add("Clear", "ghost", function()
+        S.clearAttackLog()
+        setMovementState("capture cleared")
+    end, "Start the recording over.")
+
+    K.caption(attacks.body,
         "By hand, for anything the broadcast does not cover: click an attack to add it to this map's book, or draw a hazard around a decoration that only announces one.", 8)
 
     local attackPickers = K.buttonRow(attacks.body, 9)
@@ -1164,9 +1183,17 @@ local function createControlUI()
         0.5, 6, true,
         function() return CFG.cloneStepHeight end, function(v) CFG.cloneStepHeight = v end, 6.85,
         "How far up a Roblox humanoid steps without jumping. Anything above this is charged Wall threat."))
-    track(K.toggle(cloneSection.content, "Avoid wall edges",
+    track(K.toggle(cloneSection.content, "Prefer open ground",
         function() return CFG.threatWallSpread end, function(v) CFG.threatWallSpread = v end, 6.9,
-        "Warm the ground beside anything impassable. Without it the cheapest route hugs every wall, which is exactly where you get cornered when an attack lands."))
+        "Cells inherit a share of the heat around them, so a green pocket ringed by red reads hot - it is a trap, somewhere you can stand right now with nowhere to go the moment it closes. Walls count as heat too, so corners are included. This is what makes the bot strafe into the open instead of backing into a corner."))
+    track(K.slider(cloneSection.content, "Enclosure", "How much surroundings count",
+        0, 1.5, true,
+        function() return CFG.threatEnclosureWeight end, function(v) CFG.threatEnclosureWeight = v end, 6.91,
+        "How strongly a cell takes on the heat around it. Higher makes it hug open ground and refuse pockets; 0 turns it off and it will happily reverse into a dead end that happens to be green."))
+    track(K.slider(cloneSection.content, "Escape range", "Studs out it checks for a way through",
+        2, 20, true,
+        function() return CFG.threatEnclosureRange end, function(v) CFG.threatEnclosureRange = v end, 6.92,
+        "How far out it looks when judging whether somewhere is enclosed. Small only notices the walls it is touching; large notices a pocket it could get sealed into."))
     track(K.toggle(cloneSection.content, "Look past the grid",
         function() return CFG.escapeScanEnabled end, function(v) CFG.escapeScanEnabled = v end, 6.95,
         "When everything inside the grid is hot, sample directions well beyond it and head for the coolest. Without this the bot can only choose between cells it can see, and cornered that means picking the least bad corner and staying in it."))

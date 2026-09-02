@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 3.2.6
+    VERSION : 3.3.0
     BUILD   : 2026-09-01
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "3.2.6"
+local SCRIPT_VERSION = "3.3.0"
 local SCRIPT_BUILD_DATE = "2026-09-01"
-local SCRIPT_CODENAME = "Thrift"
+local SCRIPT_CODENAME = "Open ground"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "3.3.0", date = "2026-09-02", notes = "Attack capture: Record what spawns logs every part that appears near you along with the verdict, then Save capture writes it to a file. A place file says what exists in ReplicatedStorage; it does not say what a part is named, parented or shaped when it actually spawns in a fight, and both dumps had an empty Workspace.enemies - so misses have been diagnosed by inference twice and got it wrong twice. The misses are the point: a part judged harmless appears in no other log. Enclosure: cells inherit a share of the heat around them, so a green pocket ringed by red reads hot because it is a trap, and walls count as heat so corners do too. Open ground now beats an enclosed pocket of equal local safety, which is what stops the bot backing into a corner instead of strafing out. And adaptive lookahead, taken from the standalone heatmap prototype: horizons stretch when WalkSpeed is low, because a slow character cannot dodge reactively and has to see danger earlier." },
     { version = "3.2.6", date = "2026-09-02", notes = "The pathfinding window is a circle rather than a square. The corners of a square are its furthest cells - 1.4 times the radius - so they were the least useful ground in the grid and the most expensive to path to, and they were a quarter of the total work. Dropping them costs nothing and buys about three more studs of sight for the same cell budget: 24 studs instead of 21 at the default. The cell array stays square because the indexing is arithmetic; the corners are simply never active, never measured, never drawn and never routed through - and because they are never measured they cannot be mistaken for walls by the edge pass." },
     { version = "3.2.5", date = "2026-09-02", notes = "Every boss attack in the game was missing from the name table. Bosses keep their attacks in a subfolder of their own - enemyProjectiles.Steampunk.bossCannonBeam and so on - and the table was built from top-level children only, then dropped Folders to avoid picking up gear, which threw away 111 attack models. Rebuilt recursively from both dumps: 519 names, up from 238. Every one of those models is built the same way, a PrimaryPart plus a hitBox and a precast, so those two names now catch attacks from bosses nobody has dumped. Two fixes for being cornered. The grid only sees about twenty studs, so boxed in with attacks filling all of it the clear ground was invisible and the bot settled for the least bad corner; when the whole window is hot it now samples bearings well beyond the grid and heads for the coolest. And the ordinary stuck detector is switched off while dodging, so nothing at all was watching for the character being wedged between a wall and an enemy - it now hops, drops the goal and marks the obstruction impassable." },
     { version = "3.2.4", date = "2026-09-02", notes = "The drifting yellow circles were the wall-edge pass treating cells the slicing had not reached yet as if they were walls. Since 3.2.0 only a slice of the grid is measured per pass, so after every window shift most cells are simply unknown - and each freshly measured cell next to one was being given edge heat of 21, which is 38 percent of lethal and lands exactly in the yellow band. It now only counts neighbours that have actually been measured and found impassable. Separately, heights were compared against the root part centre rather than the floor underfoot, and the root sits about three studs up: Step height 2.5 really described a rise of five and a half, so the slider said one thing and the grid did another. It measures from the floor now." },
@@ -492,10 +493,34 @@ CFG.cloneMaxClimb = 6.0
 CFG.cloneStepHeight = 2.5
 CFG.threatWallWeight = 60        -- heat for ground you cannot simply walk onto
 CFG.threatWallSpread = true      -- warm the cells beside a wall as well
+-- Enclosure. A green pocket ringed by red is a TRAP: you can stand in it right
+-- now and have nowhere to go the moment it closes. Cells inherit a share of the
+-- heat around them, so an enclosed pocket reads hotter than open ground of the
+-- same local safety and the bot strafes out instead of backing into a corner.
+CFG.threatEnclosureWeight = 0.55
+CFG.threatEnclosureRange = 6.0   -- studs out to sample for a way through
 
 -- Looking past the edge of the grid (3.2.5). The window only reaches about
 -- twenty studs; cornered with attacks inside all of it, the genuinely clear
 -- ground is simply invisible and the bot settles for the least bad corner.
+-- Attack capture (3.3.0). A place file says what exists in ReplicatedStorage;
+-- it does not say what a part is NAMED, PARENTED or SHAPED when it actually
+-- spawns during a fight, and both dumps had an empty Workspace.enemies. This
+-- records every part that appears near you along with the verdict, so a miss
+-- can be read rather than guessed at.
+CFG.diagnoseAttacks = false
+CFG.diagnoseRadius = 90
+CFG.diagnoseMax = 900
+CFG.diagnoseFile = "DungeonAutofarm_attacklog.txt"
+
+-- Adaptive lookahead. Borrowed from the standalone heatmap prototype, which
+-- scales its prediction window inversely with the agent's speed: a slow agent
+-- cannot dodge reactively, so it has to see danger coming much earlier. Every
+-- horizon in this script was a fixed constant regardless of WalkSpeed, which
+-- meant the same warning time whether you were sprinting or crawling.
+CFG.adaptiveLookahead = true
+CFG.lookaheadBaseSpeed = 16      -- the WalkSpeed the tuned horizons assume
+
 CFG.escapeScanEnabled = true
 CFG.escapeScanRays = 16          -- directions sampled beyond the grid
 CFG.escapeScanFar = 2.8          -- times the grid radius
@@ -705,6 +730,11 @@ HZ.seenAt = {}
 HZ.manualParts = {}
 -- Live safe-spot markers: the places a boss says you MUST stand.
 HZ.safeZones = {}
+-- Attack capture: [part] = true for things already recorded, and the pending
+-- lines waiting to be written.
+HZ.diagnosed = setmetatable({}, { __mode = "k" })
+HZ.diagnoseLines = {}
+HZ.diagnoseCount = 0
 -- What the safety tests actually iterate: single parts, plus one box for each
 -- dense cluster. Rebuilt with HZ.detected.
 HZ.volumes = {}
