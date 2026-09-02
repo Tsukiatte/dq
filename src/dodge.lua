@@ -638,12 +638,14 @@ local function runDodge(humanoid, root)
     end
     releaseFacing(humanoid)
     local arrived = driveTo(humanoid, root, target)
+    -- The mover is named in the status so "is it tweening?" is answered by
+    -- looking, not by guessing from how it moves.
     if arrived then
         DG.target = nil
         releaseMover(humanoid, root)
-        setMovementState("DODGE arrived")
+        setMovementState("DODGE arrived [" .. tostring(CFG.moveMode) .. "]")
     else
-        setMovementState("DODGE " .. tostring(DG.targetReason))
+        setMovementState("DODGE " .. tostring(DG.targetReason) .. " [" .. tostring(CFG.moveMode) .. "]")
     end
     return true
 end

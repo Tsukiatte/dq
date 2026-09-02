@@ -11,6 +11,13 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.2.1 - 2026-09-02
+- The HUD status names the active mover in brackets — `DODGE waiting for a gap
+  [tween]` — so "is it tweening?" is answered by looking. The **Movement**
+  dropdown at the top of the Dodge section switches between tween, walk, steer
+  and velocity; tween is the default, and only a config saved on an older build
+  would override it.
+
 ## 4.2.0 - 2026-09-02 - "The box is the approach"
 
 The bullet-hell screenshot was the most diagnostic yet: **42 telegraphs
