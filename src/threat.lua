@@ -110,6 +110,36 @@ local function urgency(timeToImpact)
     return t ^ CFG.threatCurve
 end
 
+-- How dangerous a point is at a given moment, given a projectile passes it at
+-- `delta` seconds from that moment. Positive delta means it has not arrived
+-- yet; negative means it has already gone by.
+--
+-- This is a window, not a ramp, and the difference matters twice over. A ramp
+-- says a corridor a shot reaches in two seconds is nearly cool, so the bot
+-- strolls in - and worse, it says the ground BEHIND a projectile is still
+-- lethal, when behind it is the safest place on the map. The bot was fleeing
+-- the one spot that could not hurt it.
+--
+-- The core of the window is geometric: how long the thing physically occupies
+-- the point, which is its own width plus yours, over its speed. A shot at a
+-- hundred studs a second is there for a twentieth of a second; a tornado
+-- ambling at five owns the ground for the best part of two. Around that sits
+-- the lead (generous - being early is how you get hit) and the wake (short,
+-- because gone is gone).
+local function passHeat(delta, halfWindow)
+    if delta >= -halfWindow and delta <= halfWindow then return 1 end
+    if delta > halfWindow then
+        local over = (delta - halfWindow) / CFG.threatProjectileLead
+        if over >= 1 then return 0 end
+        local t = 1 - over
+        return t * t
+    end
+    local over = (-delta - halfWindow) / CFG.threatProjectileWake
+    if over >= 1 then return 0 end
+    local t = 1 - over
+    return t * t
+end
+
 -- ------------------------------------------------------------------ queries
 -- Heat at a point, at TWO moments, in a single walk over the threat sources.
 --
@@ -207,8 +237,11 @@ local function getThreatPair(position, timeA, timeB)
                             local edge = sideways <= width and 1
                                 or (1 - (sideways - width) / falloff) ^ 2
                             local arrive = along / speed
-                            totalA = totalA + THREAT_LETHAL * urgency(arrive - timeA) * edge
-                            totalB = totalB + THREAT_LETHAL * urgency(arrive - timeB) * edge
+                            -- How long it actually sits on this point: its own
+                            -- width plus ours, over its speed.
+                            local halfWindow = max(width / speed, 0.05)
+                            totalA = totalA + THREAT_LETHAL * passHeat(arrive - timeA, halfWindow) * edge
+                            totalB = totalB + THREAT_LETHAL * passHeat(arrive - timeB, halfWindow) * edge
                         end
                     end
                 end

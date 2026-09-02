@@ -11,6 +11,42 @@ file and that table in sync on every edit.
 
 ---
 
+## 3.2.1 - 2026-09-02
+
+### Projectile timing was wrong in both directions
+The corridor was scored with the **ground-attack urgency ramp**, and a ramp is
+the wrong shape for something moving:
+
+| projectile | ramp (was) | window (now) |
+|---|---|---|
+| arrives in 2.0s | 12 — stroll in | 0 |
+| arrives in 0.5s | 67 | 35 |
+| arrives in 0.2s | 86 | **75** |
+| passing now | 100 | **100** |
+| **passed 0.5s ago** | **100 — flees** | **0** |
+
+Two separate errors. A corridor a shot reached in two seconds read as nearly
+cool, so the bot walked straight in. And the ground *behind* a projectile stayed
+lethal — **it was fleeing the safest place on the map**.
+
+A projectile is dangerous in a **window around the moment it passes**. The core
+of that window is geometric: the projectile's own width plus yours, over its
+speed. So one formula gives a 100 st/s shot a lethal window of a twentieth of a
+second, and a 9-stud tornado ambling at 5 st/s a window of nearly two seconds
+either side — because it genuinely takes that long to move its own width past a
+point. Around the core sit **Projectile lead** (1.1s, generous — being early is
+how you get hit) and **Projectile wake** (0.3s, short — gone is gone).
+
+The "will I still be standing here" sample covers the rest: a shot arriving in
+two seconds is cool on arrival and lethal at arrival-plus-dwell, so the bot will
+cross the corridor but will not stop in it.
+
+### Recommended settings
+A button at the top of the Clone section that resets the whole thing to the
+tuning arrived at across the dungeons tested so far. The values live in
+`config.lua` beside the loader, so the defaults and the reset cannot drift
+apart.
+
 ## 3.2.0 - 2026-09-02 - "Thrift"
 
 Performance. Measured against a 900-cell grid (radius 22 at 1.5 spacing)
