@@ -18,6 +18,7 @@ local getVisualRoot = S.getVisualRoot
 local walkTowardPoint = S.walkTowardPoint
 local clearPointRoute = S.clearPointRoute
 local releaseFacing = S.releaseFacing
+local setPathEditEnabled = S.setPathEditEnabled
 
 -- =========================================================================
 -- MACRO WAYPOINTS (2.5.0)
@@ -183,6 +184,15 @@ local function startRecording()
         RT.farmEnabled = false
         if S.setLoopButtonState then S.setLoopButtonState() end
         heavyDebug("Macro", "Loop switched off for recording - you are driving now.")
+    end
+
+    -- And the camera must be yours. The waypoint editor's free-fly camera
+    -- detaches from the character entirely, so recording with it armed would
+    -- capture a route the character never walked.
+    if NAV.pathEditEnabled then
+        setPathEditEnabled(false)
+        if S.setFreecamButtonState then S.setFreecamButtonState() end
+        heavyDebug("Macro", "Free-fly editor switched off: a macro is recorded from your own camera.")
     end
 
     MC.recording = true
@@ -496,6 +506,12 @@ local function setMacroMode(mode)
         if MC.recording then stopRecording() end
         clearMacroRoute()
     else
+        -- The free-fly editor belongs to the waypoint system; it has no meaning
+        -- in macro mode and would only get in the way of recording.
+        if NAV.pathEditEnabled then
+            setPathEditEnabled(false)
+            if S.setFreecamButtonState then S.setFreecamButtonState() end
+        end
         renderMacroRoute(MC.playIndex)
     end
     heavyDebug("Macro", "Mode: " .. MC.mode)

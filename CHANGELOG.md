@@ -11,6 +11,21 @@ file and that table in sync on every edit.
 
 ---
 
+## 2.6.0 - 2026-09-01 - "Firstperson"
+- **Macros are a top-level mode now.** They had been nested inside the waypoint
+  editor's panel behind a Waypoints/Macros selector, which was wrong on its own
+  terms: the two systems are peers. Macros get their own **Macros** button in
+  the main window and their own panel, with the idle-mode switch
+  (Waypoints / Macros) at the top of it.
+- **Recording switches the free-fly editor off.** This is the real bug: the
+  editor detaches the camera from the character entirely, so recording with it
+  armed captured a route the character never walked - and you cannot drive in
+  first person while a free camera has your input. Starting a recording now
+  disables the editor, and so does switching the idle mode to Macros, since the
+  editor has no meaning there.
+- The waypoint panel's **Clear** button is no longer context-sensitive (it only
+  ever clears waypoints); the macro panel has its own **Clear all**.
+
 ## 2.5.1 - 2026-09-01
 - **Fixed: the macro Record and Bind buttons could not be reached.** The Route
   panel was only ever opened by the **Edit Path** button, and that same button
