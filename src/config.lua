@@ -30,13 +30,10 @@ local SCRIPT_VERSION = S.SCRIPT_VERSION
 =========================================================================== ]]
 
 local LD = S.LD
-local MC = S.MC
 local MAP_LABELS = S.MAP_LABELS
 local refreshLowDetail = S.refreshLowDetail
-local serializeMacros = S.serializeMacros
 local serializeZones = S.serializeZones
 local loadZones = S.loadZones
-local loadMacros = S.loadMacros
 
 local CONFIG_FILE = "DungeonAutofarm_config.json"
 
@@ -89,60 +86,14 @@ local function syncCurrentMapToStore()
     RT.zoneData[RT.currentMap] = serializeZones()
 
     RT.mapData[RT.currentMap] = { waypath = waypath, keep = keep }
-    -- Macros are bulky and live in their own file; the map store only carries
-    -- the light data.
-    RT.macroData[RT.currentMap] = serializeMacros()
 end
 
--- =========================================================================
--- The macro file. Separate from the config because a single ten-minute
--- recording is thousands of samples, and keeping it apart means the config
--- stays small and hand-editable while the macros stay easy to copy between
--- machines or hand to someone else.
--- =========================================================================
-local function saveMacroFile()
-    if not hasFileAccess() then return false, "no file access in this executor" end
-    local ok, err = pcall(function()
-        local payload = { version = SCRIPT_VERSION, maps = RT.macroData }
-        writefile(CFG.macroFile, game:GetService("HttpService"):JSONEncode(payload))
-    end)
-    if ok then
-        local total = 0
-        for _, list in pairs(RT.macroData) do total = total + #list end
-        heavyDebug("Config", string.format("Saved %d macro(s) to %s.", total, CFG.macroFile))
-        return true
-    end
-    heavyDebug("Config", "Macro save failed: " .. tostring(err))
-    return false, tostring(err)
-end
-
-local function loadMacroFile()
-    if not hasFileAccess() then return false end
-    local exists = false
-    pcall(function() exists = isfile(CFG.macroFile) end)
-    if not exists then return false end
-
-    local data
-    local ok = pcall(function()
-        data = game:GetService("HttpService"):JSONDecode(readfile(CFG.macroFile))
-    end)
-    if not ok or type(data) ~= "table" or type(data.maps) ~= "table" then
-        heavyDebug("Config", "Macro file unreadable; starting with none.")
-        return false
-    end
-
-    table.clear(RT.macroData)
-    local total = 0
-    for code, list in pairs(data.maps) do
-        if MAP_LABELS[code] and type(list) == "table" then
-            RT.macroData[code] = list
-            total = total + #list
-        end
-    end
-    heavyDebug("Config", string.format("Loaded %d macro(s) across %d map(s) from %s.",
-        total, (function() local c = 0 for _ in pairs(RT.macroData) do c = c + 1 end return c end)(),
-        CFG.macroFile))
-    return true
+-- The island. "clone" is the box; "legacy" is the older search-for-a-safe-
+-- point dodge. Switching turns the dodge subsystem on or off with it.
+local function setMode(mode)
+    if mode ~= "legacy" and mode ~= "clone" then mode = "clone" end
+    RT.mode = mode
+    if S.setDodgeActive then S.setDodgeActive(mode == "clone") end
 end
 
 -- Checks a map's stored data out into the live tables. Does NOT save.
@@ -170,8 +121,6 @@ local function applyMapFromStore(code)
     refreshLowDetail()
     if S.refreshMapPanel then S.refreshMapPanel() end
 
-    local macroCount = loadMacros(RT.macroData[code])
-
     table.clear(HZ.attackBook)
     for _, record in ipairs(RT.attackData[code] or {}) do
         table.insert(HZ.attackBook, record)
@@ -183,8 +132,8 @@ local function applyMapFromStore(code)
     local keepCount = 0
     for _ in pairs(LD.keepNames) do keepCount = keepCount + 1 end
     heavyDebug("Map", string.format(
-        "%s (%s): %d waypoint(s), %d macro(s), %d attack(s), %d zone(s), %d kept name(s).",
-        code, MAP_LABELS[code] or code, #NAV.waypath, macroCount,
+        "%s (%s): %d waypoint(s), %d attack(s), %d zone(s), %d kept name(s).",
+        code, MAP_LABELS[code] or code, #NAV.waypath,
         #HZ.attackBook, zoneCount, keepCount))
 end
 
@@ -241,7 +190,7 @@ local function buildConfigTable()
             followPath = CFG.followPath,
             loopPath = CFG.loopPath,
             waypointClearRadius = CFG.waypointClearRadius,
-            macroMode = MC.mode,
+            mode = RT.mode,
             pathfindingEnabled = CFG.pathfindingEnabled,
             dodgeInterval = CFG.dodgeInterval,
             dodgeReach = CFG.dodgeReach,
@@ -266,6 +215,7 @@ local function buildConfigTable()
             dodgeShowRange = CFG.dodgeShowRange,
             dodgeCornerCost = CFG.dodgeCornerCost,
             dodgeApproachWeight = CFG.dodgeApproachWeight,
+            dodgeStepProbe = CFG.dodgeStepProbe,
             attackMethod = CFG.attackMethod,
             autoClickEnabled = CFG.autoClickEnabled,
             clickAtCursor = CFG.clickAtCursor,
@@ -277,9 +227,6 @@ local function buildConfigTable()
             moveMode = CFG.moveMode,
             moveTakeControls = CFG.moveTakeControls,
             moveArriveRadius = CFG.moveArriveRadius,
-            macroLoop = CFG.macroLoop,
-            macroShowRoute = CFG.macroShowRoute,
-            macroRecordBind = MC.recordBind.Name,
             abilityRadiusEnabled = CFG.abilityRadiusEnabled,
             abilityRadius = CFG.abilityRadius,
             showAbilityRadius = CFG.showAbilityRadius,
@@ -340,7 +287,6 @@ local function saveConfig()
 
     if ok then
         heavyDebug("Config", "Saved to " .. CONFIG_FILE)
-        saveMacroFile()
         return true
     end
 
@@ -382,15 +328,16 @@ local function applyConfigData(data)
         if combat.recoveryEnabled ~= nil then
             CFG.recoveryEnabled = combat.recoveryEnabled == true
         end
-        if combat.macroMode == "macro" or combat.macroMode == "legacy"
-            or combat.macroMode == "clone" then
-            MC.mode = combat.macroMode
-        end
+        -- "macroMode" is the pre-4.3 key; "macro" itself no longer exists.
+        local mode = combat.mode or combat.macroMode
+        if mode == "macro" then mode = "legacy" end
+        if mode == "legacy" or mode == "clone" then setMode(mode) end
         if combat.pathfindingEnabled ~= nil then CFG.pathfindingEnabled = combat.pathfindingEnabled == true end
         for _, key in ipairs({ "dodgeInterval", "dodgeReach", "dodgeRings", "dodgeRays", "dodgeProbe",
             "dodgeMargin", "dodgeShoulder", "dodgeLead", "dodgeLinger", "dodgeDwell", "dodgeMoveAt",
             "dodgeHysteresis", "dodgeDistanceCost", "dodgeEnemyRadius", "dodgeEnemySoft",
-            "dodgeMaxClimb", "dodgeMaxDrop", "dodgeCornerCost", "dodgeApproachWeight" }) do
+            "dodgeMaxClimb", "dodgeMaxDrop", "dodgeCornerCost", "dodgeApproachWeight",
+            "dodgeStepProbe" }) do
             CFG[key] = tonumber(combat[key]) or CFG[key]
         end
         for _, key in ipairs({ "dodgeManual", "dodgeShowField", "dodgeShowTarget", "dodgeShowRange" }) do
@@ -412,13 +359,6 @@ local function applyConfigData(data)
         end
         CFG.moveArriveRadius = tonumber(combat.moveArriveRadius) or CFG.moveArriveRadius
         if combat.moveTakeControls ~= nil then CFG.moveTakeControls = combat.moveTakeControls == true end
-        if combat.macroLoop ~= nil then CFG.macroLoop = combat.macroLoop == true end
-        if combat.macroShowRoute ~= nil then CFG.macroShowRoute = combat.macroShowRoute == true end
-        if type(combat.macroRecordBind) == "string" then
-            -- Enum.KeyCode[name] throws on a bad name rather than returning nil.
-            local ok, keyCode = pcall(function() return Enum.KeyCode[combat.macroRecordBind] end)
-            if ok and keyCode then MC.recordBind = keyCode end
-        end
     end
 
     local visuals = data.visuals
@@ -557,12 +497,6 @@ local function applyConfigData(data)
                     waypath = type(entry.waypath) == "table" and entry.waypath or {},
                     keep = type(entry.keep) == "table" and entry.keep or {},
                 }
-                -- Pre-2.7 configs kept the macros inline; adopt them into the
-                -- macro store so nothing recorded before the split is lost.
-                if type(entry.macros) == "table" and #entry.macros > 0
-                    and not RT.macroData[code] then
-                    RT.macroData[code] = entry.macros
-                end
             end
         end
     end
@@ -577,7 +511,6 @@ local function applyConfigData(data)
             "Adopted the pre-2.4 waypoint path into map %s.", RT.currentMap))
     end
 
-    loadMacroFile()
     applyMapFromStore(RT.currentMap)
     local mapCount = 0
     for _ in pairs(RT.mapData) do mapCount = mapCount + 1 end
@@ -668,7 +601,6 @@ local function loadNamedConfig(index)
     heavyDebug("Config", string.format("Loaded saved config '%s'.", entry.name))
     if S.refreshAllWidgets then S.refreshAllWidgets() end
     if S.refreshPathPanel then S.refreshPathPanel() end
-    if S.refreshMacroPanel then S.refreshMacroPanel() end
     if S.refreshMapPanel then S.refreshMapPanel() end
     if S.refreshAttackBookPanel then S.refreshAttackBookPanel() end
     return true, wantsStreamer
@@ -730,7 +662,7 @@ end
 S.loadConfig = loadConfig
 S.saveConfig = saveConfig
 -- The game publishes the dungeon it has loaded. Following it means the
--- waypoints, macros, attack book and drawn zones for that dungeon are already
+-- waypoints, attack book and drawn zones for that dungeon are already
 -- in place by the time you can move, instead of waiting to be picked.
 local MAP_BY_GAME_NAME = {
     ["desert temple"] = "DT", ["winter outpost"] = "WO", ["pirate island"] = "PI",
@@ -749,7 +681,6 @@ local function applyDetectedMap(raw)
         "The game says we are in %s; switched to %s and loaded its data.", raw, code))
     if S.refreshAllWidgets then S.refreshAllWidgets() end
     if S.refreshPathPanel then S.refreshPathPanel() end
-    if S.refreshMacroPanel then S.refreshMacroPanel() end
     if S.refreshMapPanel then S.refreshMapPanel() end
     if S.refreshAttackBookPanel then S.refreshAttackBookPanel() end
     if S.refreshZonePanel then S.refreshZonePanel() end
@@ -767,7 +698,7 @@ end
 -- One button's worth of tuning (4.0.0). Kept beside the loader so the defaults
 -- and the reset cannot drift apart.
 local RECOMMENDED_DODGE = {
-    dodgeInterval = 0.05, dodgeReach = 18, dodgeRings = 4, dodgeRays = 24, dodgeApproachWeight = 0.012,
+    dodgeInterval = 0.05, dodgeReach = 18, dodgeRings = 4, dodgeRays = 24, dodgeApproachWeight = 0.012, dodgeStepProbe = 5,
     dodgeProbe = 0, dodgeMargin = 0.5, dodgeShoulder = 3.0,
     dodgeLead = 1.2, dodgeLinger = 0.35, dodgeDwell = 1.2,
     dodgeMoveAt = 0.15, dodgeHysteresis = 0.12, dodgeDistanceCost = 0.008,
@@ -792,8 +723,7 @@ S.loadNamedConfig = loadNamedConfig
 S.deleteNamedConfig = deleteNamedConfig
 S.renameNamedConfig = renameNamedConfig
 S.loadConfigStore = loadConfigStore
-S.saveMacroFile = saveMacroFile
-S.loadMacroFile = loadMacroFile
+S.setMode = setMode
 S.syncCurrentMapToStore = syncCurrentMapToStore
 S.syncStreamerToggleWidget = syncStreamerToggleWidget
 end

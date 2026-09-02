@@ -52,10 +52,7 @@ local noteOwnAction = S.noteOwnAction
 local runRecovery = S.runRecovery
 local enterRecovery = S.enterRecovery
 local updateStuckDetector = S.updateStuckDetector
-local MC = S.MC
-local recordStep = S.recordStep
-local runMacroPlayback = S.runMacroPlayback
-local startMacroInput = S.startMacroInput
+local dodgeStepClear = S.dodgeStepClear
 local startPrecastListener = S.startPrecastListener
 local DG = S.DG
 local ZN = S.ZN
@@ -184,6 +181,18 @@ local function watchOwnAnimations(character)
 end
 
 -- Attack Execution
+-- Where pursuit is about to step: its next waypoint if it has a route, else
+-- straight at the enemy.
+local function pursuitAhead(enemyRoot)
+    local wp = NAV.waypoints and NAV.waypoints[NAV.index]
+    if wp ~= nil then
+        local t = typeof(wp)
+        if t == "Vector3" then return wp end
+        if t == "PathWaypoint" or (t == "table" and wp.Position) then return wp.Position end
+    end
+    return enemyRoot.Position
+end
+
 local function attackEnemy(enemy)
     if not enemy then
         heavyDebugOnChange("attack_guard", "nil_enemy", "Attack", "ABORT: enemy is nil.")
@@ -205,14 +214,25 @@ local function attackEnemy(enemy)
 
     -- With pathfinding off the bot still picks a target and still swings if it
     -- happens to be in reach; it just stops driving your character there.
-    if DG.active and CFG.dodgeEnabled then
-        -- The box is the approach. Pursuit drove straight through the pattern
-        -- to get in range; the box closes on the target only across safe ground
-        -- and waits when there is none.
-    elseif CFG.pathfindingEnabled then
-        updatePursuitMovement(enemy, humanoid, root, enemyRoot)
-    else
+    if not CFG.pathfindingEnabled then
         setMovementState("pathfinding off (testing)")
+    elseif DG.active and CFG.dodgeEnabled then
+        -- Pursuit walks the map; the dodge outranks it. The loop only reaches
+        -- this with no box to follow, and even then pursuit gets a step only
+        -- if the next few studs of its route are clear. When they are not the
+        -- character holds, and the box - told pursuit is blocked - picks the
+        -- way in one safe spot at a time. (4.2.0 had dropped pursuit outright,
+        -- so the bot could no longer cross a room.)
+        if dodgeStepClear(root, humanoid, pursuitAhead(enemyRoot)) then
+            DG.pursuitBlocked = false
+            updatePursuitMovement(enemy, humanoid, root, enemyRoot)
+        else
+            DG.pursuitBlocked = true
+            humanoid:MoveTo(root.Position)
+            setMovementState("holding for a gap")
+        end
+    else
+        updatePursuitMovement(enemy, humanoid, root, enemyRoot)
     end
 
     local flatOffset = Vector3.new(root.Position.X - enemyRoot.Position.X, 0, root.Position.Z - enemyRoot.Position.Z)
@@ -488,7 +508,7 @@ local function startAutofarm()
     detectGameAndInitialize()
     watchOwnAnimations(character)
     watchHealth(character)
-    startMacroInput()
+    S.setMode(RT.mode)
 
     LocalPlayer.CharacterAdded:Connect(function(newChar)
         character = newChar
@@ -515,16 +535,6 @@ local function startAutofarm()
         local now = os.clock()
         if RT.originalNamecall and now - RT.hookInstalledAt >= CFG.remoteHookLifetime then
             unhookAttackRemotes()
-        end
-
-        -- Macro recording samples from here, not from the combat loop: while you
-        -- are recording, the bot is deliberately NOT farming, so the combat loop
-        -- is not running at all.
-        if MC.recording then
-            local recOk, recErr = xpcall(recordStep, debug.traceback)
-            if not recOk then
-                heavyDebugThrottled("record_error", 1.0, "FATAL", "Macro recorder threw:\n" .. tostring(recErr))
-            end
         end
 
         -- Trial runs, freezing and picking work with the loop OFF (2.4.0): they
@@ -709,16 +719,6 @@ local function startAutofarm()
                     setMovementState("HAZARD - repulsion fallback")
                     heavyDebugThrottled("hazard_fallback", 1.0, "Loop", "No escape route yet. Using raw repulsion vector.")
                 end
-            elseif MC.playing then
-                -- Replaying a recorded run. It owns movement outright: the
-                -- recording already contains the fighting, and letting pursuit
-                -- pull the character off the route would desynchronise the
-                -- actions from the places they were aimed at. Hazard escape
-                -- still sits above this, and the replay steers back onto the
-                -- route afterwards because the samples are absolute positions.
-                heavyDebugOnChange("loop_branch", "macro", "Loop", "BRANCH: MACRO PLAYBACK")
-                if #NAV.escapeWaypoints > 0 then clearEscapeRoute() end
-                runMacroPlayback(humanoid, root)
             elseif NAV.recovery then
                 -- Wedged: walking the manual path out. Everything else waits.
                 heavyDebugOnChange("loop_branch", "recovery", "Loop",
@@ -751,10 +751,8 @@ local function startAutofarm()
 
                 -- No enemy: walk the hand-placed path rather than standing
                 -- still. Only when idle, so it never competes with an active
-                -- fight - and only in legacy mode, since the waypoint path and
-                -- the macro list are two answers to the same question and the
-                -- dropdown picks which one is in charge.
-                local walking = CFG.followPath and CFG.pathfindingEnabled and MC.mode ~= "macro"
+                -- fight.
+                local walking = CFG.followPath and CFG.pathfindingEnabled
                     and not NAV.pathEditEnabled
                     and followPath(humanoid, root)
 
@@ -770,10 +768,8 @@ local function startAutofarm()
 
             -- Last resort (2.2.0): loitering in one spot while trying to move
             -- means all of the above has wedged itself. Walk the manual path.
-            -- Not during macro playback, which has its own skip-ahead recovery
-            -- and must not be dragged off its route by this one.
             -- Recovery is pathfinding's own last resort, so it goes quiet with it.
-            if not MC.playing and CFG.pathfindingEnabled then
+            if CFG.pathfindingEnabled then
                 updateStuckDetector(root, NAV.driving, inHazard, tickClock)
             end
 
@@ -781,15 +777,7 @@ local function startAutofarm()
             -- bot backs out of the telegraph while still pointed at the enemy,
             -- which keeps it in position to attack the moment it is clear. Not
             -- during recovery - there the character should look where it walks.
-            if MC.playing then
-                -- Macro playback owns facing and has already applied the
-                -- recorded direction this tick. This branch used to fall
-                -- through to releaseFacing, which switched the alignment rig
-                -- off again every single frame - so the recorded rotation was
-                -- captured and stored correctly and then thrown away a
-                -- microsecond after it was applied, which read as "rotation is
-                -- not being recorded".
-            elseif CFG.faceTarget and NAV.cachedEnemy and not NAV.recovery then
+            if CFG.faceTarget and NAV.cachedEnemy and not NAV.recovery then
                 local targetRoot = NAV.cachedEnemy:FindFirstChild("HumanoidRootPart")
                     or NAV.cachedEnemy.PrimaryPart
                     or NAV.cachedEnemy:FindFirstChildWhichIsA("BasePart")

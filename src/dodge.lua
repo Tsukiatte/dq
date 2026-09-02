@@ -323,43 +323,57 @@ local function decide(root, humanoid)
     -- through safe ground and holds still when there is none: that is the
     -- whole of "approach" now, and pursuit no longer moves the character in
     -- this mode.
+    -- Near the target, the box is the approach: the last stretch through a
+    -- pattern is crossed one safe spot at a time. Far from it, pursuit walks
+    -- the map and the box fires only for danger - unless pursuit is stopped at
+    -- the edge of something, in which case the box picks the way in.
     local approach = nil
     if RT.farmEnabled and not CFG.dodgeManual and NAV.cachedEnemy and NAV.cachedEnemy.Parent then
         local er = NAV.cachedEnemy:FindFirstChild("HumanoidRootPart") or NAV.cachedEnemy.PrimaryPart
-        if er then approach = er.Position end
+        if er then
+            local p = er.Position
+            local ax, az = p.X - rx, p.Z - rz
+            local near = CFG.dodgeReach * 1.5
+            if ax * ax + az * az <= near * near or DG.pursuitBlocked then approach = p end
+        end
     end
     local preferred = max(CFG.attackRange, CFG.dodgeEnemyRadius + 1)
     local approachWeight = CFG.dodgeApproachWeight
-
-    -- Score every candidate. Cheap: it is arithmetic, no raycasts yet.
-    local cands = DG.cands
-    local distCost = CFG.dodgeDistanceCost
     local fractions = DG.pathFractions
-    for i, off in ipairs(DG.offsets) do
-        local c = cands[i]
-        if not c then c = {} cands[i] = c end
-        local cx, cz = rx + off.x, rz + off.z
-        local T = off.dist / speed
 
-        -- Five samples: three on the way, two once there. The score is half
-        -- the worst of them and half the average - a spot that is hit at one
-        -- moment on the way is not as bad as one that is hit at every moment,
-        -- and in a field where everything is hit at SOME moment that
-        -- difference is the only gradient there is. Pure max made every
-        -- candidate in a bullet hell read exactly 1.0 and the nearest won.
+    -- Five samples along the line from here to (rx+ox, rz+oz): three on the
+    -- way, two once there, each at the moment it would actually happen. The
+    -- score is half the worst of them and half the average - a spot hit at one
+    -- moment on the way is not as bad as one hit at every moment, and in a
+    -- field where everything is hit at SOME moment that difference is the
+    -- only gradient there is. Pure max made every candidate in a bullet hell
+    -- read exactly 1.0 and the nearest won. Returns worst, graded.
+    local function score(ox, oz, dist)
+        local T = dist / speed
         local worst, total = 0, 0
         for k = 1, #fractions do
             local f = fractions[k]
-            local d = dangerAt(rx + off.x * f, ry, rz + off.z * f, T * f)
+            local d = dangerAt(rx + ox * f, ry, rz + oz * f, T * f)
             total = total + d
             if d > worst then worst = d end
         end
+        local cx, cz = rx + ox, rz + oz
         local d1 = dangerAt(cx, ry, cz, T + dwell * 0.5)
         local d2 = dangerAt(cx, ry, cz, T + dwell)
         total = total + d1 + d2
         if d1 > worst then worst = d1 end
         if d2 > worst then worst = d2 end
-        local graded = worst * 0.5 + (total / (#fractions + 2)) * 0.5
+        return worst, worst * 0.5 + (total / (#fractions + 2)) * 0.5
+    end
+
+    -- Score every candidate. Cheap: it is arithmetic, no raycasts yet.
+    local cands = DG.cands
+    local distCost = CFG.dodgeDistanceCost
+    for i, off in ipairs(DG.offsets) do
+        local c = cands[i]
+        if not c then c = {} cands[i] = c end
+        local cx, cz = rx + off.x, rz + off.z
+        local worst, graded = score(off.x, off.z, off.dist)
 
         c.x, c.z, c.dist, c.danger = cx, cz, off.dist, worst
         c.cost = graded + off.dist * distCost
@@ -434,21 +448,34 @@ local function decide(root, humanoid)
         if checked >= CFG.dodgeRayBudget then break end
     end
 
-    -- Hysteresis: keep the box where it is unless somewhere is clearly better,
-    -- or where it is has stopped being safe. Re-picking the argmin every frame
-    -- is how a character shuffles on the spot between two equal choices.
+    -- Hysteresis, for a box whose LINE is still clear and only then. The old
+    -- check re-read danger at the box and nowhere else, so an attack placed
+    -- between the character and the box did not exist as far as the held box
+    -- was concerned: the character walked its straight line into it while a
+    -- step to either side was open. The bots that beat bullet hells commit to
+    -- nothing - twinject re-picks its velocity every frame from scratch - so
+    -- the box survives a decision only while every sample on the way to it
+    -- and at it still passes. Otherwise it is dropped on the spot and the
+    -- field is re-read, and the re-read prices the straight line, which is
+    -- what puts the new box to the left or the right.
     local target = DG.target
     if target then
-        local dx, dz = target.X - rx, target.Z - rz
-        local d = sqrt(dx * dx + dz * dz)
-        local T = d / speed
-        local still = max(dangerAt(target.X, ry, target.Z, T), dangerAt(target.X, ry, target.Z, T + dwell))
-        local stillCost = still + d * distCost
-        if still < CFG.dodgeMoveAt and best and (best.adjusted or best.cost) > stillCost - CFG.dodgeHysteresis then
-            best = nil    -- the current box wins
-        elseif still >= CFG.dodgeMoveAt then
+        local tx, tz = target.X - rx, target.Z - rz
+        local d = sqrt(tx * tx + tz * tz)
+        local worst, graded = score(tx, tz, d)
+        if worst >= CFG.dodgeMoveAt then
             DG.target = nil
             target = nil
+            DG.targetReason = "line closed"
+        elseif best then
+            local stillCost = graded + d * distCost
+            if approach then
+                local ax, az = target.X - approach.X, target.Z - approach.Z
+                stillCost = stillCost + approachWeight * max(0, sqrt(ax * ax + az * az) - preferred)
+            end
+            if (best.adjusted or best.cost) > stillCost - CFG.dodgeHysteresis then
+                best = nil    -- the current box wins
+            end
         end
     end
 
@@ -462,9 +489,17 @@ local function decide(root, humanoid)
             local ax, az = rx - approach.X, rz - approach.Z
             inRange = sqrt(ax * ax + az * az) <= preferred + 1.5
         end
-        if inRange or not best or best.danger >= CFG.dodgeMoveAt then
+        if inRange then
             DG.target = nil
-            DG.targetReason = inRange and "safe here" or "waiting for a gap"
+            DG.targetReason = "safe here"
+            return
+        end
+        -- A held box that just won the hysteresis stays held; dropping it here
+        -- was what made the approach creep a stud at a time.
+        if target and not best then return end
+        if not best or best.danger >= CFG.dodgeMoveAt then
+            DG.target = nil
+            DG.targetReason = "waiting for a gap"
             return
         end
         -- Hysteresis for the approach too, or the box creeps a stud at a time.
@@ -598,10 +633,32 @@ local function paint(root)
     end
 end
 
+-- Is a step from here toward `to` clear? Pursuit asks before it moves. The
+-- dodge decides twenty times a second, but a MoveTo issued between two
+-- decisions can still put a foot into something the next decision would have
+-- refused, and pursuit is the one thing that walks TOWARD attacks. Only the
+-- next few studs are checked: further than that is the box's business.
+local function stepClear(root, humanoid, to)
+    if not DG.active or not CFG.dodgeEnabled or not DG.reach then return true end
+    local rp = root.Position
+    local dx, dz = to.X - rp.X, to.Z - rp.Z
+    local len = sqrt(dx * dx + dz * dz)
+    if len < 0.1 then return true end
+    local step = min(len, CFG.dodgeStepProbe)
+    local ux, uz = dx / len * step, dz / len * step
+    local T = step / max(humanoid.WalkSpeed, 4)
+    local d = max(
+        dangerAt(rp.X + ux * 0.5, rp.Y, rp.Z + uz * 0.5, T * 0.5),
+        dangerAt(rp.X + ux, rp.Y, rp.Z + uz, T),
+        dangerAt(rp.X + ux, rp.Y, rp.Z + uz, T + CFG.dodgeDwell * 0.5))
+    return d < CFG.dodgeMoveAt
+end
+
 -- ------------------------------------------------------------ entry points
 local function setDodgeActive(active)
     DG.active = active
     DG.target = nil
+    DG.pursuitBlocked = false
     if active then
         buildOffsets()
         buildVisuals()
@@ -655,4 +712,5 @@ S.buildDodgeVisuals = buildVisuals
 S.dodgeStep = dodgeStep
 S.runDodge = runDodge
 S.dodgeDangerAt = dangerAt
+S.dodgeStepClear = stepClear
 end

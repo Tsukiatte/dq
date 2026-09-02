@@ -10,7 +10,6 @@ local SM = S.SM
 local NAV = S.NAV
 local HZ = S.HZ
 local LD = S.LD
-local MC = S.MC
 local DG = S.DG
 local ZN = S.ZN
 local K = S.UIKit
@@ -69,19 +68,6 @@ local renderPathMarkers = S.renderPathMarkers
 local moveWaypoint = S.moveWaypoint
 local removeWaypoint = S.removeWaypoint
 local clearWaypath = S.clearWaypath
--- macro
-local setMacroMode = S.setMacroMode
-local toggleRecording = S.toggleRecording
-local playMacro = S.playMacro
-local stopPlayback = S.stopPlayback
-local removeMacro = S.removeMacro
-local moveMacro = S.moveMacro
-local renameMacro = S.renameMacro
-local clearMacros = S.clearMacros
-local renderMacroRoute = S.renderMacroRoute
-local saveMacrosToMap = S.saveMacrosToMap
-local playMapMacros = S.playMapMacros
-local stopMacroSubsystem = S.stopMacroSubsystem
 -- streamer
 local refreshStreamerOverlay = S.refreshStreamerOverlay
 local setPendingBindField = S.setPendingBindField
@@ -177,7 +163,6 @@ local function destructScript()
 
     setTelegraphPickerEnabled(false)
     setPathEditEnabled(false)
-    stopMacroSubsystem()
     S.setDodgeActive(false)
     clearPrecastZones()
     -- Through setLowDetailEnabled, so the mode flag is cleared first and the
@@ -377,11 +362,7 @@ local function buildHud(parent)
 
         local running = RT.farmEnabled and not RT.destroyed
         local text, color
-        if MC.recording then
-            text, color = "Recording", Color3.fromRGB(255, 170, 60)
-        elseif MC.playing then
-            text, color = "Macro", Color3.fromRGB(150, 110, 255)
-        elseif running then
+        if running then
             text, color = "Running", T.StatusGood
         else
             text, color = "Disabled", T.StatusBad
@@ -609,7 +590,6 @@ local function createControlUI()
             setCurrentMap(code)
             refreshAllWidgets()
             if S.refreshPathPanel then S.refreshPathPanel() end
-            if S.refreshMacroPanel then S.refreshMacroPanel() end
             if S.refreshMapPanel then S.refreshMapPanel() end
             S.refreshAttackBookPanel()
             S.refreshZonePanel()
@@ -852,20 +832,14 @@ local function createControlUI()
     end
 
     -- ------------------------------------------------------------------
-    -- The island: which system is in charge. Legacy is the pathfinding and
-    -- dodging bot; Macro replays runs you recorded. They are alternatives, so
-    -- the sections belonging to the one you are NOT using are hidden rather
-    -- than left on screen to be scrolled past.
+    -- The island: how the character dodges. Legacy and Dodge both fight and
+    -- pathfind and differ only in how they dodge, so they share every section
+    -- except the Dodge section, which is shown only for Dodge.
     -- ------------------------------------------------------------------
-    -- Legacy and Clone both fight and pathfind and differ only in how they
-    -- dodge, so they share every section except their own. Macro replaces the
-    -- lot with a recording.
-    local legacySections, macroSections, cloneSections = {}, {}, {}
+    local legacySections, cloneSections = {}, {}
     local modeIsland
     local function applyMode()
-        local mode = MC.mode
-        for _, sec in ipairs(legacySections) do sec.holder.Visible = mode ~= "macro" end
-        for _, sec in ipairs(macroSections) do sec.holder.Visible = mode == "macro" end
+        local mode = RT.mode
         for _, sec in ipairs(cloneSections) do sec.holder.Visible = mode == "clone" end
         if modeIsland then modeIsland.render() end
     end
@@ -874,14 +848,11 @@ local function createControlUI()
         { value = "legacy", label = "Legacy",
           tip = "Finds enemies, walks to them, fights them, and dodges by searching for a safe point each time something lands near you." },
         { value = "clone", label = "Dodge",
-          tip = "The same bot, dodging differently: a box that is never in danger, and a character that follows it." },
-        { value = "macro", label = "Macro",
-          tip = "Replays runs you recorded yourself - where you walked, where you looked, what you pressed." },
-    }, function() return MC.mode end, function(v)
-        setMacroMode(v)
+          tip = "The same bot, dodging differently: a box that is never in danger, and a character that follows it. Pursuit still walks the map underneath it; the box outranks pursuit whenever it has somewhere to be." },
+    }, function() return RT.mode end, function(v)
+        S.setMode(v)
         applyMode()
-        if S.refreshMacroPanel then S.refreshMacroPanel() end
-    end, 1, "Which system drives your character. Only one can be in charge, so only its settings are shown.")
+    end, 1, "Which system dodges for you. Only one can be in charge, so only its settings are shown.")
     track(modeIsland)
 
     -- ------------------------------------------------------------------
@@ -993,7 +964,7 @@ local function createControlUI()
     -- section without renumbering it.
     track(K.toggle(navigation.content, "Follow the game's map",
         function() return CFG.autoDetectMap end, function(v) CFG.autoDetectMap = v end, -3,
-        "The game publishes the dungeon name in Workspace.dungeonName. With this on the map picker follows it, so waypoints, macros and the attack book all switch themselves when you enter a dungeon."))
+        "The game publishes the dungeon name in Workspace.dungeonName. With this on the map picker follows it, so waypoints and the attack book both switch themselves when you enter a dungeon."))
     track(K.toggle(navigation.content, "Pathfinding",
         function() return CFG.pathfindingEnabled end, function(v) CFG.pathfindingEnabled = v end, -2,
         "Off stops the bot driving your character: no pursuit, no waypoints, no recovery. It still picks targets and swings if one is in reach. For testing."))
@@ -1006,7 +977,7 @@ local function createControlUI()
         "How wide the navmesh thinks your character is. Past about 2.0 it will not fit through the game's doorways and every path fails."))
     track(K.toggle(navigation.content, "Follow path when idle",
         function() return CFG.followPath end, function(v) CFG.followPath = v end, 2,
-        "With nothing to fight, walk the waypoints (or the macros) instead of standing still."))
+        "With nothing to fight, walk the waypoints instead of standing still."))
     track(K.toggle(navigation.content, "Loop path",
         function() return CFG.loopPath end, function(v) CFG.loopPath = v end, 3,
         "Return to the first waypoint after the last, rather than holding at the end."))
@@ -1186,6 +1157,10 @@ local function createControlUI()
         0, 0.05, true,
         function() return CFG.dodgeApproachWeight end, function(v) CFG.dodgeApproachWeight = v end, 11.5,
         "The box is the approach. Among safe spots it prefers ones nearer the target, so the character closes only through clear ground and waits when there is none. Pursuit no longer moves the character in this mode - it walked straight through patterns to get in range."))
+    track(K.slider(cloneSection.content, "Pursuit probe", "Studs ahead pursuit checks before a step",
+        2, 12, false,
+        function() return CFG.dodgeStepProbe end, function(v) CFG.dodgeStepProbe = v end, 11.7,
+        "Pursuit walks the map underneath the dodge and asks before every step whether this many studs of its route are clear. If they are not it holds, and the box picks the way in one safe spot at a time."))
     track(K.slider(cloneSection.content, "Probe size", "0 uses your root part",
         0, 3, true,
         function() return CFG.dodgeProbe end, function(v) CFG.dodgeProbe = v end, 12,
@@ -1330,14 +1305,6 @@ local function createControlUI()
         function() return CFG.colorHitbox end,
         function(c) CFG.colorHitbox = c updateHitboxVisualizer() end,
         "Your own character's collision shape.")
-    track(K.toggle(overlays.content, "Macro route",
-        function() return CFG.macroShowRoute end,
-        function(v) CFG.macroShowRoute = v renderMacroRoute(MC.playIndex) end, 13,
-        "The recorded route of the selected macro."))
-    track(K.colorRow(overlays.content, "Macro route colour",
-        function() return CFG.colorMacro end,
-        function(c) CFG.colorMacro = c renderMacroRoute(MC.playIndex) end, 14,
-        "Colour of that route."))
     track(K.slider(overlays.content, "Background blur", "While the interface is open",
         0, 32, false,
         function() return CFG.guiBlur end,
@@ -1408,7 +1375,6 @@ local function createControlUI()
         refreshAllWidgets()
         if S.refreshPathPanel then S.refreshPathPanel() end
         if S.refreshMapPanel then S.refreshMapPanel() end
-        if S.refreshMacroPanel then S.refreshMacroPanel() end
         S.refreshAttackBookPanel()
         refreshNameLists()
         setMovementState("config loaded")
@@ -1422,7 +1388,7 @@ local function createControlUI()
         updateHitboxVisualizer()
         heavyDebug("Config", "Every tuning value reset to its shipped default. Not saved until you press Save.")
         setMovementState("defaults restored (not saved)")
-    end, "Put every slider, toggle and colour back to how it shipped. Does not touch your paths, macros or Attack Book, and is not saved until you press Save.")
+    end, "Put every slider, toggle and colour back to how it shipped. Does not touch your paths or Attack Book, and is not saved until you press Save.")
     configButtons2.add("Changelog", "ghost", printChangelog, "Print the full version history to the console.")
     configButtons2.add("Destruct", "danger", destructScript, "Shut the script down and put everything back.")
 
@@ -1439,7 +1405,7 @@ local function createControlUI()
 
     -- Map ---------------------------------------------------------------
     local mapSection = K.section(routes.body, "Map", nextOrder2(),
-        "Which dungeon's waypoints, macros and keep list are loaded. Saved separately per map.")
+        "Which dungeon's waypoints and keep list are loaded. Saved separately per map.")
     local mapOptions = {}
     for _, code in ipairs(MAP_CODES) do
         table.insert(mapOptions, { value = code, label = code .. "  -  " .. (MAP_LABELS[code] or code) })
@@ -1449,7 +1415,6 @@ local function createControlUI()
         function(code)
             setCurrentMap(code)
             if S.refreshPathPanel then S.refreshPathPanel() end
-            if S.refreshMacroPanel then S.refreshMacroPanel() end
             if S.refreshMapPanel then S.refreshMapPanel() end
         end, 1,
         "Switching checks the current map's data back in first, so nothing is lost."))
@@ -1462,7 +1427,6 @@ local function createControlUI()
         loadConfig()
         refreshAllWidgets()
         if S.refreshPathPanel then S.refreshPathPanel() end
-        if S.refreshMacroPanel then S.refreshMacroPanel() end
         if S.refreshMapPanel then S.refreshMapPanel() end
         setMovementState("config loaded (" .. RT.currentMap .. ")")
     end, "Read the config back from disk.")
@@ -1472,8 +1436,8 @@ local function createControlUI()
         if mapDropdown and mapDropdown.render then mapDropdown.render() end
         local keepCount = 0
         for _ in pairs(LD.keepNames) do keepCount = keepCount + 1 end
-        mapSummary.Text = string.format("%s: %d waypoint(s), %d macro(s), %d kept part name(s).",
-            RT.currentMap, #NAV.waypath, #MC.macros, keepCount)
+        mapSummary.Text = string.format("%s: %d waypoint(s), %d kept part name(s).",
+            RT.currentMap, #NAV.waypath, keepCount)
         if not keepList.Parent then return end
         for _, child in ipairs(keepList:GetChildren()) do
             if child:IsA("GuiObject") then child:Destroy() end
@@ -1559,138 +1523,6 @@ local function createControlUI()
     end
     S.refreshPathPanel()
     S.setFreecamButtonState()
-
-    -- Macros ------------------------------------------------------------
-    local macroSection = K.section(routes.body, "Macros", nextOrder2(),
-        "Recorded runs: where you went, where you looked and what you pressed. Recorded from your normal camera.")
-    table.insert(macroSections, macroSection)
-    track(K.toggle(macroSection.content, "Use macros when idle",
-        function() return MC.mode == "macro" end,
-        function(v)
-            setMacroMode(v and "macro" or "legacy")
-            if S.refreshMacroPanel then S.refreshMacroPanel() end
-        end, 1,
-        "Whether the waypoints or the macros drive the bot when it has nothing to fight. They are alternatives, so exactly one is in charge."))
-    local recordButtons = K.buttonRow(macroSection.content, 2)
-    local recordButton, bindButton, playButton
-    recordButton = recordButtons.add("Record", "danger", function()
-        toggleRecording()
-        S.refreshMacroPanel()
-    end, "Start and stop recording. The loop switches off while you record - you are driving. The free camera is switched off too, because a macro is recorded from your own camera.")
-    bindButton = recordButtons.add("Bind: ]", "ghost", function()
-        -- The next key pressed becomes the bind; Escape cancels. Captured by
-        -- the always-on listener in the macro module.
-        MC.bindCapture = not MC.bindCapture
-        S.refreshMacroPanel()
-    end, "Click, then press a key. That key starts and stops recording from anywhere. Escape cancels.")
-    local playButtons = K.buttonRow(macroSection.content, 3)
-    playButton = playButtons.add("Play from top", "accent", function()
-        if MC.playing then stopPlayback("stopped from the panel") else playMacro(1) end
-        S.refreshMacroPanel()
-    end, "Walk to the start of each macro in order, then replay it.")
-    track(K.toggle(macroSection.content, "Loop macros",
-        function() return CFG.macroLoop end, function(v) CFG.macroLoop = v end, 4,
-        "Start the list again after the last macro."))
-    track(K.toggle(macroSection.content, "Replay recorded facing",
-        function() return CFG.macroFaceRecorded end,
-        function(v) CFG.macroFaceRecorded = v end, 5,
-        "Reproduce where you were LOOKING, not just where you walked. Attacks fire in the direction the camera points, so a click replayed facing the wrong way hits nothing."))
-    local macroList = K.list(macroSection.content, 200, 6)
-
-    -- File the open recordings under any map, and play any map's file back,
-    -- without switching the whole GUI over first.
-    local saveTargetMap = RT.currentMap
-    local playTargetMap = RT.currentMap
-    local mapValues = {}
-    for _, code in ipairs(MAP_CODES) do
-        table.insert(mapValues, { value = code, label = code .. "  -  " .. (MAP_LABELS[code] or code) })
-    end
-
-    track(K.dropdown(macroSection.content, "Save to map", mapValues,
-        function() return saveTargetMap end, function(v) saveTargetMap = v end, 7,
-        "Which map these recordings belong to. They are written to " .. CFG.macroFile
-        .. ", which survives between executions."))
-    local saveMapButtons = K.buttonRow(macroSection.content, 8)
-    saveMapButtons.add("Save to map", "accent", function()
-        saveMacrosToMap(saveTargetMap)
-        setMovementState("macros saved to " .. saveTargetMap)
-    end, "File the recordings you have open under the chosen map, and write the macro file.")
-    saveMapButtons.add("Clear all", "danger", clearMacros, "Delete every macro currently open.")
-
-    track(K.dropdown(macroSection.content, "Play map", mapValues,
-        function() return playTargetMap end, function(v) playTargetMap = v end, 9,
-        "Load that map's saved recordings and start playing them from the top."))
-    local playMapButtons = K.buttonRow(macroSection.content, 10)
-    playMapButtons.add("Play map", "accent", function()
-        playMapMacros(playTargetMap)
-        refreshAllWidgets()
-        if S.refreshMapPanel then S.refreshMapPanel() end
-        S.refreshMacroPanel()
-    end, "Switch to that map, load its macros and play them from the top.")
-    playMapButtons.add("Save file", "ghost", function()
-        local ok = S.saveMacroFile and S.saveMacroFile()
-        setMovementState(ok and "macro file written" or "no file access")
-    end, "Write " .. CFG.macroFile .. " now, without touching anything else.")
-
-    S.refreshMacroPanel = function()
-        recordButton.Text = MC.recording and "STOP recording" or "Record"
-        recordButton.BackgroundColor3 = MC.recording and Color3.fromRGB(232, 168, 52) or T.StatusBad
-        bindButton.Text = MC.bindCapture and "press key" or ("Bind: " .. MC.recordBind.Name)
-        bindButton.BackgroundColor3 = MC.bindCapture and T.AccentMid or T.SurfaceElement
-        bindButton.TextColor3 = MC.bindCapture and T.TextOnAccent or T.TextPrimary
-        playButton.Text = MC.playing and "Stop playback" or "Play from top"
-
-        if not macroList.Parent then return end
-        for _, child in ipairs(macroList:GetChildren()) do
-            if child:IsA("GuiObject") then child:Destroy() end
-        end
-        if #MC.macros == 0 then
-            local l = K.label(macroList, "No macros for " .. RT.currentMap .. " yet. Press Record, run the route yourself, press it again.", "captionSub", 1)
-            l.Size = UDim2.new(1, 0, 0, 32)
-            l.TextWrapped = true
-            return
-        end
-        for i, macro in ipairs(MC.macros) do
-            local playingThis = MC.playing and MC.playIndex == i
-            local entry = K.listEntry(macroList, macro.name, string.format("%d pts, %.0fs, %d action%s%s",
-                #macro.samples, macro.duration or 0, #(macro.actions or {}),
-                #(macro.actions or {}) == 1 and "" or "s",
-                playingThis and string.format("  -  PLAYING %d/%d", MC.playCursor, #macro.samples) or ""),
-                i, 4)
-            entry.frame.Size = UDim2.new(1, 0, 0, 42)
-            entry.title.Visible = false
-            if playingThis then entry.meta.TextColor3 = T.StatusGood end
-
-            local nameBox = Instance.new("TextBox")
-            nameBox.BackgroundColor3 = T.SurfaceField
-            nameBox.BorderSizePixel = 0
-            nameBox.Size = UDim2.new(1, 0, 0, 18)
-            nameBox.Text = macro.name
-            nameBox.TextColor3 = T.TextPrimary
-            nameBox.TextSize = 12
-            nameBox.TextXAlignment = Enum.TextXAlignment.Left
-            nameBox.ClearTextOnFocus = false
-            nameBox.LayoutOrder = 0
-            K.setFont(nameBox, "sans", Enum.FontWeight.SemiBold)
-            nameBox.Parent = entry.title.Parent
-            K.corner(nameBox, 4)
-            K.pad(nameBox, 0, 4, 0, 4)
-            nameBox.FocusLost:Connect(function()
-                local text = nameBox.Text:gsub("^%s+", ""):gsub("%s+$", "")
-                if text == "" then nameBox.Text = macro.name else renameMacro(i, text) end
-            end)
-
-            K.iconButton(entry.actions, "play", function()
-                playMacro(i)
-                renderMacroRoute(i)
-                S.refreshMacroPanel()
-            end, 1, "Play this macro.")
-            K.iconButton(entry.actions, "up", function() moveMacro(i, -1) end, 2, "Play earlier in the list.")
-            K.iconButton(entry.actions, "down", function() moveMacro(i, 1) end, 3, "Play later in the list.")
-            K.iconButton(entry.actions, "delete", function() removeMacro(i) end, 4, "Delete this macro.")
-        end
-    end
-    S.refreshMacroPanel()
 
     -- Streamer ----------------------------------------------------------
     local streamerSection = K.section(routes.body, "Streamer", nextOrder2(),
@@ -1947,7 +1779,7 @@ local function createControlUI()
     panelToggle("Routes & Data", 3,
         function() return CFG.panelRoutes end,
         function(v) CFG.panelRoutes = v applyVisibility() end,
-        "Maps, waypoints, macros, streamer mode and the live telegraph feed.")
+        "Maps, waypoints, streamer mode and the live telegraph feed.")
     panelToggle("User", 4,
         function() return CFG.panelAccount end,
         function(v) CFG.panelAccount = v applyVisibility() end,
@@ -1993,7 +1825,6 @@ local function createControlUI()
     applyVisibility()
 
     combat.setOpen(true)
-    macroSection.setOpen(true)
     mapSection.setOpen(true)
     applyMode()
     refreshAllWidgets()

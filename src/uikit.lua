@@ -37,6 +37,11 @@ local Theme = {
     SurfaceElement = Color3.fromHex("26262c"),
     SurfaceHover   = Color3.fromHex("303038"),
     SurfaceField   = Color3.fromHex("1c1c21"),
+    -- A section is a list of settings; its header sits darker than the rows
+    -- and its rows sit on a darker well still, so a row (a setting) and a
+    -- header (a list you can open) read as two different things.
+    SurfaceSection = Color3.fromHex("1e1e24"),
+    SurfaceWell    = Color3.fromHex("121216"),
     SurfaceChip    = Color3.fromHex("0c0c0f"),
     Hairline       = Color3.fromHex("323338"),
 
@@ -405,7 +410,9 @@ end
 -- A Frame with Active = true raises InputBegan for mouse buttons on its own, so
 -- no extra child is needed and nothing joins the layout.
 local function hoverable(frame, clickable)
-    local base = Theme.SurfaceElement
+    -- Whatever the frame was painted is what it goes back to: section headers
+    -- are darker than ordinary rows and must not come back as one.
+    local base = frame.BackgroundColor3
     frame.MouseEnter:Connect(function() frame.BackgroundColor3 = Theme.SurfaceHover end)
     frame.MouseLeave:Connect(function() frame.BackgroundColor3 = base end)
     if not clickable then return nil end
@@ -1391,21 +1398,24 @@ local function section(parent, title, order, explain)
     vlist(holder, Theme.GapSm)
 
     local head, headLabel, _ = row(holder, title, 1, nil, 24)
+    head.BackgroundColor3 = Theme.SurfaceSection
     local hit = hoverable(head, true)
     local chev = chevron(head)
 
+    -- The rows of an open section sit in a well a shade darker than the
+    -- window, so the settings read as cards inside the list they belong to.
     local content = Instance.new("Frame")
     content.Name = "Content"
-    content.BackgroundTransparency = 1
+    content.BackgroundColor3 = Theme.SurfaceWell
+    content.BorderSizePixel = 0
     content.AutomaticSize = Enum.AutomaticSize.Y
     content.Size = UDim2.new(1, 0, 0, 0)
     content.Visible = false
     content.LayoutOrder = 2
     content.Parent = holder
+    corner(content, Theme.RadiusMd)
     vlist(content, Theme.GapSm)
-    -- Full width, matching the design: the open section's rows line up with the
-    -- section header rather than being indented under it.
-    pad(content, 2, 0, 4, 0)
+    pad(content, 6, 6, 6, 6)
 
     local open = false
     local function setOpen(value)
