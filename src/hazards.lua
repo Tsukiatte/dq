@@ -15,6 +15,7 @@ local UI = S.UI
 local heavyDebug = S.heavyDebug
 local Workspace = S.Workspace
 local getVisualRoot = S.getVisualRoot
+local ZN = S.ZN
 
 -- Realistic Player Hitbox
 local function getPlayerHitboxMetrics()
@@ -498,6 +499,9 @@ local function isDamageBrick(part)
     -- A fully faded telegraph has already resolved. Checked ahead of every other
     -- rule, manual picks included, so a marked part stops counting once it fades.
     if part.Transparency >= CFG.telegraphTransparencyCutoff then return false end
+
+    -- A hand-drawn zone IS the hazard: it exists only because someone said so.
+    if part:GetAttribute("DQZone") then return true end
 
     -- A hand-picked telegraph outranks everything, including a name that was
     -- learned as our own effect (the pick unlearns it, but be explicit here).
@@ -1258,6 +1262,236 @@ local function resetWallCatalog()
     HZ.catalogDirty = true
 end
 
+-- =========================================================================
+-- HAND-DRAWN HAZARD ZONES (2.11.0)
+--
+-- Some attacks are announced by something that is not the damage. A rune on
+-- the floor, a glow, a decal - no amount of appearance scoring turns a
+-- decoration into a hitbox, because it genuinely is not one. So you point at
+-- the decoration and draw the volume yourself, once, and from then on every
+-- copy of that decoration carries one.
+--
+-- A definition is a signature (name + parent name) plus a shape. The volumes
+-- are real Parts placed in Workspace rather than a parallel list, because
+-- everything downstream - the safety test, the penalty field, the clone ring -
+-- already understands Parts. They carry a DQZone attribute so isDamageBrick
+-- takes them at their word.
+-- =========================================================================
+
+local function zoneFolder()
+    if ZN.folder and ZN.folder.Parent then return ZN.folder end
+    local folder = Instance.new("Folder")
+    folder.Name = "DungeonAutofarmZones"
+    -- Deliberately NOT under the visual root: that subtree is excluded from
+    -- hazard classification, and these have to be classified as hazards.
+    folder.Parent = Workspace
+    ZN.folder = folder
+    return folder
+end
+
+local function clearZones()
+    if ZN.folder then ZN.folder:Destroy() end
+    ZN.folder = nil
+    for part, volume in pairs(ZN.live) do
+        if volume and volume.Parent then volume:Destroy() end
+        ZN.live[part] = nil
+    end
+end
+
+local function zoneMatches(def, part)
+    if string.lower(part.Name) ~= def.partName then return false end
+    if def.parentName ~= "" then
+        local parent = part.Parent
+        if not parent or string.lower(parent.Name) ~= def.parentName then return false end
+    end
+    return true
+end
+
+-- Attaches a volume to `part` if any definition claims it and it has none yet.
+local function ensureZoneFor(part)
+    if ZN.live[part] then return end
+    for _, def in ipairs(ZN.defs) do
+        if zoneMatches(def, part) then
+            local volume = Instance.new("Part")
+            volume.Name = "Zone_" .. part.Name
+            volume.Shape = def.shape == "circle" and Enum.PartType.Cylinder or Enum.PartType.Block
+            volume.Size = def.shape == "circle"
+                and Vector3.new(def.height, def.radius * 2, def.radius * 2)
+                or Vector3.new(def.radius * 2, def.height, def.radius * 2)
+            volume.Anchored = true
+            volume.CanCollide = false
+            volume.CanQuery = false
+            volume.CanTouch = false
+            volume.CastShadow = false
+            volume.Material = Enum.Material.ForceField
+            volume.Color = CFG.zoneColor
+            volume.Transparency = CFG.zoneTransparency
+            volume:SetAttribute("DQZone", true)
+            -- A cylinder's length runs along X, so it has to be laid on its side
+            -- to stand up as a disc.
+            volume.CFrame = def.shape == "circle"
+                and (CFrame.new(part.Position) * CFrame.Angles(0, 0, math.rad(90)))
+                or CFrame.new(part.Position)
+            volume.Parent = zoneFolder()
+            ZN.live[part] = volume
+            HZ.manualParts[volume] = true
+            poolAdd(volume)
+            return
+        end
+    end
+end
+
+-- Per frame: keep each volume on its decoration, and drop the ones whose
+-- decoration has gone.
+local function updateZones()
+    if not next(ZN.live) then return end
+    local dead = nil
+    for part, volume in pairs(ZN.live) do
+        if not part.Parent or not volume.Parent then
+            dead = dead or {}
+            dead[#dead + 1] = part
+        else
+            local position = part.Position
+            if (volume.Position - position).Magnitude > 0.05 then
+                local _, yaw = volume.CFrame:ToOrientation()
+                volume.CFrame = volume.Size.X == volume.Size.Y
+                    and CFrame.new(position)
+                    or (volume:GetAttribute("DQZoneCircle")
+                        and (CFrame.new(position) * CFrame.Angles(0, 0, math.rad(90)))
+                        or CFrame.new(position))
+            end
+        end
+    end
+    if dead then
+        for _, part in ipairs(dead) do
+            local volume = ZN.live[part]
+            if volume then
+                HZ.manualParts[volume] = nil
+                poolRemove(volume)
+                if volume.Parent then volume:Destroy() end
+            end
+            ZN.live[part] = nil
+        end
+    end
+end
+
+-- Rebuilds every live volume from the current definitions. Called when the
+-- definitions change or the map does.
+local function rebuildZones()
+    clearZones()
+    for _, part in ipairs(HZ.partPool) do
+        if part.Parent and not part:GetAttribute("DQZone") then ensureZoneFor(part) end
+    end
+    heavyDebug("Zone", string.format("%d zone definition(s); %d volume(s) placed.",
+        #ZN.defs, (function() local c = 0 for _ in pairs(ZN.live) do c = c + 1 end return c end)()))
+end
+
+-- The draft volume shown while you drag one out.
+local function updateZonePreview()
+    if not ZN.root or not ZN.root.Parent then return end
+    local preview = ZN.preview
+    if not preview or not preview.Parent then
+        preview = Instance.new("Part")
+        preview.Name = "ZonePreview"
+        preview.Anchored = true
+        preview.CanCollide = false
+        preview.CanQuery = false
+        preview.CanTouch = false
+        preview.CastShadow = false
+        preview.Material = Enum.Material.ForceField
+        preview.Color = CFG.zoneColor
+        preview.Transparency = 0.55
+        preview.Parent = getVisualRoot()
+        ZN.preview = preview
+    end
+    local radius = math.clamp(ZN.draftRadius, CFG.zoneMinRadius, CFG.zoneMaxRadius)
+    local height = CFG.zoneDefaultHeight
+    if ZN.draftShape == "circle" then
+        preview.Shape = Enum.PartType.Cylinder
+        preview.Size = Vector3.new(height, radius * 2, radius * 2)
+        preview.CFrame = CFrame.new(ZN.root.Position) * CFrame.Angles(0, 0, math.rad(90))
+    else
+        preview.Shape = Enum.PartType.Block
+        preview.Size = Vector3.new(radius * 2, height, radius * 2)
+        preview.CFrame = CFrame.new(ZN.root.Position)
+    end
+end
+
+local function clearZonePreview()
+    if ZN.preview then ZN.preview:Destroy() end
+    ZN.preview = nil
+    ZN.root = nil
+    ZN.dragging = false
+end
+
+local function addZoneDef(part, shape, radius, height)
+    if not part or not part:IsA("BasePart") then return false end
+    local def = {
+        name = part.Name,
+        partName = string.lower(part.Name),
+        parentName = (part.Parent and part.Parent ~= Workspace) and string.lower(part.Parent.Name) or "",
+        shape = shape == "square" and "square" or "circle",
+        radius = math.clamp(radius, CFG.zoneMinRadius, CFG.zoneMaxRadius),
+        height = height or CFG.zoneDefaultHeight,
+    }
+    for i, existing in ipairs(ZN.defs) do
+        if existing.partName == def.partName and existing.parentName == def.parentName then
+            ZN.defs[i] = def
+            rebuildZones()
+            heavyDebug("Zone", string.format("Updated the zone on '%s' (%s, %.0f studs).",
+                def.name, def.shape, def.radius))
+            if S.refreshZonePanel then S.refreshZonePanel() end
+            return true
+        end
+    end
+    table.insert(ZN.defs, def)
+    rebuildZones()
+    heavyDebug("Zone", string.format("Zone drawn on '%s': %s, %.0f studs. Every copy of it now carries one.",
+        def.name, def.shape, def.radius))
+    if S.refreshZonePanel then S.refreshZonePanel() end
+    return true
+end
+
+local function removeZoneDef(index)
+    local def = table.remove(ZN.defs, index)
+    if not def then return end
+    rebuildZones()
+    heavyDebug("Zone", string.format("Removed the zone on '%s'.", def.name))
+    if S.refreshZonePanel then S.refreshZonePanel() end
+end
+
+local function serializeZones()
+    local out = {}
+    for _, def in ipairs(ZN.defs) do
+        table.insert(out, {
+            name = def.name, partName = def.partName, parentName = def.parentName,
+            shape = def.shape, radius = def.radius, height = def.height,
+        })
+    end
+    return out
+end
+
+local function loadZones(list)
+    table.clear(ZN.defs)
+    if type(list) == "table" then
+        for _, def in ipairs(list) do
+            if type(def) == "table" and type(def.partName) == "string" and tonumber(def.radius) then
+                table.insert(ZN.defs, {
+                    name = def.name or def.partName,
+                    partName = def.partName,
+                    parentName = type(def.parentName) == "string" and def.parentName or "",
+                    shape = def.shape == "square" and "square" or "circle",
+                    radius = tonumber(def.radius),
+                    height = tonumber(def.height) or CFG.zoneDefaultHeight,
+                })
+            end
+        end
+    end
+    rebuildZones()
+    if S.refreshZonePanel then S.refreshZonePanel() end
+    return #ZN.defs
+end
+
 local function classifyPoolPart(part, now)
     if not part.Parent then
         poolRemove(part)
@@ -1271,6 +1505,10 @@ local function classifyPoolPart(part, now)
     if not maybeTelegraph and next(HZ.learnedNames) ~= nil then
         maybeTelegraph = HZ.learnedNames[string.lower(part.Name)] == true
     end
+    -- A part matching a zone definition gets a volume attached to it, so the
+    -- decoration that only announces an attack starts carrying one.
+    if #ZN.defs > 0 and not part:GetAttribute("DQZone") then ensureZoneFor(part) end
+
     setCandidate(part, maybeTelegraph and isDamageBrick(part), now)
     if CFG.showWalls then
         setInvisWall(part, isInvisibleWall(part))
@@ -1713,6 +1951,7 @@ local function worldIndexStep()
     -- not combat work: they run here rather than in scanDamageBricks so they
     -- keep happening (and HZ.recentParts keeps being pruned) with the loop off.
     trackRecentParts(now)
+    updateZones()
     lowDetailStep()
 end
 
@@ -2013,6 +2252,8 @@ local function setTelegraphPickerEnabled(enabled, mode)
     HZ.pickerEnabled = enabled
     HZ.ownPickerEnabled = enabled and mode == "own" or false
     LD.pickerEnabled = enabled and mode == "keep" or false
+    ZN.pickerEnabled = enabled and mode == "zone" or false
+    if not ZN.pickerEnabled then clearZonePreview() end
 
     for _, connection in ipairs(HZ.pickerConnections) do
         connection:Disconnect()
@@ -2028,13 +2269,48 @@ local function setTelegraphPickerEnabled(enabled, mode)
 
     table.insert(HZ.pickerConnections, HZ.pickerMouse.Move:Connect(function()
         if not HZ.pickerEnabled then return end
+        -- While dragging a zone the radius follows the cursor across the world,
+        -- measured flat from the decoration you started on.
+        if ZN.pickerEnabled and ZN.dragging and ZN.root and ZN.root.Parent then
+            local hit = HZ.pickerMouse.Hit
+            if hit then
+                local offset = hit.Position - ZN.root.Position
+                ZN.draftRadius = Vector3.new(offset.X, 0, offset.Z).Magnitude
+                updateZonePreview()
+            end
+            return
+        end
         setHoverHighlight(HZ.pickerMouse.Target)
     end))
+
+    if ZN.pickerEnabled then
+        table.insert(HZ.pickerConnections, HZ.pickerMouse.Button1Up:Connect(function()
+            if not ZN.pickerEnabled or not ZN.dragging then return end
+            ZN.dragging = false
+            if ZN.root and ZN.root.Parent and ZN.draftRadius >= CFG.zoneMinRadius then
+                addZoneDef(ZN.root, ZN.draftShape, ZN.draftRadius, CFG.zoneDefaultHeight)
+            else
+                heavyDebug("Zone", "Drag was too small to be a zone; nothing added.")
+            end
+            clearZonePreview()
+        end))
+    end
 
     table.insert(HZ.pickerConnections, HZ.pickerMouse.Button1Down:Connect(function()
         if not HZ.pickerEnabled then return end
         local target = HZ.pickerMouse.Target
-        if LD.pickerEnabled then
+        if ZN.pickerEnabled then
+            -- Point at the decoration that announces the attack, then drag
+            -- outwards to size the volume around it.
+            if target and target:IsA("BasePart") then
+                ZN.root = target
+                ZN.dragging = true
+                ZN.draftRadius = CFG.zoneDefaultRadius
+                updateZonePreview()
+                heavyDebug("Zone", string.format(
+                    "Root set to '%s'. Drag outwards to size the zone, release to keep it.", target.Name))
+            end
+        elseif LD.pickerEnabled then
             toggleKeepPart(target)
         elseif HZ.ownPickerEnabled then
             togglePickedOwn(target)
@@ -2043,11 +2319,13 @@ local function setTelegraphPickerEnabled(enabled, mode)
         end
     end))
 
-    heavyDebug("Picker", LD.pickerEnabled
+    heavyDebug("Picker", ZN.pickerEnabled
+        and "Picker armed (DRAW ZONE). Press on the decoration that announces the attack, drag outwards, release."
+        or (LD.pickerEnabled
         and "Picker armed (KEEP VISIBLE). Click a part to keep or drop its name in low detail."
         or (HZ.ownPickerEnabled
             and "Picker armed (OWN ATTACKS). Click one of your own effects to mark or unmark it."
-            or "Picker armed (TELEGRAPH). Click an attack - or a frozen copy of one - to add it to the Attack Book."))
+            or "Picker armed (TELEGRAPH). Click an attack - or a frozen copy of one - to add it to the Attack Book.")))
 end
 
 S.clearHazardHighlights = clearHazardHighlights
@@ -2086,4 +2364,11 @@ S.resetWallCatalog = resetWallCatalog
 S.startWorldIndex = startWorldIndex
 S.stopWorldIndex = stopWorldIndex
 S.worldIndexStep = worldIndexStep
+S.addZoneDef = addZoneDef
+S.removeZoneDef = removeZoneDef
+S.serializeZones = serializeZones
+S.loadZones = loadZones
+S.rebuildZones = rebuildZones
+S.clearZones = clearZones
+S.clearZonePreview = clearZonePreview
 end

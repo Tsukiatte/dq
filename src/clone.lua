@@ -47,8 +47,8 @@ local releaseFacing = S.releaseFacing
 -- the count, ring or radius settings change.
 local function buildOffsets()
     local offsets = {}
-    local rings = math.max(1, math.floor(CFG.cloneRings))
-    local total = math.max(4, math.floor(CFG.cloneCount))
+    local rings = math.clamp(math.floor(CFG.cloneRings), 1, CFG.cloneMaxRings)
+    local total = math.clamp(math.floor(CFG.cloneCount), 4, CFG.cloneMaxVolumes)
     local perRing = math.max(3, math.floor(total / rings))
 
     for ring = 1, rings do

@@ -561,6 +561,25 @@ local function startAutofarm()
             -- time one is needed.
             if CL.active then cloneStep(root) end
 
+            -- Manual clone: the ring is the whole feature. It watches, it
+            -- colours, and it pulls you out of an attack - and nothing else
+            -- runs, so the character is yours between dodges.
+            if CL.active and CFG.cloneManual then
+                if not isPositionSafeFromDamageBricks(root.Position, 0.5) then
+                    heavyDebugOnChange("loop_branch", "clone_manual_dodge", "Loop",
+                        "BRANCH: CLONE MANUAL - dodging.")
+                    runCloneEvasion(humanoid, root)
+                else
+                    heavyDebugOnChange("loop_branch", "clone_manual", "Loop",
+                        "BRANCH: CLONE MANUAL - watching; you have the controls.")
+                    setMovementState(string.format("CLONE manual (%d/%d safe)",
+                        CL.safeCount, #CL.nodes))
+                    NAV.lastIssuedMove = nil
+                end
+                releaseFacing(humanoid)
+                return
+            end
+
             -- Whichever branch below actually moves the character toward a goal
             -- sets this; the recovery detector reads it after the branch.
             NAV.driving = false

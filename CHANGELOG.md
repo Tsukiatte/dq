@@ -11,6 +11,50 @@ file and that table in sync on every edit.
 
 ---
 
+## 2.11.0 - 2026-09-02 - "Fieldwork"
+
+### The Attacks panel
+Everything about one dungeon's attacks, in one place: **the map**, **Freeze**,
+**Select attack**, **Draw zone**, this map's **Attack Book**, and the zones
+drawn on it.
+
+- **Freeze** holds a still copy of every attack that appears. A telegraph is on
+  screen for a fraction of a second, which is not long enough to point at one.
+- **Select attack** puts what you clicked into the book. Clicking a frozen copy
+  records the original's identity, not the copy's.
+- **Draw zone** is for the case no amount of appearance scoring can solve: an
+  attack announced by something that is not the damage - a rune on the floor, a
+  glow, a decal. Press on the decoration, **drag outwards to size a circle or a
+  square around it**, release. From then on **every copy of that decoration
+  carries a hazard volume**, and the dodge treats it like any other.
+  The volumes are real Parts rather than a parallel list, because everything
+  downstream - the safety test, the penalty field, the clone ring - already
+  understands Parts.
+
+### Per-map, and saved
+- **The Attack Book and the zones are stored per map now**, with the waypoints,
+  macros and keep lists. What hurts you in Ghastly Harbor is not what hurts you
+  in the Underworld, and one book shared across all fourteen is a book mostly
+  full of entries that never match. They persist between executions.
+- A pre-2.11 global book is **adopted into whichever map the config names**
+  rather than dropped.
+
+### Clone
+- **Manual mode**: the ring dodges for you and nothing else runs - no target
+  hunting, no pursuit, no waypoints. You drive, it pulls you out of attacks.
+- **Rings cap at 10, volumes at 100.**
+
+### Interface
+- **Opening the interface blurs and darkens the game behind it.** The blur is a
+  Lighting effect, so it only touches the 3D view and never the GUI on top of
+  it; the dim is a sheet behind the windows. Both adjustable, both zero to
+  disable, and the blur is removed from Lighting on Destruct so it cannot be
+  left on your screen after the script is gone.
+- **List entries are laid out explicitly.** They were a horizontal list holding
+  a frame holding a vertical list, and nested auto-layout has now mangled three
+  separate things in this GUI. Two labels and a row of icons do not need a
+  layout engine to place them.
+
 ## 2.10.0 - 2026-09-02 - "Profiles"
 Two new panels.
 
