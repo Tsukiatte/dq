@@ -11,6 +11,24 @@ file and that table in sync on every edit.
 
 ---
 
+## 2.12.0 - 2026-09-02 - "Pinned"
+- **A pin on every window header**, beside the info circle. Grey when it is not
+  pinned, accent when it is - a thumbtack drawn from two frames, like every
+  other glyph in the kit.
+- **A pinned window stays on screen after RightShift closes the rest**, and is
+  still draggable. Click the pin again and it goes back to hiding with
+  everything else - if the interface is closed at the time, it disappears
+  immediately.
+- **Pins are remembered between sessions**, so a readout you always want is set
+  up once.
+- A pinned window still respects its switch in **Modules**: turning a module off
+  means off, pinned or not.
+- **The blur and the dim stay tied to the interface**, not to any pinned window.
+  Dimming the whole game because one small panel is pinned would be absurd.
+- Visibility is now decided in one place (`applyVisibility`) from two inputs -
+  is the interface open, and is this window pinned - rather than each caller
+  setting `.Visible` on six frames and hoping they agree.
+
 ## 2.11.0 - 2026-09-02 - "Fieldwork"
 
 ### The Attacks panel

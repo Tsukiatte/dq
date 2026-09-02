@@ -1253,8 +1253,57 @@ local function window(parent, opts)
 
     local title = label(header, opts.title or "Window", "windowTitle", 2)
     title.ZIndex = 4
-    -- tile (14) + gap (12), plus the info circle (20) + gap (12) when present.
-    flexFill(title, 26 + (opts.info and 32 or 0))
+    -- tile (14) + gap (12), the pin (20) + gap (12), and the info circle
+    -- (20) + gap (12) when there is one.
+    flexFill(title, 26 + 32 + (opts.info and 32 or 0))
+
+    -- The pin. A pinned window stays on screen after the interface is closed,
+    -- so a readout you want while you play does not cost you the whole GUI.
+    -- Grey when it is not pinned, accent when it is.
+    local pinned = false
+    local pin = Instance.new("TextButton")
+    pin.Name = "Pin"
+    pin.BackgroundColor3 = Theme.SurfaceElement
+    pin.BorderSizePixel = 0
+    pin.Size = UDim2.fromOffset(20, 20)
+    pin.Text = ""
+    pin.AutoButtonColor = false
+    pin.LayoutOrder = 3
+    pin.ZIndex = 4
+    pin.Parent = header
+    corner(pin, 6)
+    local pinStroke = stroke(pin, Theme.Hairline, 1)
+
+    -- A thumbtack, drawn from two frames: no asset to fail to load.
+    local pinHead = Instance.new("Frame")
+    pinHead.Name = "Head"
+    pinHead.BorderSizePixel = 0
+    pinHead.AnchorPoint = Vector2.new(0.5, 0.5)
+    pinHead.Position = UDim2.fromOffset(10, 7)
+    pinHead.Size = UDim2.fromOffset(11, 4)
+    pinHead.ZIndex = 5
+    corner(pinHead, 2)
+    pinHead.Parent = pin
+
+    local pinStem = Instance.new("Frame")
+    pinStem.Name = "Stem"
+    pinStem.BorderSizePixel = 0
+    pinStem.AnchorPoint = Vector2.new(0.5, 0)
+    pinStem.Position = UDim2.fromOffset(10, 9)
+    pinStem.Size = UDim2.fromOffset(3, 7)
+    pinStem.ZIndex = 5
+    corner(pinStem, 1)
+    pinStem.Parent = pin
+
+    local function renderPin()
+        local color = pinned and Theme.AccentMid or Theme.TextMuted
+        pinHead.BackgroundColor3 = color
+        pinStem.BackgroundColor3 = color
+        pinStroke.Color = pinned and Theme.AccentMid or Theme.Hairline
+        pin.BackgroundColor3 = pinned and Theme.SurfaceHover or Theme.SurfaceElement
+    end
+    renderPin()
+    tip(pin, "Pin this window so it stays on screen after you close the interface. You can still drag it. Click again to let it hide with the rest.")
 
     if opts.info then
         local info = Instance.new("TextLabel")
@@ -1298,7 +1347,17 @@ local function window(parent, opts)
     pad(body, 10, Theme.GapLg, Theme.GapXl, Theme.GapLg)
     vlist(body, Theme.GapSm)
 
-    return { frame = frame, header = header, body = body, title = title }
+    local api = { frame = frame, header = header, body = body, title = title }
+
+    function api.isPinned() return pinned end
+    function api.setPinned(value)
+        pinned = value and true or false
+        renderPin()
+        if opts.onPinChanged then opts.onPinChanged(api) end
+    end
+    pin.MouseButton1Click:Connect(function() api.setPinned(not pinned) end)
+
+    return api
 end
 
 -- A collapsible section: the Row is the header, the content sits under it and

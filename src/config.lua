@@ -265,6 +265,11 @@ local function buildConfigTable()
             panelAccount = CFG.panelAccount,
             panelConfigs = CFG.panelConfigs,
             panelAttacks = CFG.panelAttacks,
+            pinnedWindows = (function()
+                local names = {}
+                for name in pairs(RT.pinnedWindows) do table.insert(names, name) end
+                return names
+            end)(),
             guiBlur = CFG.guiBlur,
             guiDim = CFG.guiDim,
             debugLevel = RT.debugLevel,
@@ -377,6 +382,12 @@ local function applyConfigData(data)
         if visuals.panelAccount ~= nil then CFG.panelAccount = visuals.panelAccount == true end
         if visuals.panelConfigs ~= nil then CFG.panelConfigs = visuals.panelConfigs == true end
         if visuals.panelAttacks ~= nil then CFG.panelAttacks = visuals.panelAttacks == true end
+        if type(visuals.pinnedWindows) == "table" then
+            table.clear(RT.pinnedWindows)
+            for _, name in ipairs(visuals.pinnedWindows) do
+                if type(name) == "string" then RT.pinnedWindows[name] = true end
+            end
+        end
         CFG.guiBlur = tonumber(visuals.guiBlur) or CFG.guiBlur
         CFG.guiDim = tonumber(visuals.guiDim) or CFG.guiDim
         RT.debugLevel = tonumber(visuals.debugLevel) or RT.debugLevel

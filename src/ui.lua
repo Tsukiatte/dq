@@ -454,7 +454,22 @@ local function createControlUI()
     local viewportY = (camera and camera.ViewportSize.Y) or 900
     local windowH = math.clamp(viewportY - 140, 320, 720)
 
+    -- Whether the interface itself is open. A pinned window ignores it; every
+    -- other window follows it, and the blur and dim follow it too - they belong
+    -- to the interface, not to a window someone left pinned.
+    local guiOpen = false
+    local windows = {}
+    local applyVisibility
+
+    local function registerWindow(name, win)
+        windows[name] = win
+        return win
+    end
+
+    local onPinChanged = function(win) applyVisibility() end
+
     local autofarm = K.window(gui, {
+        onPinChanged = onPinChanged,
         name = "Autofarm", title = "Autofarm", width = 320, height = windowH,
         position = UDim2.fromOffset(24, 24), visible = false,
         info = "Everything the bot does while it is running. Sections stay collapsed until you open them.",
@@ -470,33 +485,45 @@ local function createControlUI()
     end
 
     local account = K.window(gui, {
+        onPinChanged = onPinChanged,
         name = "Account", title = "User", width = 310, height = 172,
         position = place(716, 24, 310, 172), visible = false,
     })
 
     local configs = K.window(gui, {
+        onPinChanged = onPinChanged,
         name = "Configs", title = "Configs", width = 310, height = 360,
         position = place(716, 214, 310, 360), visible = false,
         info = "Saved setups. Each one is a complete snapshot of every setting, kept in its own file so it survives between sessions.",
     })
 
     local attacks = K.window(gui, {
+        onPinChanged = onPinChanged,
         name = "Attacks", title = "Attacks", width = 330, height = 560,
         position = place(1040, 300, 330, 560), visible = false,
         info = "Everything about this map's attacks: freeze them so you can point at one, add it to the book, and draw a hazard around a decoration that only announces one.",
     })
 
     local modules = K.window(gui, {
+        onPinChanged = onPinChanged,
         name = "Modules", title = "Modules", width = 260, height = 260,
         position = place(1040, 24, 260, 260), visible = false,
         info = "Which panels appear when you open the interface. This one always does - hiding the thing that unhides everything else would be a door that locks behind you.",
     })
 
     local routes = K.window(gui, {
+        onPinChanged = onPinChanged,
         name = "Routes", title = "Routes & Data", width = 340, height = windowH,
         position = UDim2.fromOffset(360, 24), visible = false,
         info = "Where the bot goes, what it has learned, and how you appear on stream. All of it is stored per map.",
     })
+
+    registerWindow("Autofarm", autofarm)
+    registerWindow("Routes", routes)
+    registerWindow("Account", account)
+    registerWindow("Configs", configs)
+    registerWindow("Attacks", attacks)
+    registerWindow("Modules", modules)
 
     -- ------------------------------------------------------------------
     -- Account panel. Headshot, name, rank, and the two actions.
@@ -1193,18 +1220,12 @@ local function createControlUI()
     track(K.slider(overlays.content, "Background blur", "While the interface is open",
         0, 32, false,
         function() return CFG.guiBlur end,
-        function(v)
-            CFG.guiBlur = v
-            if RT.blurEffect then
-                RT.blurEffect.Size = v
-                RT.blurEffect.Enabled = v > 0 and autofarm.frame.Visible
-            end
-        end, 17,
+        function(v) CFG.guiBlur = v applyVisibility() end, 17,
         "Blurs the game behind the windows so the interface reads clearly. 0 turns it off."))
     track(K.slider(overlays.content, "Background dim", "While the interface is open",
         0, 0.8, true,
         function() return CFG.guiDim end,
-        function(v) CFG.guiDim = v if S.setPanelsOpen then S.setPanelsOpen(autofarm.frame.Visible) end end, 18,
+        function(v) CFG.guiDim = v applyVisibility() end, 18,
         "Darkens the game behind the windows. 0 turns it off."))
     track(K.toggle(overlays.content, "HUD",
         function() return CFG.showHud end, function(v) CFG.showHud = v end, 15,
@@ -1762,20 +1783,37 @@ local function createControlUI()
     -- ------------------------------------------------------------------
     -- Open and close
     -- ------------------------------------------------------------------
-    local function setOpen(open)
-        dim.Visible = open and CFG.guiDim > 0
+    -- A window is on screen if the interface is open OR it is pinned, and in
+    -- both cases only if its module is switched on. The blur and the dim follow
+    -- the interface alone: dimming the whole game for one pinned readout would
+    -- be absurd.
+    local function panelEnabled(name)
+        if name == "Autofarm" then return CFG.panelAutofarm end
+        if name == "Routes" then return CFG.panelRoutes end
+        if name == "Account" then return CFG.panelAccount end
+        if name == "Configs" then return CFG.panelConfigs end
+        if name == "Attacks" then return CFG.panelAttacks end
+        return true      -- Modules is never switchable; see the Modules panel.
+    end
+
+    applyVisibility = function()
+        for name, win in pairs(windows) do
+            local pinned = win.isPinned()
+            RT.pinnedWindows[name] = pinned or nil
+            win.frame.Visible = (guiOpen or pinned) and panelEnabled(name)
+        end
+        dim.Visible = guiOpen and CFG.guiDim > 0
         dim.BackgroundTransparency = 1 - CFG.guiDim
         if RT.blurEffect then
-            RT.blurEffect.Enabled = open and CFG.guiBlur > 0
+            RT.blurEffect.Enabled = guiOpen and CFG.guiBlur > 0
             RT.blurEffect.Size = CFG.guiBlur
         end
-        autofarm.frame.Visible = open and CFG.panelAutofarm
-        routes.frame.Visible = open and CFG.panelRoutes
-        account.frame.Visible = open and CFG.panelAccount
-        configs.frame.Visible = open and CFG.panelConfigs
-        attacks.frame.Visible = open and CFG.panelAttacks
-        modules.frame.Visible = open
-        if not open then K.hideTip() end
+        if not guiOpen then K.hideTip() end
+    end
+
+    local function setOpen(open)
+        guiOpen = open and true or false
+        applyVisibility()
     end
     S.setPanelsOpen = setOpen
 
@@ -1783,23 +1821,23 @@ local function createControlUI()
     -- has to re-run setOpen, and setOpen has to exist first.
     panelToggle("Autofarm", 2,
         function() return CFG.panelAutofarm end,
-        function(v) CFG.panelAutofarm = v setOpen(true) end,
+        function(v) CFG.panelAutofarm = v applyVisibility() end,
         "The main window: combat, abilities, navigation, telegraphs, overlays.")
     panelToggle("Routes & Data", 3,
         function() return CFG.panelRoutes end,
-        function(v) CFG.panelRoutes = v setOpen(true) end,
+        function(v) CFG.panelRoutes = v applyVisibility() end,
         "Maps, waypoints, macros, streamer mode and the live telegraph feed.")
     panelToggle("User", 4,
         function() return CFG.panelAccount end,
-        function(v) CFG.panelAccount = v setOpen(true) end,
+        function(v) CFG.panelAccount = v applyVisibility() end,
         "Your account card, and Detach.")
     panelToggle("Attacks", 5,
         function() return CFG.panelAttacks end,
-        function(v) CFG.panelAttacks = v setOpen(true) end,
+        function(v) CFG.panelAttacks = v applyVisibility() end,
         "This map's attack book, the pickers, and the zone drawing tools.")
     panelToggle("Configs", 6,
         function() return CFG.panelConfigs end,
-        function(v) CFG.panelConfigs = v setOpen(true) end,
+        function(v) CFG.panelConfigs = v applyVisibility() end,
         "Saved setups.")
     panelToggle("HUD", 7,
         function() return CFG.showHud end,
@@ -1814,6 +1852,11 @@ local function createControlUI()
 
     -- Sensible starting state: Combat open so the window is not a wall of
     -- closed rows on first launch.
+    for name, win in pairs(windows) do
+        if RT.pinnedWindows[name] then win.setPinned(true) end
+    end
+    applyVisibility()
+
     combat.setOpen(true)
     macroSection.setOpen(true)
     mapSection.setOpen(true)
