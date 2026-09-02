@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 3.2.1
+    VERSION : 3.2.2
     BUILD   : 2026-09-01
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "3.2.1"
+local SCRIPT_VERSION = "3.2.2"
 local SCRIPT_BUILD_DATE = "2026-09-01"
 local SCRIPT_CODENAME = "Thrift"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "3.2.2", date = "2026-09-02", notes = "Terrain is a threat now, not just a floor check. The grid only ever asked whether a cell had a floor within reach, which says nothing about whether you can get there: a wall has a floor, and so does a ledge you would have to jump onto. Both read as open ground and the bot found out by walking into them. Cells are probed upward through the space the character would occupy, so anything solid standing there is out; a rise above Step height is reachable but charged Wall threat in proportion, because a jump mid-fight is a moment spent not dodging. Ground beside anything impassable is warmed too, so the cheapest route stops hugging walls, which is where you get cornered. Wall threat, Step height and the edge warming are all adjustable." },
     { version = "3.2.1", date = "2026-09-02", notes = "Projectiles were using the ground-attack urgency ramp, which got the timing wrong in both directions: a corridor a shot reached in two seconds read as 12 out of 100 so the bot strolled into it, and the ground BEHIND a projectile stayed at 100, so it fled the safest place on the map. A projectile is dangerous in a WINDOW around the moment it passes, not on a ramp. The core of that window is geometric - the projectile width plus yours, over its speed - so a fast shot is lethal for a fraction of a second while a wide slow tornado owns the ground for seconds either side, from one formula. Around it sit a generous lead, because being early is how you get hit, and a short wake, because gone is gone. Also added a Recommended settings button that resets the whole Clone section to the tuning arrived at so far." },
     { version = "3.2.0", date = "2026-09-02", notes = "Performance. getPlayerHitboxMetrics was being called inside the per-cell threat query, which at 900 cells and two time samples was 3,600 Instance lookups per evaluation, twelve times a second, re-deriving numbers that had not changed - it is computed once per pass now. The two time samples walk the threat sources once instead of twice, halving the dominant cost. The grid is evaluated in SLICES with verdicts persisting between passes, so a large radius no longer has to judge every cell inside one frame. A* stopped clearing four arrays of 900 entries on every call (a quarter of a million pointless writes a second while dodging) in favour of a generation stamp, and its open set is a real binary heap over parallel numeric arrays rather than a linear scan. Painting writes only the properties that actually changed. Separately: the safety probe is now its own setting rather than the drawn disc - probing with the whole body including limbs made the grid blind to any pocket narrower than your shoulders, which is why small safe zones went unseen." },
     { version = "3.1.2", date = "2026-09-02", notes = "A delayed attack is harmless until it nearly lands, and the squared urgency ramp did not say that - it went lethal a FULL SECOND before impact, which quietly turned every marker into a wall. With attacks overlapping, walls everywhere means no route at all; a gradient always leaves somewhere to flow to. The ramp is now cubed and adjustable, so a marker reads green through most of its wind-up and reddens hard at the end. Goal choice weights the heat where you WILL be over the heat where you land, because a square that is cool now and hot in a moment is a trap. And when nothing is safe at all it stops committing to a destination and simply flows downhill every pass, which is the behaviour that survives a saturated field. The discs are a nine-band ramp now - dark green, green, yellow-green, light yellow, dark yellow, orange, red - because across hundreds of discs a two-stop blend cannot show the difference between cool and coolest." },
@@ -464,6 +465,14 @@ CFG.cloneEvalInterval = 0.08     -- how often safety is re-tested (positions mov
 CFG.cloneSafetyMargin = 0.75      -- extra clearance a clone must have to count as safe
 CFG.cloneMaxDrop = 12.0          -- a clone whose floor is further below this is off a ledge
 CFG.cloneMaxClimb = 6.0
+-- Terrain as heat (3.2.2). "Has a floor" is not the same question as "can I get
+-- there": a ledge you must jump onto and a wall in the way both have perfectly
+-- good floors. A Roblox humanoid steps up about this much for free; anything
+-- higher needs a jump, and a jump in the middle of a boss fight is a moment
+-- spent not dodging.
+CFG.cloneStepHeight = 2.5
+CFG.threatWallWeight = 60        -- heat for ground you cannot simply walk onto
+CFG.threatWallSpread = true      -- warm the cells beside a wall as well
 CFG.cloneCommitTime = 0.35       -- hold a chosen clone this long before reconsidering
 -- Where the innermost ring sits. Not a fraction of the radius: a fraction
 -- means the hole around the character grows every time you widen the ring,

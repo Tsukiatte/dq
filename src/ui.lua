@@ -1138,6 +1138,17 @@ local function createControlUI()
         0, 4, true,
         function() return CFG.cloneSafeDwell end, function(v) CFG.cloneSafeDwell = v end, 6.7,
         "A cell counts as a destination only if nothing lands on it for this long after you get there. At 0 it judges the instant of arrival only, which is how it used to walk somewhere, stop, and be killed by an attack that was already announced."))
+    track(K.slider(cloneSection.content, "Wall threat", "Heat for ground you cannot walk onto",
+        0, 100, false,
+        function() return CFG.threatWallWeight end, function(v) CFG.threatWallWeight = v end, 6.8,
+        "Anything you cannot simply step onto counts as danger. A ledge within jump range is reachable but costs this, scaled by how high it is - a jump mid-fight is a moment spent not dodging. Ground with something solid standing in it is out entirely, whatever this says."))
+    track(K.slider(cloneSection.content, "Step height", "Rise you can walk up for free",
+        0.5, 6, true,
+        function() return CFG.cloneStepHeight end, function(v) CFG.cloneStepHeight = v end, 6.85,
+        "How far up a Roblox humanoid steps without jumping. Anything above this is charged Wall threat."))
+    track(K.toggle(cloneSection.content, "Avoid wall edges",
+        function() return CFG.threatWallSpread end, function(v) CFG.threatWallSpread = v end, 6.9,
+        "Warm the ground beside anything impassable. Without it the cheapest route hugs every wall, which is exactly where you get cornered when an attack lands."))
     track(K.slider(cloneSection.content, "Caution", "Studs of detour one point of heat is worth",
         0.5, 8, true,
         function() return CFG.threatWeight end, function(v) CFG.threatWeight = v end, 7,

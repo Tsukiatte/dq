@@ -263,6 +263,9 @@ local function buildConfigTable()
             cloneKeepDistance = CFG.cloneKeepDistance,
             threatWeight = CFG.threatWeight,
             threatMoveAt = CFG.threatMoveAt,
+            threatWallWeight = CFG.threatWallWeight,
+            threatWallSpread = CFG.threatWallSpread,
+            cloneStepHeight = CFG.cloneStepHeight,
             threatProjectileLead = CFG.threatProjectileLead,
             threatProjectileWake = CFG.threatProjectileWake,
             threatProbeRadius = CFG.threatProbeRadius,
@@ -416,6 +419,9 @@ local function applyConfigData(data)
         if combat.cloneKeepDistance ~= nil then CFG.cloneKeepDistance = combat.cloneKeepDistance == true end
         CFG.threatWeight = tonumber(combat.threatWeight) or CFG.threatWeight
         CFG.threatMoveAt = tonumber(combat.threatMoveAt) or CFG.threatMoveAt
+        CFG.threatWallWeight = tonumber(combat.threatWallWeight) or CFG.threatWallWeight
+        CFG.cloneStepHeight = tonumber(combat.cloneStepHeight) or CFG.cloneStepHeight
+        if combat.threatWallSpread ~= nil then CFG.threatWallSpread = combat.threatWallSpread == true end
         CFG.threatProjectileLead = tonumber(combat.threatProjectileLead) or CFG.threatProjectileLead
         CFG.threatProjectileWake = tonumber(combat.threatProjectileWake) or CFG.threatProjectileWake
         CFG.threatProbeRadius = tonumber(combat.threatProbeRadius) or CFG.threatProbeRadius
@@ -800,6 +806,7 @@ local RECOMMENDED_CLONE = {
     threatHorizon = 4.0, threatCurve = 3.0, threatFalloff = 7.0,
     threatFutureBias = 0.65, threatColorBands = 9,
     threatSweepTime = 3.0, threatProjectileLead = 1.1, threatProjectileWake = 0.3,
+    threatWallWeight = 60, cloneStepHeight = 2.5,
     cloneEnemyRadius = 12.0, cloneEnemySoftRadius = 20.0,
     cloneSafeDwell = 1.6, cloneCommitTime = 0.35, cloneDepthBonus = 1.5,
 }
@@ -807,6 +814,7 @@ local RECOMMENDED_CLONE = {
 local function applyRecommendedClone()
     for key, value in pairs(RECOMMENDED_CLONE) do CFG[key] = value end
     CFG.threatSweepEnabled = true
+    CFG.threatWallSpread = true
     CFG.dodgeProjectiles = true
     CFG.showThreatGradient = true
     CFG.cloneAutoRings = true
