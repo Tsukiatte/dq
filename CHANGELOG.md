@@ -11,6 +11,81 @@ file and that table in sync on every edit.
 
 ---
 
+## 2.5.0 - 2026-09-01 - "Playback"
+Macro Waypoints: record a run, keep the recordings per map, play them back.
+
+### The mode dropdown
+- The path panel (now **Route**) has a two-way selector at the top:
+  **Waypoints** (the legacy hand-placed path) and **Macros** (recorded runs).
+  They are alternative answers to "what do I do when there is nothing to
+  fight", so exactly one is in charge - in macro mode the idle branch no longer
+  walks the waypoint path, and switching to legacy stops any playback.
+- The bottom **Clear** button is context-sensitive: it clears whichever list
+  the current mode owns. **Save** and **Load** are unchanged and cover both.
+
+### Recording
+- **Record** button, plus a **bind box**: click it, press a key, that key now
+  starts and stops recording from anywhere (Escape cancels the capture). The
+  bind is saved with the config. The listener ignores the key while a text box
+  has focus, so renaming a macro cannot start a recording.
+- Starting a recording **switches the loop off** - you are driving, and the bot
+  must not fight you for the character. Starting playback switches it back on,
+  since the main loop is what drives movement each frame.
+- A recording captures the start position as its first sample and then samples
+  the root every `CFG.macroSampleDistance` (2.5 studs) or
+  `CFG.macroSampleInterval` (0.12s), whichever comes first, plus every action
+  input - attack click, Q, E, jump - anchored to the sample it happened at.
+  Coordinates are rounded to one decimal, which is far under the arrive radius
+  and keeps a long macro's JSON to a sane size.
+
+### Why positions and not held keys
+- The obvious reading of "record the inputs and play them back" is to store
+  W-down at 0.4s, W-up at 2.1s and re-send them on a timer. That desynchronises
+  within seconds in practice: a different framerate, a slightly different spawn
+  point, one clip on a doorframe or one knockback shifts the character off the
+  recorded line, and every later input then lands somewhere else with no way to
+  notice or recover.
+- Movement is therefore stored as **absolute positions**. The replay steers back
+  onto the recorded route after any disturbance, and a macro recorded at 30fps
+  plays correctly at 144. The **actions are still exactly the recorded inputs** -
+  they are anchored to the point along the route where they were made rather
+  than to a wall-clock offset, so they stay attached to whatever they were
+  aimed at.
+
+### Playback
+- **Play from top** runs the list in order; **Play this** on a row starts from
+  that one. **Loop** restarts the list after the last macro.
+- Each macro plays in two phases. **Approach**: walk to its first sample using
+  the normal routed pathfinding (navmesh where there is one, steering where
+  there is not) - the character may be anywhere, and only the recorded part of
+  the route is known to be walkable. **Replay**: follow the samples in order,
+  firing each action as its anchor sample is reached. Several samples are
+  consumed per frame when the character is moving well, so the replay does not
+  crawl.
+- **Hazard escape still sits above playback**, so it dodges telegraphs that were
+  not there when you recorded and then rejoins the route - which works precisely
+  because the samples are absolute. Everything else (pursuit, recovery, the
+  stuck detector, target facing) stands down while a macro is playing: the
+  recording already contains the fighting, and being pulled off the route would
+  detach every later action from the place it was aimed at.
+- **Stuck handling is the macro's own**: no progress toward a sample for
+  `CFG.macroGiveUpTime` skips that sample and jumps; `CFG.macroSkipLimit`
+  skips in a row abandons the macro and moves to the next. A door that is shut
+  this run, or having drifted below a ledge, is survivable rather than terminal.
+
+### Storage and display
+- Macros are stored **per map**, in the same per-map entry as that map's
+  waypoints and low-detail keep list, so a dungeon's whole setup travels
+  together. The list is renamable (type in the row) and reorderable (^ / v / X).
+- The selected macro's route is drawn in the world as a sparse violet line with
+  a green **START** orb and its name, capped and rebuilt only on selection, not
+  per frame. `CFG.macroShowRoute` turns it off.
+
+### Structure
+- New module `src/macro.lua`, loaded between `path` and `streamer`
+  (`tools/modules.py`, `main.lua`). It imports from core/nav only and is
+  consumed by config, ui and main.
+
 ## 2.4.0 - 2026-09-01 - "Cartography"
 Four requests: hold attacks still long enough to pick them, trial runs with the
 loop off, a low-detail world, and per-map storage.

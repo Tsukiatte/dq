@@ -51,6 +51,10 @@ local runRecovery = S.runRecovery
 local enterRecovery = S.enterRecovery
 local updateStuckDetector = S.updateStuckDetector
 local recordDamageEvent = S.recordDamageEvent
+local MC = S.MC
+local recordStep = S.recordStep
+local runMacroPlayback = S.runMacroPlayback
+local startMacroInput = S.startMacroInput
 
 -- Trial runs (2.3.0): every drop in health is handed to the correlator while a
 -- trial run is on. The connection is per character and rebuilt on respawn.
@@ -402,6 +406,7 @@ local function startAutofarm()
     detectGameAndInitialize()
     watchOwnAnimations(character)
     watchHealth(character)
+    startMacroInput()
 
     LocalPlayer.CharacterAdded:Connect(function(newChar)
         character = newChar
@@ -426,6 +431,16 @@ local function startAutofarm()
         local now = os.clock()
         if RT.originalNamecall and now - RT.hookInstalledAt >= CFG.remoteHookLifetime then
             unhookAttackRemotes()
+        end
+
+        -- Macro recording samples from here, not from the combat loop: while you
+        -- are recording, the bot is deliberately NOT farming, so the combat loop
+        -- is not running at all.
+        if MC.recording then
+            local recOk, recErr = xpcall(recordStep, debug.traceback)
+            if not recOk then
+                heavyDebugThrottled("record_error", 1.0, "FATAL", "Macro recorder threw:\n" .. tostring(recErr))
+            end
         end
 
         -- Trial runs, freezing and picking work with the loop OFF (2.4.0): they
@@ -569,6 +584,16 @@ local function startAutofarm()
                     setMovementState("HAZARD - repulsion fallback")
                     heavyDebugThrottled("hazard_fallback", 1.0, "Loop", "No escape route yet. Using raw repulsion vector.")
                 end
+            elseif MC.playing then
+                -- Replaying a recorded run. It owns movement outright: the
+                -- recording already contains the fighting, and letting pursuit
+                -- pull the character off the route would desynchronise the
+                -- actions from the places they were aimed at. Hazard escape
+                -- still sits above this, and the replay steers back onto the
+                -- route afterwards because the samples are absolute positions.
+                heavyDebugOnChange("loop_branch", "macro", "Loop", "BRANCH: MACRO PLAYBACK")
+                if #NAV.escapeWaypoints > 0 then clearEscapeRoute() end
+                runMacroPlayback(humanoid, root)
             elseif NAV.recovery then
                 -- Wedged: walking the manual path out. Everything else waits.
                 heavyDebugOnChange("loop_branch", "recovery", "Loop",
@@ -599,9 +624,13 @@ local function startAutofarm()
                 local wasDriving = NAV.enemy ~= nil or NAV.walkAnchor ~= nil
                 if NAV.enemy then resetPursuitPath() end
 
-                -- No enemy: walk the hardcoded path rather than standing still.
-                -- Only when idle, so it never competes with an active fight.
-                local walking = CFG.followPath and not NAV.pathEditEnabled
+                -- No enemy: walk the hand-placed path rather than standing
+                -- still. Only when idle, so it never competes with an active
+                -- fight - and only in legacy mode, since the waypoint path and
+                -- the macro list are two answers to the same question and the
+                -- dropdown picks which one is in charge.
+                local walking = CFG.followPath and MC.mode == "legacy"
+                    and not NAV.pathEditEnabled
                     and followPath(humanoid, root)
 
                 if walking then
@@ -616,13 +645,17 @@ local function startAutofarm()
 
             -- Last resort (2.2.0): loitering in one spot while trying to move
             -- means all of the above has wedged itself. Walk the manual path.
-            updateStuckDetector(root, NAV.driving, inHazard, tickClock)
+            -- Not during macro playback, which has its own skip-ahead recovery
+            -- and must not be dragged off its route by this one.
+            if not MC.playing then
+                updateStuckDetector(root, NAV.driving, inHazard, tickClock)
+            end
 
             -- Applied after the branch so facing survives a hazard escape: the
             -- bot backs out of the telegraph while still pointed at the enemy,
             -- which keeps it in position to attack the moment it is clear. Not
             -- during recovery - there the character should look where it walks.
-            if CFG.faceTarget and NAV.cachedEnemy and not NAV.recovery then
+            if CFG.faceTarget and NAV.cachedEnemy and not NAV.recovery and not MC.playing then
                 local targetRoot = NAV.cachedEnemy:FindFirstChild("HumanoidRootPart")
                     or NAV.cachedEnemy.PrimaryPart
                     or NAV.cachedEnemy:FindFirstChildWhichIsA("BasePart")

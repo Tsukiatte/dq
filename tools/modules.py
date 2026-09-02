@@ -6,4 +6,4 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, "src")
 BUNDLE = os.path.join(ROOT, "DungeonAutofarm.lua")
 
-ORDER = ["core", "hazards", "nav", "path", "streamer", "config", "ui", "main"]
+ORDER = ["core", "hazards", "nav", "path", "macro", "streamer", "config", "ui", "main"]

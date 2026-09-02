@@ -71,6 +71,17 @@ local clearFrozenParts = S.clearFrozenParts
 local setLowDetailEnabled = S.setLowDetailEnabled
 local clearKeepList = S.clearKeepList
 local refreshLowDetail = S.refreshLowDetail
+local MC = S.MC
+local setMacroMode = S.setMacroMode
+local toggleRecording = S.toggleRecording
+local playMacro = S.playMacro
+local stopPlayback = S.stopPlayback
+local removeMacro = S.removeMacro
+local moveMacro = S.moveMacro
+local renameMacro = S.renameMacro
+local clearMacros = S.clearMacros
+local renderMacroRoute = S.renderMacroRoute
+local stopMacroSubsystem = S.stopMacroSubsystem
 
 local function addCorner(instance, radius)
     local corner = Instance.new("UICorner")
@@ -602,6 +613,7 @@ local function destructScript()
     -- first and the effect restore is not immediately undone.
     setLowDetailEnabled(false)
     clearFrozenParts()
+    stopMacroSubsystem()
 
     -- Everything drawn in the world lives under this one folder.
     if RT.visualRoot then
@@ -1098,7 +1110,7 @@ local function createControlUI()
     -- is shown while Edit Path is on.
     local pathPanel = Instance.new("Frame")
     pathPanel.Name = "PathPanel"
-    pathPanel.Size = UDim2.fromOffset(268, 452)
+    pathPanel.Size = UDim2.fromOffset(268, 492)
     pathPanel.Position = UDim2.new(0, 24, 0, 20)
     pathPanel.BackgroundColor3 = Color3.fromRGB(25, 27, 34)
     pathPanel.BorderSizePixel = 0
@@ -1112,7 +1124,7 @@ local function createControlUI()
     pathTitle.Position = UDim2.fromOffset(12, 8)
     pathTitle.BackgroundTransparency = 1
     pathTitle.Font = Enum.Font.GothamBold
-    pathTitle.Text = "Path Waypoints"
+    pathTitle.Text = "Route"
     pathTitle.TextColor3 = Color3.fromRGB(255, 200, 90)
     pathTitle.TextSize = 15
     pathTitle.TextXAlignment = Enum.TextXAlignment.Left
@@ -1121,7 +1133,7 @@ local function createControlUI()
 
     local pathHint = Instance.new("TextLabel")
     pathHint.Size = UDim2.new(1, -20, 0, 30)
-    pathHint.Position = UDim2.fromOffset(12, 34)
+    pathHint.Position = UDim2.fromOffset(12, 68)
     pathHint.BackgroundTransparency = 1
     pathHint.Font = Enum.Font.Gotham
     pathHint.Text = "Fly: WASD + E/Q. Look: hold right mouse. Left-click the map to drop a point."
@@ -1135,7 +1147,7 @@ local function createControlUI()
     -- Clear-radius slider (how close counts as passing a waypoint).
     local radiusLabel = Instance.new("TextLabel")
     radiusLabel.Size = UDim2.new(1, -20, 0, 16)
-    radiusLabel.Position = UDim2.fromOffset(12, 70)
+    radiusLabel.Position = UDim2.fromOffset(12, 104)
     radiusLabel.BackgroundTransparency = 1
     radiusLabel.Font = Enum.Font.GothamMedium
     radiusLabel.Text = string.format("Clear radius: %.0f", CFG.waypointClearRadius)
@@ -1146,7 +1158,7 @@ local function createControlUI()
 
     local radiusTrack = Instance.new("Frame")
     radiusTrack.Size = UDim2.new(1, -20, 0, 8)
-    radiusTrack.Position = UDim2.fromOffset(10, 90)
+    radiusTrack.Position = UDim2.fromOffset(10, 124)
     radiusTrack.BackgroundColor3 = Color3.fromRGB(66, 70, 82)
     radiusTrack.BorderSizePixel = 0
     radiusTrack.Active = true
@@ -1206,7 +1218,7 @@ local function createControlUI()
 
     local showRadiusButton = Instance.new("TextButton")
     showRadiusButton.Size = UDim2.new(1, -20, 0, 26)
-    showRadiusButton.Position = UDim2.fromOffset(10, 106)
+    showRadiusButton.Position = UDim2.fromOffset(10, 140)
     showRadiusButton.BackgroundColor3 = Color3.fromRGB(180, 64, 64)
     showRadiusButton.BorderSizePixel = 0
     showRadiusButton.Font = Enum.Font.GothamBold
@@ -1223,8 +1235,8 @@ local function createControlUI()
     end)
 
     local pathList = Instance.new("ScrollingFrame")
-    pathList.Size = UDim2.new(1, -20, 1, -216)
-    pathList.Position = UDim2.fromOffset(10, 140)
+    pathList.Size = UDim2.new(1, -20, 1, -250)
+    pathList.Position = UDim2.fromOffset(10, 174)
     pathList.BackgroundTransparency = 1
     pathList.BorderSizePixel = 0
     pathList.ScrollBarThickness = 4
@@ -1264,8 +1276,275 @@ local function createControlUI()
         if S.refreshPathPanel then S.refreshPathPanel() end
         setMovementState("config loaded")
     end)
-    bottomButton("Clear", 178, Color3.fromRGB(180, 64, 64), clearWaypath)
+    bottomButton("Clear", 178, Color3.fromRGB(180, 64, 64), function()
+        -- Context-sensitive: the two modes own different lists.
+        if MC.mode == "macro" then clearMacros() else clearWaypath() end
+    end)
     savePathButton.Active = true
+
+    -- =====================================================================
+    -- Mode selector, and the macro view that sits behind it (2.5.0).
+    --
+    -- Legacy = the hand-placed waypoint path. Macro = recorded runs. The two
+    -- are alternative answers to "what do I do when there is nothing to
+    -- fight", so exactly one is in charge and this picks which.
+    -- =====================================================================
+    local legacyWidgets = { pathHint, radiusLabel, radiusTrack, showRadiusButton, pathList }
+
+    local macroView = Instance.new("Frame")
+    macroView.Name = "MacroView"
+    macroView.Size = UDim2.new(1, -20, 1, -114)
+    macroView.Position = UDim2.fromOffset(10, 68)
+    macroView.BackgroundTransparency = 1
+    macroView.Visible = false
+    macroView.Parent = pathPanel
+
+    local function modeButton(text, x, mode)
+        local b = Instance.new("TextButton")
+        b.Size = UDim2.fromOffset(120, 26)
+        b.Position = UDim2.fromOffset(x, 36)
+        b.BorderSizePixel = 0
+        b.Font = Enum.Font.GothamBold
+        b.Text = text
+        b.TextColor3 = Color3.fromRGB(255, 255, 255)
+        b.TextSize = 12
+        b.Parent = pathPanel
+        addCorner(b, 6)
+        b.MouseButton1Click:Connect(function()
+            setMacroMode(mode)
+            S.refreshMacroPanel()
+        end)
+        return b
+    end
+    local legacyModeButton = modeButton("Waypoints", 10, "legacy")
+    local macroModeButton = modeButton("Macros", 138, "macro")
+
+    -- Record row: the button, and the box that captures its keybind.
+    local recordButton = Instance.new("TextButton")
+    recordButton.Size = UDim2.fromOffset(150, 30)
+    recordButton.Position = UDim2.fromOffset(0, 0)
+    recordButton.BackgroundColor3 = Color3.fromRGB(202, 55, 55)
+    recordButton.BorderSizePixel = 0
+    recordButton.Font = Enum.Font.GothamBold
+    recordButton.Text = "Record"
+    recordButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    recordButton.TextSize = 12
+    recordButton.Parent = macroView
+    addCorner(recordButton, 6)
+    recordButton.MouseButton1Click:Connect(function()
+        toggleRecording()
+        S.refreshMacroPanel()
+    end)
+
+    local bindButton = Instance.new("TextButton")
+    bindButton.Size = UDim2.fromOffset(88, 30)
+    bindButton.Position = UDim2.fromOffset(158, 0)
+    bindButton.BackgroundColor3 = Color3.fromRGB(70, 110, 175)
+    bindButton.BorderSizePixel = 0
+    bindButton.Font = Enum.Font.GothamMedium
+    bindButton.Text = "Bind: ]"
+    bindButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    bindButton.TextSize = 11
+    bindButton.Parent = macroView
+    addCorner(bindButton, 6)
+    bindButton.MouseButton1Click:Connect(function()
+        -- The next key pressed becomes the bind; Escape cancels. Captured by
+        -- the always-on listener in the macro module.
+        MC.bindCapture = not MC.bindCapture
+        S.refreshMacroPanel()
+    end)
+
+    local playButton = Instance.new("TextButton")
+    playButton.Size = UDim2.fromOffset(150, 30)
+    playButton.Position = UDim2.fromOffset(0, 36)
+    playButton.BackgroundColor3 = Color3.fromRGB(52, 168, 83)
+    playButton.BorderSizePixel = 0
+    playButton.Font = Enum.Font.GothamBold
+    playButton.Text = "Play from top"
+    playButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    playButton.TextSize = 12
+    playButton.Parent = macroView
+    addCorner(playButton, 6)
+    playButton.MouseButton1Click:Connect(function()
+        if MC.playing then
+            stopPlayback("stopped from the panel")
+        else
+            playMacro(1)
+        end
+        S.refreshMacroPanel()
+    end)
+
+    local loopButton = Instance.new("TextButton")
+    loopButton.Size = UDim2.fromOffset(88, 30)
+    loopButton.Position = UDim2.fromOffset(158, 36)
+    loopButton.BackgroundColor3 = Color3.fromRGB(180, 64, 64)
+    loopButton.BorderSizePixel = 0
+    loopButton.Font = Enum.Font.GothamMedium
+    loopButton.Text = "Loop: OFF"
+    loopButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    loopButton.TextSize = 11
+    loopButton.Parent = macroView
+    addCorner(loopButton, 6)
+    loopButton.MouseButton1Click:Connect(function()
+        CFG.macroLoop = not CFG.macroLoop
+        S.refreshMacroPanel()
+    end)
+
+    local macroHint = Instance.new("TextLabel")
+    macroHint.Size = UDim2.new(1, 0, 0, 28)
+    macroHint.Position = UDim2.fromOffset(0, 70)
+    macroHint.BackgroundTransparency = 1
+    macroHint.Font = Enum.Font.Gotham
+    macroHint.Text = "Recording turns the loop off so you drive. Play walks to each start, then replays."
+    macroHint.TextColor3 = Color3.fromRGB(160, 165, 180)
+    macroHint.TextSize = 10
+    macroHint.TextWrapped = true
+    macroHint.TextXAlignment = Enum.TextXAlignment.Left
+    macroHint.TextYAlignment = Enum.TextYAlignment.Top
+    macroHint.Parent = macroView
+
+    local macroList = Instance.new("ScrollingFrame")
+    macroList.Size = UDim2.new(1, 0, 1, -102)
+    macroList.Position = UDim2.fromOffset(0, 102)
+    macroList.BackgroundTransparency = 1
+    macroList.BorderSizePixel = 0
+    macroList.ScrollBarThickness = 4
+    macroList.ScrollBarImageColor3 = Color3.fromRGB(80, 85, 100)
+    macroList.CanvasSize = UDim2.new(0, 0, 0, 0)
+    macroList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    macroList.Parent = macroView
+    local macroLayout = Instance.new("UIListLayout")
+    macroLayout.Padding = UDim.new(0, 4)
+    macroLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    macroLayout.Parent = macroList
+
+    S.refreshMacroPanel = function()
+        local isMacro = MC.mode == "macro"
+        local ACTIVE = Color3.fromRGB(148, 92, 232)
+        local IDLE = Color3.fromRGB(52, 56, 68)
+        legacyModeButton.BackgroundColor3 = isMacro and IDLE or ACTIVE
+        macroModeButton.BackgroundColor3 = isMacro and ACTIVE or IDLE
+        for _, widget in ipairs(legacyWidgets) do widget.Visible = not isMacro end
+        macroView.Visible = isMacro
+
+        recordButton.Text = MC.recording and "STOP recording" or "Record"
+        recordButton.BackgroundColor3 = MC.recording
+            and Color3.fromRGB(232, 168, 52) or Color3.fromRGB(202, 55, 55)
+        bindButton.Text = MC.bindCapture and "press a key..." or ("Bind: " .. MC.recordBind.Name)
+        bindButton.BackgroundColor3 = MC.bindCapture
+            and Color3.fromRGB(232, 142, 78) or Color3.fromRGB(70, 110, 175)
+        playButton.Text = MC.playing and "Stop playback" or "Play from top"
+        playButton.BackgroundColor3 = MC.playing
+            and Color3.fromRGB(180, 64, 64) or Color3.fromRGB(52, 168, 83)
+        loopButton.Text = "Loop: " .. (CFG.macroLoop and "ON" or "OFF")
+        loopButton.BackgroundColor3 = CFG.macroLoop
+            and Color3.fromRGB(52, 168, 83) or Color3.fromRGB(180, 64, 64)
+
+        if not macroList.Parent then return end
+        for _, child in ipairs(macroList:GetChildren()) do
+            if child:IsA("GuiObject") then child:Destroy() end
+        end
+        if #MC.macros == 0 then
+            local empty = Instance.new("TextLabel")
+            empty.Size = UDim2.new(1, 0, 0, 40)
+            empty.BackgroundTransparency = 1
+            empty.Font = Enum.Font.Gotham
+            empty.Text = "No macros for " .. RT.currentMap .. " yet. Press Record (or the bind), run the route yourself, press it again."
+            empty.TextColor3 = Color3.fromRGB(150, 153, 165)
+            empty.TextSize = 11
+            empty.TextWrapped = true
+            empty.Parent = macroList
+            return
+        end
+
+        for i, macro in ipairs(MC.macros) do
+            local playingThis = MC.playing and MC.playIndex == i
+            local row = Instance.new("Frame")
+            row.Size = UDim2.new(1, 0, 0, 46)
+            row.BackgroundColor3 = playingThis
+                and Color3.fromRGB(46, 62, 52) or Color3.fromRGB(35, 38, 47)
+            row.BorderSizePixel = 0
+            row.LayoutOrder = i
+            row.Parent = macroList
+            addCorner(row, 5)
+
+            local nameBox = Instance.new("TextBox")
+            nameBox.Size = UDim2.new(1, -96, 0, 20)
+            nameBox.Position = UDim2.fromOffset(8, 3)
+            nameBox.BackgroundColor3 = Color3.fromRGB(45, 48, 58)
+            nameBox.BorderSizePixel = 0
+            nameBox.Font = Enum.Font.GothamBold
+            nameBox.Text = macro.name
+            nameBox.TextColor3 = Color3.fromRGB(200, 170, 255)
+            nameBox.TextSize = 12
+            nameBox.TextXAlignment = Enum.TextXAlignment.Left
+            nameBox.ClearTextOnFocus = false
+            nameBox.Parent = row
+            addCorner(nameBox, 4)
+            nameBox.FocusLost:Connect(function()
+                local text = nameBox.Text:gsub("^%s+", ""):gsub("%s+$", "")
+                if text == "" then nameBox.Text = macro.name else renameMacro(i, text) end
+            end)
+
+            local info = Instance.new("TextLabel")
+            info.Size = UDim2.new(1, -96, 0, 18)
+            info.Position = UDim2.fromOffset(8, 25)
+            info.BackgroundTransparency = 1
+            info.Font = Enum.Font.Gotham
+            info.Text = string.format("%d pts, %.0fs, %d action%s%s",
+                #macro.samples, macro.duration or 0, #(macro.actions or {}),
+                #(macro.actions or {}) == 1 and "" or "s",
+                playingThis and string.format("  -  PLAYING %d/%d", MC.playCursor, #macro.samples) or "")
+            info.TextColor3 = playingThis and Color3.fromRGB(140, 230, 170) or Color3.fromRGB(170, 175, 190)
+            info.TextSize = 10
+            info.TextXAlignment = Enum.TextXAlignment.Left
+            info.TextTruncate = Enum.TextTruncate.AtEnd
+            info.Parent = row
+
+            local function miniButton(text, x, color, onClick)
+                local b = Instance.new("TextButton")
+                b.Size = UDim2.fromOffset(20, 20)
+                b.Position = UDim2.new(1, x, 0, 3)
+                b.BackgroundColor3 = color
+                b.BorderSizePixel = 0
+                b.Font = Enum.Font.GothamBold
+                b.Text = text
+                b.TextColor3 = Color3.fromRGB(255, 255, 255)
+                b.TextSize = 11
+                b.Parent = row
+                addCorner(b, 4)
+                b.MouseButton1Click:Connect(onClick)
+                return b
+            end
+            miniButton("^", -88, Color3.fromRGB(70, 110, 175), function()
+                moveMacro(i, -1)
+            end)
+            miniButton("v", -64, Color3.fromRGB(70, 110, 175), function()
+                moveMacro(i, 1)
+            end)
+            miniButton("X", -40, Color3.fromRGB(180, 64, 64), function()
+                removeMacro(i)
+            end)
+
+            local playRow = Instance.new("TextButton")
+            playRow.Size = UDim2.fromOffset(64, 18)
+            playRow.Position = UDim2.new(1, -88, 0, 25)
+            playRow.BackgroundColor3 = Color3.fromRGB(52, 168, 83)
+            playRow.BorderSizePixel = 0
+            playRow.Font = Enum.Font.GothamBold
+            playRow.Text = "Play this"
+            playRow.TextColor3 = Color3.fromRGB(255, 255, 255)
+            playRow.TextSize = 10
+            playRow.Parent = row
+            addCorner(playRow, 4)
+            playRow.MouseButton1Click:Connect(function()
+                playMacro(i)
+                renderMacroRoute(i)
+                S.refreshMacroPanel()
+            end)
+        end
+    end
+    S.refreshMacroPanel()
 
     -- Assign the forward-declared rebuilder now that the list frame exists.
     S.refreshPathPanel = function()
@@ -1874,6 +2153,7 @@ local function createControlUI()
 end
 
 S.createControlUI = createControlUI
+S.setLoopButtonState = setLoopButtonState
 S.stopCharacterMovement = stopCharacterMovement
 S.updateEnemyDisplay = updateEnemyDisplay
 end

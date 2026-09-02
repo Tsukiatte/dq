@@ -1,6 +1,6 @@
 # Dungeon Autofarm — Handoff
 
-Context for whoever picks this up next. Updated at **v2.4.0 "Cartography"**.
+Context for whoever picks this up next. Updated at **v2.5.0 "Playback"**.
 
 - **Repo:** `Tsukiatte/dq`. Source is `src/*.lua` (eight modules, Roblox Luau,
   run through an executor). `DungeonAutofarm.lua` at the root is a **built
@@ -37,10 +37,11 @@ bottom (`S.heavyDebug = heavyDebug`). **Load order is fixed and load-bearing**
 | 2 | `hazards` | Classifiers + memo caches, `isDamageBrick`, hazard geometry, overlays, telegraph feed, **world index**, pickers |
 | 3 | `nav` | Pursuit routing, retry ladder, steering (`steerTowards`), blacklists, escape routing, facing rig, **routed point walking** (`walkTowardPoint`, `followPath`) |
 | 4 | `path` | Manual waypoint path: markers, editing, free-fly editor, progression, **recovery** |
-| 5 | `streamer` | Streamer Mode (untouched since 1.x) |
-| 6 | `config` | JSON save/load |
-| 7 | `ui` | Control window, streamer panel, path panel, `destructScript` |
-| 8 | `main` | Enemy scan, attack, abilities, remote hook, the two Heartbeat loops, `startAutofarm()` |
+| 5 | `macro` | **Macro Waypoints**: recording, the macro list, playback |
+| 6 | `streamer` | Streamer Mode (untouched since 1.x) |
+| 7 | `config` | JSON save/load, **per-map storage** |
+| 8 | `ui` | Control window, streamer panel, route panel, attack book panel, map panel, `destructScript` |
+| 9 | `main` | Enemy scan, attack, abilities, remote hook, the two Heartbeat loops, `startAutofarm()` |
 
 **`RT`** is where the old loose mutable locals live (`RT.farmEnabled`,
 `RT.debugLevel`, `RT.destroyed`, the connections, the render toggles). They are
@@ -162,6 +163,28 @@ folder under it.
    attack range ends it early. **No path set = nothing to recover along**; the
    log says so, throttled.
 
+**Macros (2.5.0, macro.lua).** `MC.mode` (`"legacy"` / `"macro"`) picks which
+idle system is in charge; in macro mode the idle branch does not walk the
+waypoint path. Recording samples the root every `CFG.macroSampleDistance` or
+`CFG.macroSampleInterval` into `MC.samples`, and logs action inputs into
+`MC.actions` **anchored to the sample index** they happened at. Playback is two
+phases: `approach` (routed `walkTowardPoint` to sample 1) then `replay` (direct
+`MoveTo` along the samples, firing actions as their anchor is passed).
+
+**Movement is stored as positions, not held keys — deliberately.** Replaying
+key-down/key-up on a timer desynchronises within seconds (framerate, spawn
+point, one doorframe clip) with no way to recover; an absolute position
+self-corrects. The actions are still the recorded inputs. Do not "fix" this by
+switching to timed input replay.
+
+`MC.playing` takes its own branch in the main loop **below hazard escape and
+above everything else** — so telegraphs are still dodged and the replay rejoins
+the route, but pursuit, recovery, the stuck detector and target facing all stand
+down. Macro stuck handling is its own: skip a sample after
+`CFG.macroGiveUpTime`, abandon the macro after `CFG.macroSkipLimit` skips.
+Recording runs from the **scanner** loop (`recordStep`), because while you
+record the bot is deliberately not farming and the combat loop is not running.
+
 **Point walking** (`walkTowardPoint`, nav.lua) is what both idle path-following
 and recovery use. It routes through the navmesh (slim agent, jumping allowed),
 follows the route with the same jump/invisible-wall handling as pursuit, drops to
@@ -250,9 +273,10 @@ model with a Humanoid. Particles/trails/beams are indexed into `LD.effects` and
 switched off with the mode. **`setLowDetailEnabled(false)` must run on Destruct**
 (it does) or the dungeon is left invisible after the script is gone.
 
-**Per-map storage (2.4.0), config.lua.** `RT.mapData[code] = { waypath, keep }`
-for every map the config knows; the live `NAV.waypath` / `LD.keepNames` are the
-selected map's entry checked out for editing. `syncCurrentMapToStore` checks in,
+**Per-map storage (2.4.0), config.lua.** `RT.mapData[code] = { waypath, keep,
+macros }` for every map the config knows; the live `NAV.waypath` /
+`LD.keepNames` / `MC.macros` are the selected map's entry checked out for
+editing. `syncCurrentMapToStore` checks in,
 `applyMapFromStore` checks out, `setCurrentMap` does both. `buildConfigTable`
 syncs first and writes every stored map, so saving one never drops the rest. A
 pre-2.4 top-level `waypath` is adopted into the named map on load. Map codes and
@@ -374,6 +398,18 @@ it while deliberately holding still or it will fire spuriously).
 - **`CFG.hookRemotes`, trial runs and freezing all keep working with the loop
   off**; if a report says "nothing happens with the loop off", check which of
   those three is actually armed before looking further.
+- **Macro config size is untested.** A 10-minute macro is roughly 5,000 samples;
+  several of those across 14 maps could make the config file large enough that
+  the executor's `writefile` becomes noticeable. If it bites, the fix is a
+  separate `DungeonAutofarm_macros_<MAP>.json` per map rather than one file.
+- **Macro playback does not verify the run.** If a dungeon's layout is
+  randomised between runs, or a door needs an event the recording assumed, the
+  replay walks the old route and skips its way through. It has no notion of
+  "this room is not the room I recorded".
+- **Recorded clicks replay at the CURRENT mouse position**, not the recorded
+  one — the attack method already worked that way, but for macros it means an
+  attack fires wherever the camera happens to point. If the game needs the
+  cursor on the target, recording the mouse ray per action is the next step.
 - **Navmesh often returns `NoPath` map-wide** in this game. Unresolved. Direct
   walking and now the routed path cover it.
 - **Own-attack timing has one known blind spot:** an enemy telegraph landing at
