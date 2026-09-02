@@ -323,10 +323,11 @@ local function lineStrike(kind)
     m.Parent = WS
     Debris:AddItem(m, 7.0)
     local t0 = tick()
+    -- The capture measured the real strikes at 0.88 s after appearing.
+    -- Warning shown until then, then it fades at the hit.
     if visible() then pc.Transparency = 0.5 end
-    task.delay(0.4, function() if pc.Parent then pc.Transparency = visible() and 0.2 or 1 end end)
-    task.delay(0.9, function() if pc.Parent then pc.Transparency = 1 end end)
-    addLive(hb, 60, kind, t0 + 0.4, t0 + 0.7)
+    task.delay(0.85, function() if pc.Parent then pc.Transparency = 1 end end)
+    addLive(hb, 60, kind, t0 + 0.85, t0 + 1.15)
 end
 
 -- Boss projectiles over the real remote, on the game's clock, with a

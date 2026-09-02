@@ -1929,8 +1929,14 @@ local function recordHit(damage)
         local best, bestScore = nil, -1
         for i = 1, math.min(#ranked, 12) do
             local r = ranked[i]
-            if r.known and r.distance <= CFG.hitAttributeRadius then
-                local st = HZ.armState[r.part]
+            local st = HZ.armState[r.part]
+            -- A parked Model (dormant, or silent for half a minute) does not
+            -- get the blame: the pool of beams at the arena centre kept
+            -- being credited with hits from the live ones passing through,
+            -- which woke the pool and stretched every beam's window to the
+            -- length of the fight.
+            local parked = st and (st.dormant or (st.onMax == 0 and not st.hit and now - st.spawn > 30))
+            if r.known and r.distance <= CFG.hitAttributeRadius and not parked then
                 local age = st and (now - st.spawn) or 99
                 local score = 0
                 if r.distance <= playerRadius + 0.5 then score = score + 2 end
@@ -2786,8 +2792,11 @@ local function updateArming(now)
                     else
                         st.fadedAt = nil
                     end
-                    if not doneBy and st.liveUntil and now >= st.liveUntil
-                        and (on == 0 or now >= st.liveUntil + 2.0) then
+                    -- A learned window is trusted as it stands: the mage
+                    -- shot's line stays drawn for seven seconds after its one
+                    -- hit, and waiting two more seconds for it to fade kept
+                    -- a dead attack on the field.
+                    if not doneBy and st.liveUntil and now >= st.liveUntil then
                         doneBy = "window over"
                     end
                     if doneBy then
