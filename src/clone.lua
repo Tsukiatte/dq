@@ -743,6 +743,70 @@ local function astar(goalK, allowLethal)
     return nil, startK
 end
 
+-- The cell nearest a world point, or nil if it is outside the window.
+local function cellNearest(x, z)
+    local spacing = max(CFG.cloneGridSpacing, 0.5)
+    local n = CL.reach
+    local di = clamp(floor((x / spacing) + 0.5) - CL.centerI, -n, n)
+    local dj = clamp(floor((z / spacing) + 0.5) - CL.centerJ, -n, n)
+    return (dj + n) * CL.side + (di + n) + 1
+end
+
+-- Look PAST the edge of the grid.
+--
+-- The window reaches about twenty studs. Cornered, with attacks filling all of
+-- it, the clear ground is outside and bestGoal cannot see it - so the bot
+-- settles for the least bad cell nearby, which when you are cornered is the
+-- corner. This samples a ring of directions well beyond the grid and returns
+-- the bearing of the coolest one, so the search has somewhere real to head for
+-- instead of shuffling on the spot.
+--
+-- Only the DIRECTION comes from out here. The A* still does the local routing,
+-- because out there is exactly where the grid has no idea what the floor does.
+local function findEscapeBearing(root, localBest)
+    if not CFG.escapeScanEnabled then return nil end
+    local now = os.clock()
+    -- Held briefly, or the bot would pick a new compass heading every frame and
+    -- pace on the spot - the very thing this exists to stop.
+    if CL.escapeDir and (now - CL.escapeAt) < CFG.cloneCommitTime * 2 then
+        return CL.escapeDir
+    end
+
+    local rootPos = root.Position
+    local spacing = max(CFG.cloneGridSpacing, 0.5)
+    local near = CL.reach * spacing * 1.15
+    local far = CL.reach * spacing * CFG.escapeScanFar
+    local rays = max(floor(CFG.escapeScanRays), 4)
+    local getThreatPair = S.getThreatPair
+    S.prepareThreatPass()
+
+    local bestDir, bestHeat = nil, huge
+    for i = 0, rays - 1 do
+        local angle = (i / rays) * math.pi * 2
+        local dx, dz = math.cos(angle), math.sin(angle)
+        -- Two samples along each bearing: a direction is only worth taking if
+        -- it stays cool, not merely if it starts cool.
+        local a = getThreatPair(Vector3.new(rootPos.X + dx * near, rootPos.Y, rootPos.Z + dz * near), 0, 0)
+        local b = getThreatPair(Vector3.new(rootPos.X + dx * far, rootPos.Y, rootPos.Z + dz * far), 0, 0)
+        local heat = max(a, b)
+        if heat < bestHeat then
+            bestHeat = heat
+            bestDir = Vector3.new(dx, 0, dz)
+        end
+    end
+
+    -- Only worth abandoning the local plan for something clearly better.
+    if bestDir and bestHeat + CFG.escapeMargin < (localBest or huge) then
+        CL.escapeDir, CL.escapeAt = bestDir, now
+        heavyDebugThrottled("clone_escape", 1.5, "Clone", string.format(
+            "Boxed in - everything within the grid is hot. Heading out on a bearing that reads %.0f against %.0f here.",
+            bestHeat, localBest or 0))
+        return bestDir
+    end
+    CL.escapeDir = nil
+    return nil
+end
+
 -- Where to go: the coolest ground we can plausibly reach, preferring somewhere
 -- that stays cool and is not right on the edge of the window. Survival first,
 -- so distance is only a tie-break against heat, never the other way round.
@@ -826,6 +890,20 @@ local function runCloneEvasion(humanoid, root)
         or CL.cells[goalK].threat >= CFG.threatLethal
     if stale then
         goalK = bestGoal(root)
+        -- If the whole window is hot, the least bad cell in it is usually the
+        -- corner we are already stuck in. Look further out and aim at the rim.
+        if saturated and goalK then
+            local localBest = max(CL.cells[goalK].threat, CL.cells[goalK].threatLater)
+            local bearing = findEscapeBearing(root, localBest)
+            if bearing then
+                local spacing = max(CFG.cloneGridSpacing, 0.5)
+                local reachOut = CL.reach * spacing * 0.9
+                local rimK = cellNearest(rootPos.X + bearing.X * reachOut,
+                    rootPos.Z + bearing.Z * reachOut)
+                local rim = CL.cells[rimK]
+                if rim and rim.standable then goalK = rimK end
+            end
+        end
         if goalK then
             CL.goalI, CL.goalJ = CL.cells[goalK].i, CL.cells[goalK].j
         else
@@ -884,6 +962,31 @@ local function runCloneEvasion(humanoid, root)
         heavyDebugThrottled("clone_wall", 1.0, "Clone",
             string.format("Cell %s is walled off; marked impassable, re-routing.", target.key))
         setMovementState("CLONE - re-routing")
+        return true
+    end
+
+    -- Progress check. The ordinary stuck detector is deliberately switched off
+    -- while dodging - holding position inside a telegraph's clearance is
+    -- sometimes correct - which left nothing at all watching for the character
+    -- being wedged between a wall and an enemy. It would push into the corner
+    -- indefinitely.
+    local progress = CL.progressPos
+    if not progress or (rootPos - progress).Magnitude >= CFG.cloneStuckDistance then
+        CL.progressPos, CL.progressAt = rootPos, now
+    elseif now - CL.progressAt >= CFG.cloneStuckTime then
+        CL.progressPos, CL.progressAt = rootPos, now
+        -- A hop clears most lips and steps, the goal is abandoned so the next
+        -- pass picks somewhere else, and the cell we were pushing at is marked
+        -- impassable so the search stops choosing the same wall.
+        humanoid.Jump = true
+        CL.floorCache[target.key] = { y = false, blocked = true, t = now }
+        target.standable = false
+        CL.goalI, CL.goalJ = nil, nil
+        CL.escapeDir = nil
+        heavyDebugThrottled("clone_pinned", 1.0, "Clone",
+            "Pinned against something for " .. string.format("%.1fs", CFG.cloneStuckTime)
+            .. " - hopping, dropping this goal and routing round it.")
+        setMovementState("CLONE - pinned, re-routing")
         return true
     end
 
