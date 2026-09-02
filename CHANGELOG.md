@@ -11,6 +11,33 @@ file and that table in sync on every edit.
 
 ---
 
+## 2.13.0 - 2026-09-02 - "Floor"
+
+### Testing switches
+- **Pathfinding** and **Dodging**, at the top of Navigation. Off stops the bot
+  driving your character with what it finds - it still finds it. With
+  pathfinding off it still picks a target and still swings if one is in reach;
+  recovery goes quiet with it, since recovery is pathfinding's own last resort.
+- Dodging **moved here from Telegraphs** so one setting has one control.
+- **Both are saved now.** Dodging never was.
+
+### Clone ring geometry
+Widening the radius opened a hole around the character. Two defects
+compounding:
+- The innermost ring sat at **55% of the radius**, so at 30 studs the nearest
+  volume was 16 studs away - and the hole grew with every widening, in the one
+  place you most need somewhere to step. Now the first ring sits at a fixed
+  **Inner radius** (4 studs) regardless.
+- Every ring got **the same number of volumes**, so the outer ring's were
+  nearly twice as far apart as the inner ring's - gaps wide enough to be hit in.
+  Volumes are now shared out **by circumference**.
+- **Auto rings** (on by default) adds rings as the radius grows so the gap
+  between them stays about **Ring spacing** (6 studs). The Rings slider is the
+  floor, not the answer. Both are settings; turn Auto rings off to get the
+  slider back as the literal count.
+- The volume cap still wins: the per-ring minimum of three can push the total
+  over it on many rings, and the cap is the promise.
+
 ## 2.12.0 - 2026-09-02 - "Pinned"
 - **A pin on every window header**, beside the info circle. Grey when it is not
   pinned, accent when it is - a thumbtack drawn from two frames, like every

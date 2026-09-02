@@ -243,6 +243,11 @@ local function buildConfigTable()
             cloneCount = CFG.cloneCount,
             cloneRings = CFG.cloneRings,
             cloneRadius = CFG.cloneRadius,
+            cloneInnerRadius = CFG.cloneInnerRadius,
+            cloneAutoRings = CFG.cloneAutoRings,
+            cloneRingSpacing = CFG.cloneRingSpacing,
+            pathfindingEnabled = CFG.pathfindingEnabled,
+            dodgeEnabled = CFG.dodgeEnabled,
             cloneSafetyMargin = CFG.cloneSafetyMargin,
             cloneCommitTime = CFG.cloneCommitTime,
             cloneManual = CFG.cloneManual,
@@ -358,6 +363,11 @@ local function applyConfigData(data)
         CFG.cloneCount = tonumber(combat.cloneCount) or CFG.cloneCount
         CFG.cloneRings = tonumber(combat.cloneRings) or CFG.cloneRings
         CFG.cloneRadius = tonumber(combat.cloneRadius) or CFG.cloneRadius
+        CFG.cloneInnerRadius = tonumber(combat.cloneInnerRadius) or CFG.cloneInnerRadius
+        CFG.cloneRingSpacing = tonumber(combat.cloneRingSpacing) or CFG.cloneRingSpacing
+        if combat.cloneAutoRings ~= nil then CFG.cloneAutoRings = combat.cloneAutoRings == true end
+        if combat.pathfindingEnabled ~= nil then CFG.pathfindingEnabled = combat.pathfindingEnabled == true end
+        if combat.dodgeEnabled ~= nil then CFG.dodgeEnabled = combat.dodgeEnabled == true end
         CFG.cloneSafetyMargin = tonumber(combat.cloneSafetyMargin) or CFG.cloneSafetyMargin
         CFG.cloneCommitTime = tonumber(combat.cloneCommitTime) or CFG.cloneCommitTime
         if combat.showClones ~= nil then CFG.showClones = combat.showClones == true end

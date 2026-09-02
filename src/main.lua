@@ -202,7 +202,13 @@ local function attackEnemy(enemy)
     end
     heavyDebugOnChange("attack_guard", "ok", "Attack", "Guards passed, entering pursuit for " .. enemy.Name)
 
-    updatePursuitMovement(enemy, humanoid, root, enemyRoot)
+    -- With pathfinding off the bot still picks a target and still swings if it
+    -- happens to be in reach; it just stops driving your character there.
+    if CFG.pathfindingEnabled then
+        updatePursuitMovement(enemy, humanoid, root, enemyRoot)
+    else
+        setMovementState("pathfinding off (testing)")
+    end
 
     local flatOffset = Vector3.new(root.Position.X - enemyRoot.Position.X, 0, root.Position.Z - enemyRoot.Position.Z)
     if flatOffset.Magnitude <= CFG.attackRange and RT.farmEnabled and not RT.destroyed and RT.gameSpecificAttackMethod then
@@ -669,7 +675,7 @@ local function startAutofarm()
                     "BRANCH: target unreachable; recovering along the path.")
                 NAV.cachedEnemy = nil
                 NAV.forceRescan = true
-                if not enterRecovery(root, "target unreachable") then
+                if not CFG.pathfindingEnabled or not enterRecovery(root, "target unreachable") then
                     setMovementState("target unreachable, reselecting")
                 end
             elseif NAV.cachedEnemy then
@@ -688,7 +694,7 @@ local function startAutofarm()
                 -- fight - and only in legacy mode, since the waypoint path and
                 -- the macro list are two answers to the same question and the
                 -- dropdown picks which one is in charge.
-                local walking = CFG.followPath and MC.mode ~= "macro"
+                local walking = CFG.followPath and CFG.pathfindingEnabled and MC.mode ~= "macro"
                     and not NAV.pathEditEnabled
                     and followPath(humanoid, root)
 
@@ -706,7 +712,8 @@ local function startAutofarm()
             -- means all of the above has wedged itself. Walk the manual path.
             -- Not during macro playback, which has its own skip-ahead recovery
             -- and must not be dragged off its route by this one.
-            if not MC.playing then
+            -- Recovery is pathfinding's own last resort, so it goes quiet with it.
+            if not MC.playing and CFG.pathfindingEnabled then
                 updateStuckDetector(root, NAV.driving, inHazard, tickClock)
             end
 
