@@ -2257,7 +2257,7 @@ local function watchOwnAbilityRemotes()
     for _, name in ipairs({ "abilityCast", "abilityUsed" }) do
         local remote = remotes:FindFirstChild(name)
         if remote and remote:IsA("RemoteEvent") then
-            table.insert(RT.connections, remote.OnClientEvent:Connect(function()
+            table.insert(RT.indexConnections, remote.OnClientEvent:Connect(function()
                 RT.lastOwnActionTime = os.clock()
             end))
             hooked = hooked + 1

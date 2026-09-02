@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 3.0.0
+    VERSION : 3.0.1
     BUILD   : 2026-09-01
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "3.0.0"
+local SCRIPT_VERSION = "3.0.1"
 local SCRIPT_BUILD_DATE = "2026-09-01"
 local SCRIPT_CODENAME = "Ground truth"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "3.0.1", date = "2026-09-02", notes = "Three fixes to 3.0.0, all found from one in-game log. RT.connections never existed: the dungeonName watcher threw on it, which also meant the ability-remote hook below it never ran at all. The precast readout was rendered once at build and never again, so it read zero however many attacks had gone past. And the payload handler dropped anything it could not read without a word, so 'Listening' and 'nothing is arriving' looked identical - it now counts every payload, prints the first three key by key, and finds the shape name even if the compressed key is not the one we asked for." },
     { version = "3.0.0", date = "2026-09-02", notes = "The script stops guessing what an attack is and listens to the game tell it. ReplicatedStorage.modules.PrecastHitbox broadcasts every ground attack on a BridgeNet2 bridge with its exact shape, position, and delayUntilAttack, so time to impact is arithmetic and each clone-grid cell is now judged at the moment you would arrive there rather than right now. 238 enemy attack names and 293 of our own are read from the game as tables, which is the mine-or-theirs question the appearance scorer used to guess. Safe-spot bosses are handled: the markers that mean STAND HERE are attractors, where before the dodge walked you out of the only survivable circle. The map follows Workspace.dungeonName, enemies are scanned from Workspace.enemies, and our own casts come from the abilityCast remote rather than animation watching. Removed: freeze, trial-run damage learning, and the recommendation queue - all three existed to work around not knowing what an attack was." },
     { version = "2.15.1", date = "2026-09-02", notes = "Clone discs are sized from the character's real bounding footprint instead of the 2-stud root part, with a Disc size scale to match by eye. The safety test is given the same radius, so a green disc still means the whole footprint fits." },
     { version = "2.15.0", date = "2026-09-02", notes = "Clone mode moved from a ring to a dense grid anchored to the world, and the dodge became a search across it. Discs the size of your hitbox every 1.5 studs, overlapping, so a safe pocket a few studs wide between two boss attacks still shows up; green means your whole body fits there. The way out is found cell by cell: red cells cost twenty-five green ones to cross so they are crossed only when there is no way around, pits and walls are never crossed, and a depth pass lets it prefer the interior of a safe area over a single green cell about to close. The old ring checked the straight line for walls only and would run through a red strip to a green node behind it. Floor heights are cached per cell; walls are learned by trying. Also: the menu key is rebindable at the top of Modules, and a pinned window no longer stops the key from reopening the interface." },
@@ -795,6 +796,9 @@ PC.connection = nil
 PC.bridge = nil
 PC.failed = false
 PC.total = 0
+PC.received = 0                  -- payloads seen on the bridge, parsed or not
+PC.lastShown = -1
+PC.lastTotal = -1
 
 -- Smallest deviation first, so steering hugs the intended heading.
 local STEER_FAN_ANGLES = { 0, 20, -20, 40, -40, 65, -65, 90, -90, 120, -120 }

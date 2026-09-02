@@ -9,6 +9,7 @@ local PC = S.PC
 local Workspace = S.Workspace
 local ReplicatedStorage = S.ReplicatedStorage
 local heavyDebug = S.heavyDebug
+local heavyDebugThrottled = S.heavyDebugThrottled
 local getVisualRoot = S.getVisualRoot
 
 -- =========================================================================
@@ -141,6 +142,12 @@ end
 
 -- Drops zones whose attack has resolved, and recolours the rest by urgency.
 local function precastStep()
+    -- Keep the Attacks panel honest. It used to be rendered once at build and
+    -- never again, so it read zero however many attacks had gone past.
+    if #PC.zones ~= PC.lastShown or PC.total ~= PC.lastTotal then
+        PC.lastShown, PC.lastTotal = #PC.zones, PC.total
+        if S.refreshPrecastPanel then S.refreshPrecastPanel() end
+    end
     if #PC.zones == 0 then return end
     local now = Workspace:GetServerTimeNow()
     for i = #PC.zones, 1, -1 do
@@ -188,11 +195,42 @@ local function startPrecastListener()
         PC.bridge = bridge
 
         PC.connection = bridge:Connect(function(data)
-            if type(data) ~= "table" then return end
+            PC.received = PC.received + 1
+            if type(data) ~= "table" then
+                heavyDebugThrottled("precast_type", 5.0, "Precast",
+                    "Payload was a " .. typeof(data) .. ", not a table.")
+                return
+            end
+
+            -- The first few payloads get printed key by key. If the wire format
+            -- is not what was read out of the decompiled module, this is where
+            -- it shows, instead of the handler silently dropping everything.
+            if PC.received <= 3 then
+                local keys = {}
+                for k, v in pairs(data) do
+                    keys[#keys + 1] = tostring(k) .. "=" .. (typeof(v) == "table" and "table" or tostring(v))
+                end
+                heavyDebug("Precast", string.format("Payload #%d: %s",
+                    PC.received, table.concat(keys, "  ")))
+            end
+
             local action = data[actionKey] or data.action
+            -- BridgeNet2 compresses string keys, and the identifier we ask for
+            -- may not be the one the server used. The shape name is distinctive
+            -- enough to find on its own.
+            if action ~= "Cube" and action ~= "Circle" then
+                for _, v in pairs(data) do
+                    if v == "Cube" or v == "Circle" then action = v break end
+                end
+            end
             local delay = tonumber(data.delayUntilAttack)
             local startTime = tonumber(data.startTime)
-            if not action or not delay or not startTime then return end
+            if not action or not delay or not startTime then
+                heavyDebugThrottled("precast_shape", 5.0, "Precast", string.format(
+                    "Payload not understood (action=%s delay=%s startTime=%s). The wire format has changed; see game/GAME_NOTES.md.",
+                    tostring(action), tostring(delay), tostring(startTime)))
+                return
+            end
 
             if action == "Circle" and typeof(data.position) == "Vector3" then
                 addZone({ shape = "Circle", position = data.position,

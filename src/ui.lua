@@ -642,9 +642,13 @@ local function createControlUI()
             precastLabel.Text = "Not listening."
         elseif PC.failed then
             precastLabel.Text = "Could not attach to the game's broadcast; falling back to appearance scoring."
+        elseif PC.received == 0 then
+            precastLabel.Text = "Attached, but the game has not broadcast anything yet. "
+                .. "Not every dungeon announces its attacks this way."
         else
-            precastLabel.Text = string.format("Listening. %d attack(s) announced and pending, %d seen this run.",
-                #PC.zones, PC.total)
+            precastLabel.Text = string.format(
+                "Listening. %d pending, %d understood of %d broadcast.",
+                #PC.zones, PC.total, PC.received)
         end
     end
     S.refreshPrecastPanel()

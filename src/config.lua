@@ -742,7 +742,7 @@ local function watchDungeonName()
     local value = Workspace:FindFirstChild("dungeonName")
     if not value or not value:IsA("StringValue") then return false end
     applyDetectedMap(value.Value)
-    table.insert(RT.connections, value.Changed:Connect(applyDetectedMap))
+    table.insert(RT.indexConnections, value.Changed:Connect(applyDetectedMap))
     heavyDebug("Map", "Following Workspace.dungeonName; the map picker now switches itself.")
     return true
 end
