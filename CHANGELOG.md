@@ -11,6 +11,29 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.4.1 - 2026-09-02
+
+### Kiting idle melee bots into a wall
+The enemy circle was body plus swing at 1.5, and enemies were extrapolated by
+their velocity out to the dwell (~1.5 s). A mob walking at you was predicted
+onto every spot near you, so the only safe ground was always further back.
+The hard circle is now the **body only** (`extent + 1`); the swing is an
+attack, and the game spawns a `hitBox` for it that is detected like any
+other. A soft ring out to the standoff is a preference below the move
+threshold. Enemies are extrapolated **0.4 s** ahead at most
+(`dodgeEnemyLookahead`).
+
+### Leaving the ball sideways
+The discount that ended the shuffle zeroed every path sample inside the ball,
+so nothing said "shortest time inside", and the new turn cost (0.25 — thirty
+studs of distance) then picked the exit by whichever way the character had
+last walked. Path samples inside the thing already hitting you keep half
+their cost in the average (`dodgeInsideWeight`), so the nearest edge wins;
+the turn cost is switched off while something is on you and its default is
+0.1; and the pull toward the boss applies only to spots whose whole line is
+clean *undiscounted*, so the exit nearest the boss cannot beat the exit
+nearest the edge.
+
 ## 4.4.0 - 2026-09-02 - "Pick a side"
 
 ### The left-right shuffle

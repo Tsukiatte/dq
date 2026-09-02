@@ -1148,7 +1148,7 @@ local function createControlUI()
     track(K.slider(cloneSection.content, "Commitment", "Cost of changing direction",
         0, 0.6, true,
         function() return CFG.dodgeTurnCost end, function(v) CFG.dodgeTurnCost = v end, 11,
-        "Two safe sides of a beam score the same, and re-picking between them each decision is the left-right shuffle. A change of direction costs this much danger and a reversal all of it, so the side picked first is kept until the other is clearly better - which a closed line always is."))
+        "Two safe sides of a beam score the same, and re-picking between them each decision is the left-right shuffle. A change of direction costs this much danger and a reversal all of it, so the side picked first is kept until the other is clearly better - which a closed line always is. Switched off while something is on you: then the shortest way out is the only way out."))
     track(K.slider(cloneSection.content, "Approach", "Pull toward the target across safe ground",
         0, 0.05, true,
         function() return CFG.dodgeApproachWeight end, function(v) CFG.dodgeApproachWeight = v end, 11.5,

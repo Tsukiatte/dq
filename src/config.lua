@@ -206,6 +206,8 @@ local function buildConfigTable()
             dodgeDistanceCost = CFG.dodgeDistanceCost,
             dodgeEnemySoftWidth = CFG.dodgeEnemySoftWidth,
             dodgeTurnCost = CFG.dodgeTurnCost,
+            dodgeEnemyLookahead = CFG.dodgeEnemyLookahead,
+            dodgeInsideWeight = CFG.dodgeInsideWeight,
             dodgeMaxClimb = CFG.dodgeMaxClimb,
             dodgeMaxDrop = CFG.dodgeMaxDrop,
             dodgeManual = CFG.dodgeManual,
@@ -334,6 +336,7 @@ local function applyConfigData(data)
         for _, key in ipairs({ "dodgeInterval", "dodgeReach", "dodgeRings", "dodgeRays", "dodgeProbe",
             "dodgeMargin", "dodgeShoulder", "dodgeLead", "dodgeLinger", "dodgeDwell", "dodgeMoveAt",
             "dodgeHysteresis", "dodgeDistanceCost", "dodgeEnemySoftWidth", "dodgeTurnCost",
+            "dodgeEnemyLookahead", "dodgeInsideWeight",
             "dodgeMaxClimb", "dodgeMaxDrop", "dodgeCornerCost", "dodgeApproachWeight",
             "dodgeStepProbe" }) do
             CFG[key] = tonumber(combat[key]) or CFG[key]
@@ -700,7 +703,7 @@ local RECOMMENDED_DODGE = {
     dodgeProbe = 0, dodgeMargin = 0.5, dodgeShoulder = 3.0,
     dodgeLead = 1.2, dodgeLinger = 0.35, dodgeDwell = 1.2,
     dodgeMoveAt = 0.15, dodgeHysteresis = 0.12, dodgeDistanceCost = 0.008,
-    dodgeEnemySoftWidth = 6, dodgeTurnCost = 0.25,
+    dodgeEnemySoftWidth = 6, dodgeTurnCost = 0.1, dodgeEnemyLookahead = 0.4, dodgeInsideWeight = 0.5,
     dodgeMaxClimb = 3.0, dodgeMaxDrop = 10.0, dodgeRayBudget = 20, dodgeCornerCost = 0.35,
     moveMode = "tween", moveArriveRadius = 1.2,
 }

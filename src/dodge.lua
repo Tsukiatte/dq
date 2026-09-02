@@ -18,6 +18,7 @@ local setMovementState = S.setMovementState
 local getVisualRoot = S.getVisualRoot
 local getPlayerHitboxMetrics = S.getPlayerHitboxMetrics
 local getEnemyStandoff = S.getEnemyStandoff
+local getEnemyExtent = S.getEnemyExtent
 local getHazardMotion = S.getHazardMotion
 local volumeClosestPoint = S.volumeClosestPoint
 local getRaycastExclusions = S.getRaycastExclusions
@@ -93,13 +94,18 @@ local function refreshSources()
                 end
                 DG.enemyPrev[model] = { x = pos.X, z = pos.Z, t = clock }
 
-                -- The enemy is the distance: its circle is its body plus a
-                -- swing, just inside where the chase stands, so standing at
-                -- the standoff is not itself a danger.
-                local hard = getEnemyStandoff(model) - 1
+                -- The hard circle is the BODY and nothing more. Its swing is
+                -- an attack, and the game spawns a hitBox for it that is
+                -- detected like any other; pricing the swing's reach as
+                -- danger in its own right made the character kite two idle
+                -- melee bots backward into a wall two rooms away, because a
+                -- mob walking at you is never further than its reach. Past
+                -- the body a soft ring out to the standoff is a preference,
+                -- below the move threshold, so it fights from there.
+                local hard = getEnemyExtent(model) + 1
                 DG.enemies[#DG.enemies + 1] = {
                     x = pos.X, y = pos.Y, z = pos.Z, vx = vx, vz = vz,
-                    hard = hard, soft = hard + CFG.dodgeEnemySoftWidth,
+                    hard = hard, soft = getEnemyStandoff(model) + CFG.dodgeEnemySoftWidth,
                 }
             end
         end
@@ -153,9 +159,13 @@ local function dangerAt(px, py, pz, t)
     -- through an attack and is taken only when every other line is worse -
     -- backed into a corner with the mob as the only way out, it goes through
     -- the mob, because dying in the corner is the alternative.
+    -- Extrapolated only a short way: a mob chasing you is predicted onto
+    -- every spot near you if you look a second ahead, and then the only
+    -- safe ground is always further back.
+    local tt = t < CFG.dodgeEnemyLookahead and t or CFG.dodgeEnemyLookahead
     for i = 1, #DG.enemies do
         local e = DG.enemies[i]
-        local dx, dz = px - (e.x + e.vx * t), pz - (e.z + e.vz * t)
+        local dx, dz = px - (e.x + e.vx * tt), pz - (e.z + e.vz * tt)
         local d2 = dx * dx + dz * dz
         if d2 < e.soft * e.soft then
             local d = sqrt(d2)
@@ -369,19 +379,25 @@ local function decide(root, humanoid)
     -- read exactly 1.0 and the nearest won. Returns worst, graded.
     local function score(ox, oz, dist)
         local T = dist / speed
-        local worst, total = 0, 0
+        local worst, raw, total = 0, 0, 0
+        local inside = CFG.dodgeInsideWeight
         for k = 1, #fractions do
             local f = fractions[k]
+            local d = dangerAt(rx + ox * f, ry, rz + oz * f, T * f)
+            if d > raw then raw = d end
             -- Less whatever is on you right now. Standing inside a beam, every
-            -- line out starts inside the beam; counting that made every held
-            -- box read as closed the moment it was chosen, and the choice
+            -- line out starts inside the beam; counting that in full made every
+            -- held box read as closed the moment it was chosen, and the choice
             -- re-rolled between the two sides each decision. What is already
-            -- hitting you is not a reason to prefer one way out over another;
-            -- how soon the line is clear of it is, and that is what remains.
-            local d = dangerAt(rx + ox * f, ry, rz + oz * f, T * f) - here0
-            if d < 0 then d = 0 end
-            total = total + d
-            if d > worst then worst = d end
+            -- hitting you is no reason to prefer one way out over another -
+            -- but time spent in it still is, so a residual stays in the
+            -- average: three samples inside the ball cost more than one, and
+            -- the nearest edge wins over the far one.
+            local fresh = d - here0
+            if fresh < 0 then fresh = 0 end
+            local stale = d < here0 and d or here0
+            total = total + fresh + stale * inside
+            if fresh > worst then worst = fresh end
         end
         local cx, cz = rx + ox, rz + oz
         local d1 = dangerAt(cx, ry, cz, T + dwell * 0.5)
@@ -389,7 +405,9 @@ local function decide(root, humanoid)
         total = total + d1 + d2
         if d1 > worst then worst = d1 end
         if d2 > worst then worst = d2 end
-        return worst, worst * 0.5 + (total / (#fractions + 2)) * 0.5
+        if d1 > raw then raw = d1 end
+        if d2 > raw then raw = d2 end
+        return worst, worst * 0.5 + (total / (#fractions + 2)) * 0.5, raw
     end
 
     -- Score every candidate. Cheap: it is arithmetic, no raycasts yet.
@@ -399,21 +417,27 @@ local function decide(root, humanoid)
         local c = cands[i]
         if not c then c = {} cands[i] = c end
         local cx, cz = rx + off.x, rz + off.z
-        local worst, graded = score(off.x, off.z, off.dist)
+        local worst, graded, raw = score(off.x, off.z, off.dist)
 
         c.x, c.z, c.dist, c.danger = cx, cz, off.dist, worst
         local cost = graded + off.dist * distCost
-        -- A change of direction costs; a reversal costs the most.
-        if turnCost > 0 and (hx ~= 0 or hz ~= 0) then
+        -- A change of direction costs; a reversal costs the most. Not while
+        -- something is on you: then the shortest way out is the only way
+        -- out, and keeping a heading was what walked the character round
+        -- the inside of the ball instead of straight off its edge.
+        if turnCost > 0 and here0 < 1 and (hx ~= 0 or hz ~= 0) then
             local dot = (off.x * hx + off.z * hz) / off.dist
-            cost = cost + turnCost * (1 - dot) * 0.5
+            cost = cost + turnCost * (1 - dot) * 0.5 * (1 - here0)
         end
         -- The pull toward the target applies among SAFE spots only. Applied to
         -- every spot it was decisive in a crowded field where everything read
         -- much the same, and the nearest-to-the-boss won: that is the walk
         -- into the boss and the death at its feet.
+        -- ...and among spots whose whole line is clean, undiscounted: from
+        -- inside the ball the exit nearest the boss must not beat the exit
+        -- nearest the edge.
         if approach then
-            if worst < moveAt then
+            if raw < moveAt then
                 local ax, az = cx - approach.X, cz - approach.Z
                 cost = cost + approachWeight * max(0, sqrt(ax * ax + az * az) - preferred)
             else
