@@ -1,0 +1,136 @@
+Agony Orbs
+Amethyst Beams
+Amethyst Blast
+Aquatic Smite
+Arcane Barrage
+Arcane Spray
+Arrow Barrage
+Arrow Rain
+Aura of Life
+Battle Shout
+Berserk
+Blade Barrage
+Blade Fall
+Blade Revolver
+Blade Storm
+Blade Throw
+Blue Fireball
+Carrot Barrage
+Chain Heal
+Chain Lightning
+Chain Phase Shock
+Chained Energy Blasts
+Chromatic Rain
+Concussive Blast
+Crystalline Cannon
+Demonic Curse
+Demonic Spikes
+Demonic Strike
+Earth Clap
+Earth Kick
+Earth Spikes
+Egg Bomb
+Electric Boom
+Electric Field
+Electric Grinder
+Electric Slash
+Enchanted Shuriken
+Enchanted Spinning Blades
+Energy Orb
+Enhanced Inner Focus
+Enhanced Inner Rage
+Explosive Mine
+Explosive Punch
+Fire Bomb
+Fireball
+Flame Cyclone
+Flame Shuriken
+Flame Strike
+Focus Beam
+Forgotten Army
+Frost Cone
+Fungal Poison
+Gale Barrage
+Gale Slice
+Geyser
+Ghostly Cannon Barrage
+Ghostly Rampage
+Glacial Blows
+God Spear
+Ground Slam
+Ground Stomp
+Guardian Call
+Guardian Roar
+Guardian's Blessing
+Hand Cannon
+Holy Barrier
+Holy Circle
+Ice Barrage
+Ice Crash
+Ice Needles
+Ice Nova
+Ice Spikes
+Ice Totem
+Icicle Barrage
+Illusion Blast
+Infernal Blast
+Infernal Orbs
+Infernal Strike
+Inner Focus
+Inner Rage
+Innervate
+Jade Rain
+Jade Roller
+Lava Barrage
+Lava Beam Orb
+Lava Cage
+Lava Lash
+Life Dash
+Life Pulse
+Lightning Beam
+Lightning Burst
+Lightning Strikes
+Mighty Leap
+Molten Ball
+Molten Shards
+Mystery Matter
+Orb Of Destruction
+Overcharge
+Phantom Blades
+Phantom Flames
+Phantom Striker
+Phase Barrage
+Piercing Rain
+Piercing Roots
+Poison Cloud
+Pulse Beam
+Pulse Waves
+Pulsefire
+Redemption
+Rejuvenating Spray
+Rending Slice
+Revitalize
+Runic Strike
+Searing Beam
+Skull Flames
+Smite
+Solar Beam
+Soul Drain
+Spear Strike
+Spirit Bomb
+Star Barrage
+Starfall
+Taunt
+Taunting Aura
+Thunderous Blast
+Triple Blade Throw
+Tsunami
+Twin Slash
+Universal Heal
+Void Beam
+Void Spheres
+Vortex
+Vortex Grenade
+Water Orb
+Whirlwind
+Wind Blast

@@ -1,0 +1,251 @@
+Agony Orbs Main Orb
+Agony Orbs Small
+Agony Orbs Star Explosion
+Amethyst Beam Beam
+Amethyst Beam Ground Part
+Amethyst Beam Ground Particles
+Amethyst Beam Orb
+Amethyst Blast
+Aquatic Smite Cast
+Aquatic Smite Hit
+Arcane Barrage Hitbox
+Arcane Barrage1
+Arcane Barrage2
+Arcane Spray
+Arrow Barrage
+Arrow Rain
+Arrow Rain Arrow
+Aura of Life
+Battle Shout
+Berserk
+Berserk Sounds
+Big Phase Ball
+Blade Barrage Sword
+Blade Fall Sword
+Blade Revolver
+Blade Storm
+Blade Throw
+Carrot Barrage
+Carrot Barrage Carrot
+Chain Heal
+Chain Lightning
+Chained Energy Blasts
+Chromatic Rain Beam
+Chromatic Rain Ring
+Crystaline Cannon Blast
+Crystaline Cannon Spiral
+Demonic Curse
+Demonic Curse Particles
+Demonic Spikes
+Demonic Strike
+Earth Clap
+Earth Kick
+Earth Spikes
+Egg Bomb
+Electric Boom
+Electric Field
+Electric Grinder
+Electric Slash
+Electric Slash Effect
+Electric Slash Explosion
+Enchanted Shuriken
+Enchanted Spinning Blades
+Energy Orb
+Enhanced Aura Ring
+Explosive Mine
+Explosive Punch Cone
+Explosive Punch Ring
+Fire Bomb
+Flame Cyclone
+Flame Shuriken
+Flame Strike
+Focus Beam
+Forgotten Army
+Forgotten Army Soldier
+Frost Cone
+Fungal Poison
+Fungal Poison Particles
+Gale Barrage
+Gale Slice Hitbox
+Gale Slice1
+Gale Slice2
+Geyser
+Ghostly Cannon Barrage
+Ghostly Cannonball
+Ghostly Rampage
+Glacial Blows
+God Spear Debris
+God Spear Debris Ring
+God Spear Explosion Cylinder
+God Spear Model
+Guardian Call
+Guardian Roar
+Guardian's Blessing
+Hand Cannon
+Ice Barrage Ball
+Ice Crash
+Ice Needles
+Ice Nova
+Ice Spikes
+Ice Totem
+Icicle Barrage
+Icicle Barrage Icicle
+Illusion Blast
+Infernal Blast Cylinder
+Infernal Orbs
+Infernal Strike
+Inner Focus Particle Holder
+Inner Rage Particle Holder
+Jade Rain Circle
+Jade Rain Crystal
+Jade Roller
+Lava Barrage Ball
+Lava Barrage Ring
+Lava Barrage Slash
+Lava Beam
+Lava Beam Explosion Cylinder
+Lava Cage
+Lava Lash
+Life Pulse
+Life Pulse Ring
+Lightning Beam
+Lightning Burst
+Lightning Burst Part
+Mighty Leap Slam Circle
+Molten Ball
+Molten Shard
+Mystery Matter
+Orb Of Destruction
+Orb Of Destruction Holder
+Overcharge
+Overcharged Effects
+Phantom Blades
+Phantom Flames
+Phantom Striker
+Phantom Striker Ball
+Phantom Striker Spawn Explosion
+Phase Ball
+Phase Ring
+Piercing Rain
+Piercing Roots
+Poison Cloud
+Pulse Beam
+Pulsefire
+Pulsefire Explosion
+Rejuvenating Spray
+Rending Slice
+Runic Strike
+Searing Beam
+Skull Flames
+Small Molten Ball
+Smite Beam
+Smite Ring
+Solar Beam
+Soul Drain
+Soul Drain Particles
+Spear Strike
+Spear Strike Ring
+Spirit Bomb
+Spirit Bomb Shockwave
+Star Barrage
+Taunting Aura
+Thunderous Blast
+Triple Blade Throw
+Tsunami
+Twin Slash
+Universal Heal
+Void Beam
+Void Sphere
+Vortex
+Vortex Grenade
+Vortex Grenade Explosion
+Whirlwind
+Wind Blast
+amethystBlastHitbox
+arrowBarrageHitbox
+berserkHitbox
+bladeRevolverHitbox
+bladeStormHitbox
+bladeThrowHitbox
+bleed
+blueFireball
+burn
+chainedEnergyBlastsHitbox
+chromaticRainHitbox
+concussiveBlastExplosion
+concussiveBlastRing
+concussiveBlastTrail
+crystalineCannonHitbox
+demonSpikeOne
+demonSpikeThree
+demonSpikeTwo
+demonicSpikesHitbox
+demonicStrikeHitbox
+earthClapHitbox
+earthKickHitbox
+earthSpikesHitbox
+electricBoomHitbox
+electricFieldHitbox
+enchantedShurikenHitbox
+energyOrbHitbox
+explorerGemExplosion
+explosivePunchHitbox
+fireball
+firebombHitbox
+flameCycloneHitbox
+focusBeamHitbox
+forgottenArmyHitbox
+fungalPoisonHitbox
+galeSliceHitbox
+genericAttachPart
+genericNeonBall
+ghostlyRampageHitbox
+groundAura
+groundSlam
+guardianBlessingball
+guardianRoarHitbox
+handCannonHitbox
+holyBarrier
+holyCircle
+iceCrashHitbox
+iceNovaHitbox
+iceSpikesHitbox
+iceTotemHitbox
+icicleBarrageHitbox
+illusionBlastHitbox
+infernalBlastHitbox
+infernalOrbHitbox
+infernalStrikeHitbox
+innervate
+lavaBarrageHitbox
+lavaCageHitbox
+lavaLashHitbox
+lightningBurstHitbox
+lightningStrike
+mightyLeapHitbox
+moltenShardsHitbox
+phantomBladesHitbox
+phantomStrikerBallHitbox
+phantomStrikerHitbox
+phase Ring
+phaseBeamModel
+piercingRootsHitbox
+pulseBeamHitbox
+pulseWavesHitbox
+pulseWavesWave
+redemption
+rendingSliceHitbox
+revitalize
+runicStrikeHitbox
+skullFlamesHitbox
+smiteHitbox
+sounds
+spearStrikeHitbox
+starfallStar
+taunt
+thunderousBlastHitbox
+tripleBladeThrowHitbox
+tsunamiHitbox
+voidSphereHitbox
+voidSphereSpawn
+vortexHitbox
