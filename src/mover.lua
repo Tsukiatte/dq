@@ -111,14 +111,22 @@ local function driveTo(humanoid, root, target, arrive)
     if not RT.moverProgressAt or not RT.moverProgressPos
         or (root.Position - RT.moverProgressPos).Magnitude > 1.5 then
         RT.moverProgressPos, RT.moverProgressAt = root.Position, now
-    elseif CFG.moveMode ~= "walk" and now - RT.moverProgressAt > 1.0 then
+    elseif CFG.moveMode ~= "walk" and now - RT.moverProgressAt > 1.0
+        and not (RT.moverFallbackUntil and now < RT.moverFallbackUntil) then
+        -- Borrow walk for a few seconds, then go back to the chosen mode. This
+        -- used to REWRITE the setting: one second against a wall - a cornered
+        -- character is against a wall - and the tween the user picked was
+        -- silently walk for the rest of the session.
         heavyDebug("Mover", "'" .. tostring(CFG.moveMode)
-            .. "' produced no movement for a second; falling back to walk.")
-        CFG.moveMode = "walk"
+            .. "' produced no movement for a second; walking for the next three.")
+        RT.moverFallbackUntil = now + 3.0
         RT.moverProgressAt = now
     end
 
     local mode = CFG.moveMode
+    if RT.moverFallbackUntil then
+        if now < RT.moverFallbackUntil then mode = "walk" else RT.moverFallbackUntil = nil end
+    end
     local direction = flat.Unit
     local speed = humanoid.WalkSpeed
 

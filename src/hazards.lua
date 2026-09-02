@@ -1835,13 +1835,21 @@ local function recordHit(damage)
     HZ.lastHitAt = now
     HZ.lastHitName = culprit and culprit.part.Name or (ranked[1] and ranked[1].part.Name) or "nothing nearby"
 
-    -- Anything known that was ON us and still reading as a telegraph was not
-    -- one: it is live from spawn from now on. Late-bound; defined further down.
+    -- The NEAREST known attack, if it was still reading as a telegraph and
+    -- nothing already live was in range to explain the hit, was not a
+    -- telegraph. Only that one: blaming everything within six studs
+    -- condemned whole lattices at once. Late-bound; defined further down.
     if S.noteTelegraphHit then
+        local nearestKnown, liveNearby = nil, false
         for i = 1, math.min(#ranked, 8) do
             local r = ranked[i]
-            if r.known and r.distance <= 6 then S.noteTelegraphHit(r.part) end
+            if r.known and r.distance <= 6 then
+                local st = HZ.armState[r.part]
+                if st and st.armedAt and not st.doneAt then liveNearby = true end
+                if not nearestKnown then nearestKnown = r end
+            end
         end
+        if nearestKnown and not liveNearby then S.noteTelegraphHit(nearestKnown.part) end
     end
 
     for _, l in ipairs(lines) do HZ.hitLog[#HZ.hitLog + 1] = l end
@@ -2408,6 +2416,33 @@ end
 -- A Model with no precast, or one that arms sooner than armMinDelay, is
 -- live from the start and never treated as a telegraph.
 -- =========================================================================
+-- Anchor parts and the damage volume itself are never "visuals": they are
+-- invisible by construction and say nothing about whether the attack is over.
+local ANCHOR_NAMES = { primarypart = true, hitbox = true, precasthitbox = true }
+
+local function collectVisuals(model, into)
+    for _, d in ipairs(model:GetDescendants()) do
+        if d:IsA("BasePart") and not ANCHOR_NAMES[string.lower(d.Name)] then
+            into[#into + 1] = d
+        end
+    end
+end
+
+-- Least transparent of the attack's visible parts, and whether any are left.
+local function visualMin(st)
+    local m, any = math.huge, false
+    local vis = st.visuals
+    for i = 1, #vis do
+        local p = vis[i]
+        if p.Parent then
+            any = true
+            local tr = p.Transparency
+            if tr < m then m = tr end
+        end
+    end
+    return m, any
+end
+
 local function updateArming(now)
     for _, part in ipairs(HZ.detected) do
         local st = nil
@@ -2417,9 +2452,22 @@ local function updateArming(now)
             if model and not st then
                 local name = string.lower(model.Name)
                 local pc = model:FindFirstChild("precast")
+                local hb = model:FindFirstChild("hitBox") or model:FindFirstChild("hitbox")
                 local spawn = HZ.seenAt[part] or HZ.spawnTimes[part] or now
-                st = { name = name, spawn = spawn, precast = pc or false, minT = math.huge,
-                       armedAt = nil, impactAt = nil, seen = now }
+                st = { name = name, spawn = spawn, precast = pc or false, hitBox = hb or false,
+                       visuals = {}, minT = math.huge, visMinEver = math.huge,
+                       armedAt = nil, impactAt = nil, seen = now, visualsAt = now }
+                collectVisuals(model, st.visuals)
+                -- An attack split across sibling Models (crossShuriken/hitBoxes
+                -- beside crossShuriken/precasts) has nothing visible in the
+                -- half that hurts. Watch the parent's visuals for it.
+                if #st.visuals == 0 and model.Parent and model.Parent:IsA("Model") then
+                    collectVisuals(model.Parent, st.visuals)
+                    if not pc then
+                        pc = model.Parent:FindFirstChild("precast", true)
+                        st.precast = pc or false
+                    end
+                end
                 local delay = RT.armDelays[name]
                 if not pc or delay == 0 then
                     -- No precast, or one that has hit us while announced
@@ -2432,11 +2480,29 @@ local function updateArming(now)
             end
             if st then
                 st.seen = now
+                -- Visuals can arrive after the Model does; look again now and then.
+                if #st.visuals == 0 and now - st.visualsAt > 0.5 then
+                    st.visualsAt = now
+                    collectVisuals(model, st.visuals)
+                end
+
+                -- The precast's darkest, tracked ALWAYS. It used to be tracked
+                -- only while pending, so an attack that armed the moment it
+                -- appeared - anything learned as live-from-spawn, which a
+                -- pulsing precast causes - never had a minimum to compare its
+                -- fade against, never counted as over, and stood as an
+                -- invisible wall until the game deleted it seconds later.
+                local pc = st.precast
+                local tr = nil
+                if pc and pc.Parent then
+                    tr = pc.Transparency
+                    if tr < st.minT then st.minT = tr end
+                end
+                local vm, anyVisual = visualMin(st)
+                if vm < st.visMinEver then st.visMinEver = vm end
+
                 if not st.armedAt then
-                    local pc = st.precast
                     if pc and pc.Parent then
-                        local tr = pc.Transparency
-                        if tr < st.minT then st.minT = tr end
                         if tr >= 0.97 and st.minT >= 0.97 then
                             -- Never been visible. Some precasts rest at 1 and
                             -- are faded IN by the server when the attack is
@@ -2466,42 +2532,59 @@ local function updateArming(now)
                 elseif st.byInvisible then
                     -- Armed only because it had never shown. Now it shows:
                     -- the telegraph has begun.
-                    local pc = st.precast
-                    if pc and pc.Parent and pc.Transparency < 0.9 then
+                    if pc and pc.Parent and tr and tr < 0.9 then
                         st.byInvisible = nil
                         st.armedAt = nil
-                        st.minT = pc.Transparency
+                        st.minT = tr
                         local delay = RT.armDelays[st.name]
                         if delay and delay > 0 then st.impactAt = st.spawn + delay end
                     end
-                elseif not st.doneAt then
-                    -- Armed, and now played out: a precast that was visible
-                    -- and has faded all the way is an attack that has
-                    -- happened. The strips of a beam pattern stayed red for
-                    -- seconds after the beams had fired, and the dodge kept
-                    -- weaving between attacks that were over. A short linger
-                    -- covers a hitBox that outlives its precast by a moment.
-                    local pc = st.precast
-                    if pc and st.minT < 0.9 then
-                        if not pc.Parent or pc.Transparency >= 0.97 then
-                            st.fadedAt = st.fadedAt or now
-                            if now - st.fadedAt >= CFG.armDoneLinger then st.doneAt = now end
-                        else
-                            st.fadedAt = nil
-                        end
+                end
+
+                -- Over? Two signals, either is enough. The hitBox - the part
+                -- that hurts - has been removed while the rest of the Model
+                -- lingers for its effects. Or everything visible about the
+                -- attack has faded to transparent or been removed, after
+                -- having been visible: that is what "the attack finished"
+                -- looks like in this game for almost every attack, and it no
+                -- longer depends on how, or whether, the attack armed.
+                if not st.doneAt then
+                    if st.hitBox and not st.hitBox.Parent then
+                        st.doneAt = now
+                    elseif st.visMinEver < 0.9 and (not anyVisual or vm >= 0.97) then
+                        st.fadedAt = st.fadedAt or now
+                        if now - st.fadedAt >= CFG.armDoneLinger then st.doneAt = now end
+                    else
+                        st.fadedAt = nil
                     end
                 end
             end
         end
         HZ.armState[part] = st
     end
-    -- Played-out attacks leave the detected set entirely: no danger, no
-    -- highlight, not in the count.
+    -- What leaves the detected set: played-out attacks entirely, anchor parts
+    -- always (a 4x1x2 PrimaryPart at the centre of every attack is not a
+    -- hazard, and it was a five-stud hot spot), and decoration inside a Model
+    -- that has a hitBox - the ball's core, a cog's teeth - because the hitBox
+    -- IS the damage there and the precast its footprint.
     local kept, n = HZ.detected, 0
     for i = 1, #kept do
         local part = kept[i]
         local st = HZ.armState[part]
-        if not (st and st.doneAt) then
+        local drop = false
+        if st then
+            if st.doneAt then
+                drop = true
+            else
+                local lname = string.lower(part.Name)
+                if lname == "primarypart" then
+                    drop = true
+                elseif st.hitBox and part ~= st.hitBox and lname ~= "precast" and lname ~= "precasthitbox" then
+                    drop = true
+                end
+            end
+        end
+        if not drop then
             n = n + 1
             kept[n] = part
         end
@@ -2516,10 +2599,19 @@ local function noteTelegraphHit(part)
     local st = part and HZ.armState[part]
     if st and not st.armedAt then
         st.armedAt = os.clock()
-        -- Saved as 0, so it stays live-from-spawn across sessions rather
-        -- than being re-learned from its fade next time.
-        RT.armDelays[st.name] = 0
-        heavyDebug("Attacks", string.format("'%s' hit while announced; it is live from spawn from now on.", st.name))
+        -- First strike: forget the learned delay and learn it again from the
+        -- next fade. Second strike: saved as 0, live from spawn for good.
+        -- Pinning on the first hit was too eager - in a lattice of beams
+        -- one hit condemned every telegraph near it, and soon nothing was
+        -- ever floor.
+        RT.armStrikes[st.name] = (RT.armStrikes[st.name] or 0) + 1
+        if RT.armStrikes[st.name] >= 2 then
+            RT.armDelays[st.name] = 0
+            heavyDebug("Attacks", string.format("'%s' hit while announced twice; it is live from spawn from now on.", st.name))
+        else
+            RT.armDelays[st.name] = nil
+            heavyDebug("Attacks", string.format("'%s' hit while announced; its timing will be learned again.", st.name))
+        end
     end
 end
 
