@@ -273,6 +273,7 @@ local function buildConfigTable()
         attacksByMap = RT.attackData,
         armDelays = RT.armDelays,
         armSpans = RT.armSpans,
+        armLongLived = RT.armLongLived,
         zonesByMap = RT.zoneData,
     }
 end
@@ -504,6 +505,12 @@ local function applyConfigData(data)
     end
     for name, delay in pairs(S.DEFAULT_ARM_DELAYS or {}) do
         if RT.armDelays[name] == nil then RT.armDelays[name] = delay end
+    end
+    table.clear(RT.armLongLived)
+    if trustLearned and type(data.armLongLived) == "table" then
+        for name, v in pairs(data.armLongLived) do
+            if type(name) == "string" and v == true then RT.armLongLived[name] = true end
+        end
     end
     table.clear(RT.armSpans)
     if type(data.armSpans) == "table" then

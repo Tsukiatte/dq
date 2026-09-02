@@ -2773,7 +2773,9 @@ local function updateArming(now)
                     local doneBy = nil
                     if st.hitBox and not st.hitBox.Parent then
                         doneBy = "hitBox gone"
-                    elseif st.onMax > 0 and on == 0 and not soundOn then
+                    elseif st.onMax > 0 and on == 0 and not soundOn and not RT.armLongLived[st.name] then
+                        -- Faded, and this attack is not one that has hit us
+                        -- after fading before.
                         st.fadedAt = st.fadedAt or now
                         if now - st.fadedAt >= CFG.armDoneLinger then doneBy = "faded" end
                     else
@@ -2870,6 +2872,16 @@ local function noteAttackHit(part)
     st.byInvisible = nil
     st.dormant = nil
     st.hit = true
+    -- Hit after its fade had marked it over: this attack keeps hurting after
+    -- its warning is gone (the passive beams burn for four seconds after the
+    -- precast fades). From now on only its learned window, a removed hitBox
+    -- or the Model going away ends it.
+    if st.doneAt or (st.fadedAt and now - st.fadedAt > 0.2) then
+        if not RT.armLongLived[st.name] then
+            RT.armLongLived[st.name] = true
+            heavyDebug("Attacks", string.format("'%s' hit after fading; its fade no longer ends it.", st.name))
+        end
+    end
     st.liveUntil = math.max(st.liveUntil or 0, st.spawn + span.last + CFG.armAssumedLinger)
     st.doneAt = nil
     st.fadedAt = nil
