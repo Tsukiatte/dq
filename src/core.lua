@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 4.8.0
+    VERSION : 4.9.0
     BUILD   : 2026-09-02
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "4.8.0"
+local SCRIPT_VERSION = "4.9.0"
 local SCRIPT_BUILD_DATE = "2026-09-02"
-local SCRIPT_CODENAME = "Gone means gone"
+local SCRIPT_CODENAME = "Learn from the hit"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "4.9.0", date = "2026-09-02", notes = "Learn from the hit. The capture from Northern Lands settled it: for every mage shot, line strike and passive beam the precast part sat at Transparency 1 for its entire seven-second life, the hitBox stayed until the game deleted the Model, and nothing the tracker watched ever changed - so every one of them was a seven-second wall regardless of when it actually fired. Two answers. The tracker now watches every channel an attack can show through - part, Decal and Texture transparency, ParticleEmitter, Beam, Trail, Gui and Highlight enabled, Sounds playing, parts arriving, the hitBox changing - and writes each attack's own timeline into the capture file. And being hit, the one signal that is never ambiguous, teaches the attack its window: the first and last age at which it has hurt us, saved by name, so from the next cast on it is floor until the lead, danger through the window, and floor again after. A hit is blamed on the nearest known attack by its nearest point rather than its centre, so a 274-stud beam whose edge is on us gets the blame. Two other things from the same run: a part named after the player under workspace.stunParts - a stun marker riding on the character - had been learned as an attack, a hazard that followed the character everywhere; and in the Enchanted Forest the appearance scorer was highlighting crystals and glows by the dozen for a minute at a time, which was itself a frame cost. Decoration names never pass the scorer now, and anything flagged on looks alone that is still there after twelve seconds is scenery for good." },
     { version = "4.8.0", date = "2026-09-02", notes = "Gone means gone. Attacks stayed red for four or five seconds after they had visibly finished - the hammer bots' most of all, and most of the Steampunk boss's - and the character guided itself along them like invisible walls. Three bugs and two gaps in the arming code. The precast's darkest transparency was tracked only while the attack was pending, so anything that armed the moment it appeared - live-from-spawn attacks, which a pulsing precast produces - never had a minimum to compare its fade against, never counted as over, and stood until the game deleted it. Expiry now tracks every visible part from the first frame and follows the game's own rule: an attack is over when everything visible about it has faded to transparent or been removed, or when its hitBox - the part that hurts - is gone while the rest lingers for effects. Attacks split across sibling Models borrow the parent's visuals. Anchor parts and decoration inside a hitBox Model are not hazards at all: the four-stud PrimaryPart at the centre of every attack was a hot spot. Stairs: every forward probe now runs through the step-versus-wall classifier the direct steerer already had, so a riser under 2.4 studs is stepped onto rather than steered around - the shin-height probe added for the pillar plinth had been reading every stair riser as a wall and walking the character diagonally up each flight. And two things found reading: the mover's watchdog permanently rewrote the Movement setting to walk after one second against anything, which a cornered character always is - it borrows walk for three seconds now; and the wall-stall sidestep could fire on the first tick of a new path from an anchor left over from the last one." },
     { version = "4.7.0", date = "2026-09-02", notes = "Steampunk knows too. The Northern Lands module is now the boss-events module: one listener per map remote, hooking every one it finds - northernBossSpecficEvents, steampunkBossSpecficEvents and the shared mapSpecificEvent so far - with a handler table per map. Read from the Steampunk Sewers client handler and the Evil Scientist's models live in Studio: Drop Cogs tweens every cog part a hundred studs straight down over three quarters of a second, so each landing footprint becomes a cube zone with the exact time; Back Flames lights its flame jets half a second after the event for a second, so each jet is a zone with the exact window. The rest of the kit - the six-beam pulse wave that is the lattice from the video, the five concentric outward blasts, the punch circle, the zig-zag, the orb shot, the cannon and horizontal beams, the ball - are server-spawned Models and arm through their precasts. Two of those are seeded so the first cast is time-aware without being learned: the pulse-wave beams fire 4.8 seconds after their strips appear, seeded at 4.5; the ball is live from the start." },
     { version = "4.6.0", date = "2026-09-02", notes = "Northern Lands knows. Read from the game's own client handler for northernBossSpecficEvents and from the attack models live in Studio: every timed attack of the three bosses and the bonus boss is sent to the client before it happens with the numbers the client animates it with, and those numbers are the attack. The script now hooks that remote and reads the game's own synced clock. Rolling projectiles - the criss cross, the seeking spike, the big spike, the moving beam, the sideways missile - become scripted paths: the dodge asks where each one WILL be at the moment it would be somewhere, from start, distance and duration, instead of extrapolating a mesh from two frames of motion. Ground spikes become circles with exact impact times and the spike's real radius. Orb beam pillars are zones held open for their six seconds. The bonus boss's tall swirly registers the arena explosion at its exact time and turns the matching colour spots into a timed safe window - outside them is the danger, but only around the explosion. The flame marker that follows a player is never a hazard itself; the flame lands where it stops. Spearman and warrior line strikes are cubes. Precasts that rest fully invisible and are faded in by the server - the lattice of secondBossLines, the sweeping flames - are live until they show and a telegraph from then, instead of live forever. The full model table is in game/attack_models.txt." },
@@ -474,6 +475,14 @@ CFG.armFadeStep = 0.08
 CFG.armMinDelay = 0.3
 -- Seconds after a precast has fully faded before the attack counts as over.
 CFG.armDoneLinger = 0.3
+-- Seconds past the last learned hit age before an attack counts as over.
+CFG.armAssumedLinger = 1.0
+-- A hit is blamed on the nearest known attack within this many studs of us
+-- (to its nearest point, not its centre).
+CFG.hitAttributeRadius = 6
+-- Something flagged on looks alone that is still there after this long is
+-- scenery, not an attack.
+CFG.appearanceMaxAge = 12
 -- Boss event remotes (4.6.0 Northern Lands, 4.7.0 every map). See bossevents.lua.
 CFG.useBossEvents = true
 CFG.bossSafeLead = 2.5      -- seconds before the swirly explodes that the colour spot becomes the only safe ground
@@ -687,6 +696,7 @@ HZ.groundTruth = setmetatable({}, { __mode = "k" })
 HZ.arming = setmetatable({}, { __mode = "k" })
 HZ.armState = setmetatable({}, { __mode = "k" })   -- [part] = its Model's arming record
 HZ.lifeLog = {}                  -- one line per attack Model's lifecycle, for the capture file
+HZ.scenery = setmetatable({}, { __mode = "k" })   -- appearance-only detections that outlived appearanceMaxAge
 -- What was next to you each time you took damage. Newest last, capped.
 HZ.hitLog = {}
 HZ.lastHitAt = -math.huge
@@ -839,7 +849,9 @@ RT.attackData = {}
 -- How long after it appears each attack (by Model name) arms, learned from
 -- watching its precast fade. Saved with the config; the earliest seen wins.
 RT.armDelays = {}
-RT.armStrikes = {}   -- hits taken while an attack read as a telegraph, by Model name (this session)
+-- Learned from being hit, by Model name: { first, last } = the earliest and
+-- latest age after appearing at which the attack has hurt us. Saved.
+RT.armSpans = {}
 RT.zoneData = {}
 RT.rejectData = nil
 

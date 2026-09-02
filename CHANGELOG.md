@@ -11,6 +11,42 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.9.0 - 2026-09-02 - "Learn from the hit"
+
+### What the capture said
+For every `northernMageShot`, `spearmanStrikeHitbox`, `northernWarriorLineStrike`
+and `firstBossPassiveBeam`: precast Transparency **1.00 for its entire 7.0 s
+life**, hitBox present until the Model was deleted, nothing the tracker
+watched ever changed. So every one of them was a seven-second wall, whenever
+it actually fired.
+
+### Every channel, and a timeline
+The tracker watches every way an attack can show itself: part, Decal and
+Texture transparency; ParticleEmitter, Beam, Trail, Gui and Highlight
+`Enabled`; Sounds playing; parts arriving after spawn; the hitBox changing
+(CanTouch, CanQuery, size, transparency). Each attack's own timeline
+(`0.0:channels 0>1 1.4:sound 1.4:armed:sound 2.1:done:faded …`) is written to
+the ATTACK LIFECYCLES section of the capture file.
+
+### Learn from the hit
+Being hit is the one unambiguous signal. The nearest known attack (by its
+**nearest point**, not its centre, so a 274-stud beam gets the blame) learns
+its **window**: first and last age at which it has hurt us (`RT.armSpans`,
+saved). From the next cast on it is floor until the lead, danger through the
+window, and floor again `armAssumedLinger` (1.0 s) after - unless it is still
+visibly on. The one that just hit is never "over". This replaces the
+strike-and-pin rule.
+
+### Also from this run
+- A part named after **you** under `workspace.stunParts` (a stun marker riding
+  on the character) had been learned as an attack. Status markers are never
+  hazards, are never learned, and are purged from an old save on load.
+- Enchanted Forest: `Crystal 52.9s`, `Glow 53.0s` - the appearance scorer
+  highlighting decoration by the dozen for a minute, which was itself a frame
+  cost. Decoration names never pass the scorer, and anything flagged on looks
+  alone that is still there after `appearanceMaxAge` (12 s) is scenery for
+  good.
+
 ## 4.8.0 - 2026-09-02 - "Gone means gone"
 
 ### Attacks that stayed red after they finished
