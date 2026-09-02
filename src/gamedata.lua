@@ -319,6 +319,14 @@ local function isKnownEnemyAttack(part) return matchesGameName(part, ENEMY_ATTAC
 local function isKnownOwnEffect(part) return matchesGameName(part, OWN_EFFECTS) end
 local function isSafeZoneMarker(part) return matchesGameName(part, SAFE_MARKERS) end
 
+-- Names too generic to identify anything. A MeshPart called MeshPart, an
+-- ice part called Ice, a wave, a ball: the dump has attacks built from parts
+-- with these names, and matching the map by them made scenery into hazards.
+-- Structure (hitBox/precast under a Model) still catches the attacks.
+for _, generic in ipairs({ "meshpart", "part", "model", "union", "unionoperation", "ball", "wave", "ice",
+    "hitbox", "precast", "primarypart", "attachment", "glow", "effect", "beam" }) do
+    ENEMY_ATTACKS[generic] = nil
+end
 S.ENEMY_ATTACKS = ENEMY_ATTACKS
 S.OWN_EFFECTS = OWN_EFFECTS
 S.SAFE_MARKERS = SAFE_MARKERS

@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 4.9.3
+    VERSION : 4.9.4
     BUILD   : 2026-09-02
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "4.9.3"
+local SCRIPT_VERSION = "4.9.4"
 local SCRIPT_BUILD_DATE = "2026-09-02"
 local SCRIPT_CODENAME = "Learn from the hit"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "4.9.4", date = "2026-09-02", notes = "From the Studio harness, three things the real Northern Lands fight also has. The 217-stud invisible cube around the boss arena was being learned as an attack after a hit - the age guard used the index timestamp, and parts present before the script started never get one - which put the whole fight inside danger; nothing arena-sized is an attack now, and a part with no timestamp counts as old. The 14 passive-beam Models parked at the arena centre, never shown and never moved, read as live for the whole fight - a permanent wall through the middle; a ground-truth Model that has shown nothing, not moved and not hit us for ten seconds is dormant, and moving, showing, a hitBox change or a hit wakes it as a fresh spawn. And the enemy attack name table held generic names - meshpart, ball, wave, ice - that matched map geometry; they are gone, and structure still catches the attacks." },
     { version = "4.9.3", date = "2026-09-02", notes = "Blame, from the Studio harness: a hit was credited to the nearest known attack, and a beam that appeared a fifth of a second ago through where we stand is nearer than the one that has been burning us for a second. That taught every beam to be live from 0.2 seconds and made the whole arena walls. Attribution now scores candidates - the part encloses us, it is old enough to have fired, it is armed and not over, its learned window covers this moment - and the capture line says who was blamed and why." },
     { version = "4.9.2", date = "2026-09-02", notes = "Found in the Studio test harness on the first run: the highlight renderer keyed its adornments with the debug-id API, which needs plugin permissions there and threw every tick - after the scan had built its volumes and before the dodge decided, so the dodge never ran once and the character stood in beams reporting no danger. Parts are keyed with a weak-table counter now, and the highlight and telegraph-feed renderers are walled off in pcall: nothing cosmetic can take the dodge down again." },
     { version = "4.9.1", date = "2026-09-02", notes = "The capture from the second Northern Lands run found the number that killed it: every mage shot and line strike carried a saved arm delay of about seven seconds, learned by 4.5.1 from the Model being deleted at 7.0s as if that were the precast fading, so each one was floor for its first 5.7 seconds. Learned timing and auto-learned names from saves written before 4.9.1 are discarded on load; hand picks and the attack book are kept. The same capture showed what a mage shot actually is: nothing visible for its first 0.6 to 0.9 seconds, then the precast appears and a second channel switches on at the very moment the hit lands. That is what the hit-window learning from 4.9.0 is for, and with the poisoned seven-second delay gone it can do its job. A part that has stood in the world for twenty seconds is never learned as an attack - a map part called FirstPart was." },
@@ -486,6 +487,9 @@ CFG.hitAttributeRadius = 6
 -- Something flagged on looks alone that is still there after this long is
 -- scenery, not an attack.
 CFG.appearanceMaxAge = 12
+-- A ground-truth attack Model that has shown nothing, not moved and not hit
+-- us for this long is parked (a pool), not attacking.
+CFG.dormantAfter = 10
 -- Boss event remotes (4.6.0 Northern Lands, 4.7.0 every map). See bossevents.lua.
 CFG.useBossEvents = true
 CFG.bossSafeLead = 2.5      -- seconds before the swirly explodes that the colour spot becomes the only safe ground

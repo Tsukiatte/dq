@@ -11,6 +11,23 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.9.4 - 2026-09-02
+
+From the Studio harness, three things the real Northern Lands fight also has:
+
+- **FirstPart**, the 217-stud invisible cube around the boss arena, was learned
+  as an attack after a hit: the 20-second age guard used the index timestamp,
+  and parts present before the script started never get one. Nothing
+  arena-sized (>= 100 x 40 x 100) is an attack now, and no timestamp = old.
+- The **14 passive-beam Models parked at the arena centre** read as live for
+  the whole fight - a permanent wall through the middle. A ground-truth Model
+  that has shown nothing, not moved and not hit us for `dormantAfter` (10 s)
+  is dormant; moving, showing, a hitBox change or a hit wakes it as a fresh
+  spawn (its timers restart from that moment).
+- The enemy attack name table held **generic names** (`meshpart`, `ball`,
+  `wave`, `ice`, ...) that matched map geometry. Removed; structure still
+  catches the attacks.
+
 ## 4.9.3 - 2026-09-02
 
 From the Studio harness: a hit was blamed on the *nearest* known attack, and a
