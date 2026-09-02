@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 2.11.0
+    VERSION : 2.12.0
     BUILD   : 2026-09-01
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "2.11.0"
+local SCRIPT_VERSION = "2.12.0"
 local SCRIPT_BUILD_DATE = "2026-09-01"
-local SCRIPT_CODENAME = "Fieldwork"
+local SCRIPT_CODENAME = "Pinned"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "2.12.0", date = "2026-09-02", notes = "Every window header has a pin beside the info circle. Grey when it is not pinned, accent when it is; a pinned window stays on screen after RightShift closes the rest, and is still draggable. Click it again and it goes back to hiding with everything else. Pins are remembered between sessions. The blur and dim stay tied to the interface rather than to any pinned window - dimming the whole game for one pinned readout would be absurd." },
     { version = "2.11.0", date = "2026-09-02", notes = "New Attacks panel: pick the map, freeze the attacks so a half-second telegraph can be pointed at, select one into the Attack Book, and draw a hazard around a decoration that only ANNOUNCES an attack - press on it, drag outwards, release, and every copy of that decoration carries one from then on. The Attack Book and the drawn zones are now stored PER MAP and survive between executions; a pre-2.11 global book is adopted into the current map. Clone gained a manual mode - the ring dodges for you and nothing else runs. Rings cap at 10 and volumes at 100. Opening the interface blurs and darkens the game behind it, both adjustable. List entries are laid out explicitly now; nested auto-layout had mangled them." },
     { version = "2.10.0", date = "2026-09-02", notes = "Two new panels. Configs saves the whole setup under a name, as many as you like, into its own file: type a name and press the tick, click a row to load it, pencil renames, bin deletes, each showing when it was saved. Modules turns each panel on and off with a square toggle - accent gradient on, greyed out off - and the Modules panel is deliberately not in its own list, because hiding the thing that unhides everything else is a door that locks behind you. Window positions are clamped into the viewport, so a default laid out for a wide screen cannot land off the edge of a small one where it could not be dragged back." },
     { version = "2.9.0", date = "2026-09-02", notes = "Clone evasion, a third mode beside Legacy and Macro. A ring of player-sized volumes follows the character, each one a standing question - would anything be hitting you here? - answered continuously and shown on a pad under it, green safe, red not. When an attack lands on the character the bot steps into the best green one. Projectiles are covered without extra work: safety measures against the swept path of a moving hazard, so a volume in the line of fire goes red before the projectile arrives. Volumes, rings, radius, margin, commit time and both colours are all settings; the ring is rebuilt on a settings change and on respawn, and torn down on a mode switch or Destruct." },
@@ -669,6 +670,10 @@ RT.macroData = {}
 -- the working config stays one small readable thing.
 RT.configs = {}
 RT.blurEffect = nil
+-- Which windows are pinned, by name. Pinned windows stay on screen after the
+-- interface is closed, so a readout you want while playing does not cost you
+-- the whole GUI.
+RT.pinnedWindows = {}
 -- Per-map attack books, and per-map hand-drawn zones. Both are properties of a
 -- dungeon, so they are keyed by map like the waypoints and the macros.
 RT.attackData = {}
