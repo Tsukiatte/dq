@@ -180,7 +180,13 @@ local function buildClones()
     CL.reach = n
     CL.side = 2 * n + 1
 
+    table.clear(CL.activeCells)
+    local limit = n * n
+
     for k = 1, CL.side * CL.side do
+        local zeroed = k - 1
+        local di, dj = zeroed % CL.side - n, floor(zeroed / CL.side) - n
+        local inRange = (di * di + dj * dj) <= limit
         -- A cylinder's length runs along X; laid on its side it is a disc.
         local pad = Instance.new("Part")
         pad.Name = "Disc_" .. k
@@ -212,7 +218,9 @@ local function buildClones()
             prism.Parent = folder
         end
 
+        if inRange then CL.activeCells[#CL.activeCells + 1] = k end
         CL.cells[k] = {
+            inRange = inRange,
             i = 0, j = 0, key = "", x = 0, z = 0, y = nil,
             standable = false, safe = false, holds = false, depth = 0, eta = 0,
             threat = huge, threatLater = huge, wallHeat = 0, blocked = false,
@@ -224,8 +232,8 @@ local function buildClones()
     CL.nodes = CL.cells
     CL.signature = gridSignature()
     heavyDebug("Clone", string.format(
-        "Grid built: %dx%d discs of %.1f studs, %.1f apart, reaching %.0f studs.",
-        CL.side, CL.side, diameter, spacing, n * spacing))
+        "Grid built: %d discs of %.1f studs in a circle %.0f studs across, %.1f apart.",
+        #CL.activeCells, diameter, n * spacing * 2, spacing))
 end
 
 local function setCloneActive(active)
@@ -325,7 +333,7 @@ local function positionCells(root)
             -- The cell is at the same world position it was before; the answer
             -- from a moment ago is a far better guess than nothing.
             local verdict = CL.verdictCache[cell.key]
-            cell.measured = verdict ~= nil
+            cell.measured = cell.inRange and verdict ~= nil
             if verdict then
                 cell.standable = verdict.standable
                 cell.safe = verdict.safe
@@ -402,7 +410,7 @@ local function paintCells()
 
     for _, cell in ipairs(CL.cells) do
         local pad, prism = cell.pad, cell.prism
-        if not visible or not cell.standable then
+        if not visible or not cell.inRange or not cell.standable then
             if pad.Transparency ~= 1 then
                 pad.Transparency = 1
                 cell.drawnColor = nil
@@ -494,14 +502,15 @@ local function evaluateCells(root)
     local getThreatPair = S.getThreatPair
 
     local cells = CL.cells
-    local count = #cells
+    local active = CL.activeCells
+    local count = #active
     local slice = min(max(floor(CFG.cloneEvalBudget), 32), count)
     local cursor = CL.evalCursor
     local rx, rz = rootPos.X, rootPos.Z
 
     for _ = 1, slice do
         if cursor > count then cursor = 1 end
-        local cell = cells[cursor]
+        local cell = cells[active[cursor]]
         cursor = cursor + 1
 
         local y, blocked
@@ -566,7 +575,8 @@ local function evaluateCells(root)
     if CFG.threatWallSpread then
         local n, side = CL.reach, CL.side
         local edgeHeat = CFG.threatWallWeight * 0.35
-        for k = 1, count do
+        for idx = 1, count do
+            local k = active[idx]
             local cell = cells[k]
             if cell.standable then
                 local zeroed = k - 1
@@ -601,7 +611,8 @@ local function evaluateCells(root)
     -- stays honest.
     local safeCount = 0
     for i = 1, count do
-        if cells[i].standable and cells[i].safe then safeCount = safeCount + 1 end
+        local c = cells[active[i]]
+        if c.standable and c.safe then safeCount = safeCount + 1 end
     end
     CL.safeCount = safeCount
     return true
@@ -712,7 +723,8 @@ local function astar(goalK, allowLethal)
             if ni >= -n and ni <= n and nj >= -n and nj <= n then
                 local nk = (nj + n) * side + (ni + n) + 1
                 local other = cells[nk]
-                if other.standable and abs((other.y or 0) - cellY) <= maxClimb then
+                if other.inRange and other.standable
+                    and abs((other.y or 0) - cellY) <= maxClimb then
                     local passable = allowLethal or other.threat < lethal
                     if passable and nb[4] then
                         -- Diagonal: both orthogonal neighbours must be walkable,
