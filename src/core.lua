@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 4.10.0
+    VERSION : 4.10.1
     BUILD   : 2026-09-02
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "4.10.0"
+local SCRIPT_VERSION = "4.10.1"
 local SCRIPT_BUILD_DATE = "2026-09-02"
 local SCRIPT_CODENAME = "Stay out of the hub"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "4.10.1", date = "2026-09-02", notes = "What the harness and the captures taught, written into the script. While a hub's gate is closed the character waits on a twenty-stud ring instead of drifting out to fifty-five, so the dash in and out fits inside a volley gap. Blame for a hit goes only to an attack that encloses us when any does - a mage line five studs away with a matching window was outscoring the beam we stood in. And the Northern Lands timings are seeded: mage shot and strikes arm at 0.85 to 0.9 seconds and are over by 1.2, and the passive beams keep burning after their warning fades - so the first cast of each is already handled, before anything is learned." },
     { version = "4.10.0", date = "2026-09-02", notes = "Stay out of the hub. In the Studio recreation of the Midgardian Champion, every remaining hit came with the dodge reading full danger and holding a safe box eighteen studs away: at melee standoff the character stands where every beam crosses, and two crossing beams cannot be cleared inside their telegraph. Pushed out to sixty studs it took no hits for a minute. So an enemy that long line attacks pass through is a hub. Each new line whose axis passes near an enemy is counted once; the rate over the last ten seconds and the interval between volleys are kept per enemy. Every candidate carries a radial cost - the chance a random line through the hub covers the spot, which falls off as width over the circumference at that distance, times the rate, over the dwell - and the approach to melee is allowed only when there is time to get there and back out before the next volley fires. Enemies that fire no lines are untouched." },
     { version = "4.9.9", date = "2026-09-02", notes = "A parked Model - dormant, or silent for half a minute - never gets the blame for a hit: the pool of fourteen beams at the arena centre kept being credited with hits from live beams passing through it, which woke the pool and stretched every beam's window to the length of the fight. And a learned window is trusted as it stands: the mage shot's line stays drawn for seven seconds after its single hit, and waiting for it to fade kept a dead attack on the field." },
     { version = "4.9.8", date = "2026-09-02", notes = "Candidate lines are sampled every two and a half studs now, up to eight samples, instead of at three fixed fractions. Three samples on an eighteen-stud line sit six studs apart and a mage shot is three studs wide: a line that stepped straight through one scored clean, and in the harness the character walked into shots it had correctly marked live." },
@@ -488,6 +489,7 @@ CFG.dodgeHubWeight = 1.0       -- radial cost scale
 CFG.dodgeHubLineWidth = 8      -- typical beam width, for the coverage estimate
 CFG.dodgeHubExit = 0.8         -- seconds needed to get back out after going in
 CFG.dodgeHubFireGuess = 1.2    -- arming delay assumed for a hub's lines until one is learned
+CFG.dodgeHubStandoff = 20      -- where to wait, off the hub, while the gate is closed
 -- A precast that has brightened back by this much from its darkest is fading:
 -- the attack has fired. Anything that arms sooner than armMinDelay after it
 -- appears is never treated as a telegraph again.

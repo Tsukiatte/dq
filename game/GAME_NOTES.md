@@ -198,3 +198,32 @@ guesswork.
 
 Projectiles fired by enemies are still physical parts, so the existing sweep
 stays useful for those; `precastHitbox` covers the ground-telegraph family.
+
+
+## 5. What the captures and the Studio harness taught (2026-09-02)
+
+Ground truth from two Northern Lands captures, the mid-fight place save, and
+a Studio recreation of the Midgardian Champion room (`tools/studio_install.lua`,
+`tools/studio_bosssim.lua`).
+
+- **Every attack is a Model with an invisible `hitBox` and a `precast`.** The
+  hitBox never changes. The precast is the only observable, and its meaning
+  is per attack: for the mage shot it *appears* at the hit (0.9 s after the
+  Model), for the boss beams it is never visible at all, for most bosses'
+  attacks it fades *at* the hit (client handlers in `mapSpecificLocals`).
+- **Timing must be learned from being hit** (`RT.armSpans`: first and last
+  age the attack hurt), because the visuals do not say. A window makes the
+  attack floor before `first - lead` and floor again after `last + linger`.
+  Attacks that hit after their fade are `armLongLived`: fade does not end them.
+- **`workspace.FirstPart`** is a 217-stud invisible cube around the boss arena.
+  **`workspace.stunParts.<PlayerName>`** is a stun marker riding on a player.
+  **14 `firstBossPassiveBeam` Models are parked at the arena centre** for the
+  whole fight. None of these is an attack; all three were once learned as one.
+- **The boss is a hub**: beams fire through its position two at a time every
+  ~2.5 s, live 1.5-5.5 s, deleted at 7 s. At melee standoff the character
+  stands where they cross and cannot clear two in the telegraph; at 20+
+  studs single beams are trivially dodged. Go in only inside a volley gap.
+- **Blame the attack that encloses you**, never the nearest part: a beam
+  spawned through you a moment ago is nearer than the one burning you.
+- **`StreamingEnabled` is on.** The saved place has no camera controller and
+  loads characters itself.

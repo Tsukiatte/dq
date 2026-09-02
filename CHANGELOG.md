@@ -11,6 +11,17 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.10.1 - 2026-09-02
+
+- While a hub's gate is closed the character waits on a ring
+  (`dodgeHubStandoff`, 20 studs) instead of drifting out to 55, so the dash in
+  and out fits inside a volley gap.
+- Blame for a hit goes only to an attack that encloses us, when any does.
+- Seeds from the Northern Lands captures and the harness (`gamedata.lua`):
+  `northernmageshot` 0.9 s, the strikes 0.85 s, all over by 1.2 s
+  (`DEFAULT_ARM_SPANS`); `firstbosspassivebeam` is long-lived
+  (`DEFAULT_LONG_LIVED`). Applied wherever nothing has been learned.
+
 ## 4.10.0 - 2026-09-02 - "Stay out of the hub"
 
 In the Studio recreation of the Midgardian Champion, every remaining hit came

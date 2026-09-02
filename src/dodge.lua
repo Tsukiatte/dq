@@ -536,7 +536,11 @@ local function decide(root, humanoid)
             local approachTime = max(sqrt(ax * ax + az * az) - preferred, 0) / speed
             local nextFire = hub.lastSpawn + hub.period + (hub.fire or CFG.dodgeHubFireGuess)
             if os.clock() + approachTime + CFG.dodgeHubExit > nextFire then
-                approach = nil
+                -- No time to go in and get out: wait on the hub ring instead
+                -- of wandering off. With nothing pulling inward the radial
+                -- cost alone had the character fifty-five studs out, from
+                -- where the gate could never open in time to matter.
+                preferred = max(preferred, CFG.dodgeHubStandoff)
                 DG.hubHold = true
             else
                 DG.hubHold = false

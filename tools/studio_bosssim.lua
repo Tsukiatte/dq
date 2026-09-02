@@ -120,12 +120,53 @@ if not boss then
     head.CFrame = CFrame.new(CENTRE + Vector3.new(0, 12, 0))
     head.Parent = boss
     local hum = Instance.new("Humanoid")
-    hum.MaxHealth = 1e9
-    hum.Health = 1e9
+    hum.MaxHealth = attr("DQSimBossHP", 3000)
+    hum.Health = hum.MaxHealth
     hum.Parent = boss
     boss.PrimaryPart = root
     boss.Parent = enemies
 end
+
+-- ------------------------------------------------------------ the bot's swings
+-- The harness loader fires this whenever the autofarm would swing at its
+-- target (the real swing needs the executor's input injection). A swing
+-- within reach takes a bite out of the boss; a dead boss comes back after a
+-- few seconds so a run can measure kills per minute.
+local attackRemote = RS:FindFirstChild("DQSimAttack")
+if not attackRemote then
+    attackRemote = Instance.new("RemoteEvent")
+    attackRemote.Name = "DQSimAttack"
+    attackRemote.Parent = RS
+end
+WS:SetAttribute("DQSimBossKills", 0)
+WS:SetAttribute("DQSimSwings", 0)
+local kills, swings = 0, 0
+local bossDown = false
+attackRemote.OnServerEvent:Connect(function(player)
+    local char = player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    local bh = boss and boss:FindFirstChildOfClass("Humanoid")
+    local br = boss and boss:FindFirstChild("HumanoidRootPart")
+    if not (root and bh and br) or bossDown then return end
+    local flat = Vector3.new(root.Position.X - br.Position.X, 0, root.Position.Z - br.Position.Z)
+    if flat.Magnitude <= attr("DQSimReach", 14) then
+        swings = swings + 1
+        WS:SetAttribute("DQSimSwings", swings)
+        bh:TakeDamage(attr("DQSimSwingDamage", 25))
+        WS:SetAttribute("DQSimBossHP", math.floor(bh.Health))
+        if bh.Health <= 0 then
+            bossDown = true
+            kills = kills + 1
+            WS:SetAttribute("DQSimBossKills", kills)
+            log(string.format("BOSS DOWN #%d at t=%.0f after %d swings; hits taken so far %d", kills, WS.DistributedGameTime, swings, hits))
+            task.delay(5, function()
+                bh.Health = bh.MaxHealth
+                bossDown = false
+                log("boss back")
+            end)
+        end
+    end
+end)
 
 -- ------------------------------------------------------------ damage
 local hits = 0
