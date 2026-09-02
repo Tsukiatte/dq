@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 3.2.3
+    VERSION : 3.2.4
     BUILD   : 2026-09-01
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "3.2.3"
+local SCRIPT_VERSION = "3.2.4"
 local SCRIPT_BUILD_DATE = "2026-09-01"
 local SCRIPT_CODENAME = "Thrift"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "3.2.4", date = "2026-09-02", notes = "The drifting yellow circles were the wall-edge pass treating cells the slicing had not reached yet as if they were walls. Since 3.2.0 only a slice of the grid is measured per pass, so after every window shift most cells are simply unknown - and each freshly measured cell next to one was being given edge heat of 21, which is 38 percent of lethal and lands exactly in the yellow band. It now only counts neighbours that have actually been measured and found impassable. Separately, heights were compared against the root part centre rather than the floor underfoot, and the root sits about three studs up: Step height 2.5 really described a rise of five and a half, so the slider said one thing and the grid did another. It measures from the floor now." },
     { version = "3.2.3", date = "2026-09-02", notes = "The basic attack no longer needs the mouse. The weapon is a Tool whose Activated event the server handles, and Tool:Activate() raises that same event straight from the client - no cursor involved, so there is nothing to press by accident and nothing to fight the player over. Auto uses it whenever a weapon is equipped and falls back to a click otherwise; Tool only never touches the mouse at all. And when a click IS used it goes to the middle of the viewport rather than wherever the cursor happens to be resting, which is what made the bot press buttons. Allow auto-clicking is the off switch." },
     { version = "3.2.2", date = "2026-09-02", notes = "Terrain is a threat now, not just a floor check. The grid only ever asked whether a cell had a floor within reach, which says nothing about whether you can get there: a wall has a floor, and so does a ledge you would have to jump onto. Both read as open ground and the bot found out by walking into them. Cells are probed upward through the space the character would occupy, so anything solid standing there is out; a rise above Step height is reachable but charged Wall threat in proportion, because a jump mid-fight is a moment spent not dodging. Ground beside anything impassable is warmed too, so the cheapest route stops hugging walls, which is where you get cornered. Wall threat, Step height and the edge warming are all adjustable." },
     { version = "3.2.1", date = "2026-09-02", notes = "Projectiles were using the ground-attack urgency ramp, which got the timing wrong in both directions: a corridor a shot reached in two seconds read as 12 out of 100 so the bot strolled into it, and the ground BEHIND a projectile stayed at 100, so it fled the safest place on the map. A projectile is dangerous in a WINDOW around the moment it passes, not on a ramp. The core of that window is geometric - the projectile width plus yours, over its speed - so a fast shot is lethal for a fraction of a second while a wide slow tornado owns the ground for seconds either side, from one formula. Around it sit a generous lead, because being early is how you get hit, and a short wake, because gone is gone. Also added a Recommended settings button that resets the whole Clone section to the tuning arrived at so far." },

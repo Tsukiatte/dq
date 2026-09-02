@@ -216,7 +216,7 @@ local function buildClones()
             i = 0, j = 0, key = "", x = 0, z = 0, y = nil,
             standable = false, safe = false, holds = false, depth = 0, eta = 0,
             threat = huge, threatLater = huge, wallHeat = 0, blocked = false,
-            baseThreat = huge, baseThreatLater = huge,
+            baseThreat = huge, baseThreatLater = huge, measured = false,
             onPath = false, isGoal = false,
             pad = pad, prism = prism, halfHeight = totalHeight * 0.5,
         }
@@ -325,6 +325,7 @@ local function positionCells(root)
             -- The cell is at the same world position it was before; the answer
             -- from a moment ago is a far better guess than nothing.
             local verdict = CL.verdictCache[cell.key]
+            cell.measured = verdict ~= nil
             if verdict then
                 cell.standable = verdict.standable
                 cell.safe = verdict.safe
@@ -477,6 +478,17 @@ local function evaluateCells(root)
 
     local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
     local speed = max((humanoid and humanoid.WalkSpeed) or 16, 4)
+
+    -- Heights are compared against the floor the character is STANDING on, not
+    -- the root part's centre, which sits about three studs above it. Measuring
+    -- from the root meant "step height 2.5" actually described a rise of five
+    -- and a half, so the slider said one thing and the grid did another.
+    local baseY = rootY
+    do
+        local hit = Workspace:Raycast(rootPos, Vector3.new(0, -12, 0), params)
+        if hit then baseY = hit.Position.Y end
+    end
+
     local dwell = CFG.cloneSafeDwell
     local lethal = CFG.threatLethal
     local getThreatPair = S.getThreatPair
@@ -495,11 +507,12 @@ local function evaluateCells(root)
         local y, blocked
         y, blocked, budget = probeCell(cell, rootY, params, budget)
         cell.y = y
-        local rise = type(y) == "number" and (y - rootY) or nil
+        local rise = type(y) == "number" and (y - baseY) or nil
         local standable = rise ~= nil
             and rise < CFG.cloneMaxClimb and rise > -CFG.cloneMaxDrop
             and not blocked
         cell.standable = standable
+        cell.measured = true
 
         -- Ground you cannot simply walk onto is a threat, not a wall. A ledge
         -- within jump range is reachable, just expensive: a jump mid-fight is a
@@ -563,7 +576,15 @@ local function evaluateCells(root)
                     local ni, nj = di + nb[1], dj + nb[2]
                     if ni >= -n and ni <= n and nj >= -n and nj <= n then
                         local other = cells[(nj + n) * side + (ni + n) + 1]
-                        if not other.standable then touching = true break end
+                        -- MEASURED and unstandable. A cell the slicing has not
+                        -- reached yet is unknown, not a wall - treating the two
+                        -- the same put a ring of edge heat around the frontier
+                        -- of every pass, which is where the drifting yellow
+                        -- circles came from.
+                        if other.measured and not other.standable then
+                            touching = true
+                            break
+                        end
                     end
                 end
                 -- Assigned, never accumulated.

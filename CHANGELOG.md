@@ -11,6 +11,39 @@ file and that table in sync on every edit.
 
 ---
 
+## 3.2.4 - 2026-09-02
+
+### The drifting yellow circles
+The wall-edge pass was treating **"not measured yet"** as **"wall"**:
+
+```lua
+if not other.standable then touching = true end
+```
+
+Since 3.2.0 only a *slice* of the grid is measured each pass, so after every
+window shift most cells are simply unknown — and every freshly measured cell
+sitting next to one was given edge heat of **21, which is 38% of lethal and
+lands squarely in the yellow band**. The result was a ring of yellow following
+the frontier of each pass across the grid, which is exactly the drifting circles
+you were seeing.
+
+Cells carry a `measured` flag now, and only a neighbour that has actually been
+measured *and* found impassable counts as a wall.
+
+This is the second bug the sliced evaluation has caused in three versions, both
+in code that post-processes the field. The rule: **anything that reads
+neighbouring cells must distinguish unknown from known-bad**, because at any
+moment most of the grid is a pass or two out of date.
+
+### Heights were measured from the wrong place
+`rise` was compared against `rootY` — the HumanoidRootPart's **centre**, which
+sits about three studs above the floor. So `Step height 2.5` actually described
+a rise of five and a half studs, and the slider meant something quite different
+from what it said.
+
+It baselines against the floor the character is standing on now, found with one
+downward ray per pass.
+
 ## 3.2.3 - 2026-09-02
 
 ### Attacking without the mouse
