@@ -438,7 +438,6 @@ local function decide(root, humanoid)
     end
     local approachWeight = CFG.dodgeApproachWeight
     local moveAt = CFG.dodgeMoveAt
-    local fractions = DG.pathFractions
 
     -- Five samples along the line from here to (rx+ox, rz+oz): three on the
     -- way, two once there, each at the moment it would actually happen. The
@@ -451,8 +450,16 @@ local function decide(root, humanoid)
         local T = dist / speed
         local worst, raw, total = 0, 0, 0
         local inside = CFG.dodgeInsideWeight
-        for k = 1, #fractions do
-            local f = fractions[k]
+        -- Samples every few studs along the line, not three fixed fractions:
+        -- three samples on an eighteen-stud line are six studs apart, and a
+        -- mage shot is three studs wide. A line that stepped straight
+        -- through one scored clean, and the character walked into it.
+        local n = math.ceil(dist / CFG.dodgeSampleSpacing)
+        if n < 2 then n = 2 elseif n > 8 then n = 8 end
+        local count = 0
+        for k = 1, n - 1 do
+            local f = k / n
+            count = count + 1
             local d = dangerAt(rx + ox * f, ry, rz + oz * f, T * f)
             if d > raw then raw = d end
             -- Less whatever is on you right now. Standing inside a beam, every
@@ -470,14 +477,17 @@ local function decide(root, humanoid)
             if fresh > worst then worst = fresh end
         end
         local cx, cz = rx + ox, rz + oz
+        local d0 = dangerAt(cx, ry, cz, T)
         local d1 = dangerAt(cx, ry, cz, T + dwell * 0.5)
         local d2 = dangerAt(cx, ry, cz, T + dwell)
-        total = total + d1 + d2
+        total = total + d0 + d1 + d2
+        if d0 > worst then worst = d0 end
         if d1 > worst then worst = d1 end
         if d2 > worst then worst = d2 end
+        if d0 > raw then raw = d0 end
         if d1 > raw then raw = d1 end
         if d2 > raw then raw = d2 end
-        return worst, worst * 0.5 + (total / (#fractions + 2)) * 0.5, raw
+        return worst, worst * 0.5 + (total / (count + 3)) * 0.5, raw
     end
 
     -- Score every candidate. Cheap: it is arithmetic, no raycasts yet.

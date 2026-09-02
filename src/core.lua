@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 4.9.7
+    VERSION : 4.9.8
     BUILD   : 2026-09-02
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "4.9.7"
+local SCRIPT_VERSION = "4.9.8"
 local SCRIPT_BUILD_DATE = "2026-09-02"
 local SCRIPT_CODENAME = "Learn from the hit"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "4.9.8", date = "2026-09-02", notes = "Candidate lines are sampled every two and a half studs now, up to eight samples, instead of at three fixed fractions. Three samples on an eighteen-stud line sit six studs apart and a mage shot is three studs wide: a line that stepped straight through one scored clean, and in the harness the character walked into shots it had correctly marked live." },
     { version = "4.9.7", date = "2026-09-02", notes = "Two from the harness. The boss projectiles' paths were failing the dodge's vertical test: a rolling body's centre rides its radius above the floor, the big spike's twenty studs up, and the tolerance reached ten - the path was there and ignored, and the hit landed with the dodge reading no danger. A path's vertical reach is now at least its radius. And FirstPart, the 217-stud trigger volume around the arena, kept being learned from a hit taken inside it despite the age guard; a big anchored part, or any anchored part sitting directly under Workspace, is never learned as an attack." },
     { version = "4.9.6", date = "2026-09-02", notes = "From the harness: a hit that lands after an attack's warning has faded and marked it over means that attack keeps hurting after its warning - the passive beams burn for four seconds after the precast goes. Such an attack is remembered by name (saved), and from then on its fade does not end it; only its learned window, a removed hitBox or the Model going away does. The simulator itself was corrected to the game's convention - the precast fades at the instant the hit begins - after it was caught teaching the learner that beams arm at 5.4 seconds." },
     { version = "4.9.5", date = "2026-09-02", notes = "Every hit in the capture now records what the dodge believed at that instant - its danger reading, its reason, whether it had a box, whether it was waiting for a gap or holding pursuit, and the HUD status. From the Studio harness: the hit rate against the recreated Midgardian Champion fell from about ten a minute to five after 4.9.4, and the remaining hits need to be explained one by one rather than tuned away." },
@@ -475,6 +476,8 @@ CFG.dodgeEnemyLookahead = 0.4
 -- What a path sample inside the thing already hitting you still costs, as a
 -- share of full: time spent in it matters, which way out does not.
 CFG.dodgeInsideWeight = 0.5
+-- Studs between samples along a candidate line (2 to 8 samples per line).
+CFG.dodgeSampleSpacing = 2.5
 -- A precast that has brightened back by this much from its darkest is fading:
 -- the attack has fired. Anything that arms sooner than armMinDelay after it
 -- appears is never treated as a telegraph again.

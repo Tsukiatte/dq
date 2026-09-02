@@ -11,6 +11,14 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.9.8 - 2026-09-02
+
+Candidate lines are sampled every `dodgeSampleSpacing` (2.5) studs, 2-8
+samples per line, instead of at three fixed fractions. Three samples on an
+18-stud line sit 6 studs apart and a mage shot is 3 studs wide: a line that
+stepped straight through one scored clean. Arrival is sampled at T as well
+as T+dwell/2 and T+dwell.
+
 ## 4.9.7 - 2026-09-02
 
 - Boss projectile paths failed the dodge's vertical test: a rolling body's
