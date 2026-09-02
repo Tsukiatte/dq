@@ -215,7 +215,8 @@ local function buildClones()
         CL.cells[k] = {
             i = 0, j = 0, key = "", x = 0, z = 0, y = nil,
             standable = false, safe = false, holds = false, depth = 0, eta = 0,
-            threat = math.huge, threatLater = math.huge,
+            threat = huge, threatLater = huge, wallHeat = 0, blocked = false,
+            baseThreat = huge, baseThreatLater = huge,
             onPath = false, isGoal = false,
             pad = pad, prism = prism, halfHeight = totalHeight * 0.5,
         }
@@ -251,22 +252,49 @@ end
 
 -- Floor height for a world cell, cached. `false` means no floor (a pit, or a
 -- wall we walked into); nil means not measured yet.
-local function floorFor(cell, rootY, params, budget)
+-- Floor height AND whether anything is standing in the way, cached together.
+--
+-- The grid used to ask only "is there a floor within reach", which says nothing
+-- about whether you can actually get there. A wall has a floor. A ledge you
+-- would have to jump onto has a floor. Both were being treated as open ground,
+-- and the bot only discovered otherwise by walking into them.
+--
+-- `blocked` is a second, upward cast through the space the character would
+-- occupy. RespectCanCollide keeps it from tripping over decorations and
+-- non-solid effects, which are everywhere in this game; where the engine is too
+-- old for that property, the hit is checked by hand.
+local function probeCell(cell, rootY, params, budget)
     local entry = CL.floorCache[cell.key]
     local now = os.clock()
     if entry and (now - entry.t) < CFG.cloneFloorRefresh then
-        return entry.y, budget
+        return entry.y, entry.blocked, budget
     end
     if budget <= 0 then
-        return entry and entry.y or nil, budget
+        if entry then return entry.y, entry.blocked, budget end
+        return nil, false, budget
     end
+
     local hit = Workspace:Raycast(
         Vector3.new(cell.x, rootY + 6, cell.z),
         Vector3.new(0, -(6 + CFG.cloneMaxDrop + 4), 0),
         params)
     local y = hit and (hit.Position.Y + 0.1) or false
-    CL.floorCache[cell.key] = { y = y, t = now }
-    return y, budget - 1
+
+    local blocked = false
+    if y then
+        local _, _, standHeight = getPlayerHitboxMetrics()
+        local up = Workspace:Raycast(
+            Vector3.new(cell.x, y + 0.6, cell.z),
+            Vector3.new(0, max(standHeight - 0.8, 1), 0),
+            params)
+        if up then
+            local part = up.Instance
+            blocked = part == nil or part.CanCollide ~= false
+        end
+    end
+
+    CL.floorCache[cell.key] = { y = y, blocked = blocked, t = now }
+    return y, blocked, budget - 1
 end
 
 -- Re-anchors the window on the character's cell when it crosses a cell
@@ -301,8 +329,12 @@ local function positionCells(root)
                 cell.standable = verdict.standable
                 cell.safe = verdict.safe
                 cell.holds = verdict.holds
-                cell.threat = verdict.threat or math.huge
-                cell.threatLater = verdict.threatLater or math.huge
+                cell.threat = verdict.threat or huge
+                cell.threatLater = verdict.threatLater or huge
+                cell.wallHeat = verdict.wallHeat or 0
+                cell.blocked = verdict.blocked or false
+                cell.baseThreat = verdict.baseThreat or huge
+                cell.baseThreatLater = verdict.baseThreatLater or huge
             else
                 cell.standable = false
                 cell.safe = false
@@ -437,6 +469,10 @@ local function evaluateCells(root)
     local params = RaycastParams.new()
     params.FilterType = Enum.RaycastFilterType.Exclude
     params.FilterDescendantsInstances = getRaycastExclusions(nil)
+    -- Newer engines can skip non-solid parts inside the cast itself, which
+    -- matters here: this game fills the floor with decorative, walk-through
+    -- geometry that would otherwise read as wall after wall.
+    pcall(function() params.RespectCanCollide = true end)
     local budget = CFG.cloneFloorBudget
 
     local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
@@ -456,12 +492,27 @@ local function evaluateCells(root)
         local cell = cells[cursor]
         cursor = cursor + 1
 
-        local y
-        y, budget = floorFor(cell, rootY, params, budget)
+        local y, blocked
+        y, blocked, budget = probeCell(cell, rootY, params, budget)
         cell.y = y
-        local standable = type(y) == "number"
-            and (y - rootY) < CFG.cloneMaxClimb and (y - rootY) > -CFG.cloneMaxDrop
+        local rise = type(y) == "number" and (y - rootY) or nil
+        local standable = rise ~= nil
+            and rise < CFG.cloneMaxClimb and rise > -CFG.cloneMaxDrop
+            and not blocked
         cell.standable = standable
+
+        -- Ground you cannot simply walk onto is a threat, not a wall. A ledge
+        -- within jump range is reachable, just expensive: a jump mid-fight is a
+        -- moment spent not dodging, and the search should only spend it when
+        -- the alternative is worse.
+        local wallHeat = 0
+        if standable and rise > CFG.cloneStepHeight then
+            local span = max(CFG.cloneMaxClimb - CFG.cloneStepHeight, 0.01)
+            wallHeat = CFG.threatWallWeight * min((rise - CFG.cloneStepHeight) / span, 1)
+        end
+        cell.wallHeat = wallHeat
+        cell.blocked = blocked and true or false
+
         if standable then
             local dx, dz = cell.x - rx, cell.z - rz
             local travel = sqrt(dx * dx + dz * dz) / speed
@@ -469,11 +520,19 @@ local function evaluateCells(root)
             -- Both time samples in one walk over the threat sources.
             local nowHeat, laterHeat = getThreatPair(
                 Vector3.new(cell.x, y, cell.z), travel, travel + dwell)
-            cell.threat = nowHeat
-            cell.threatLater = laterHeat
+            -- Kept without the wall-edge term so the spread pass below can be
+            -- recomputed from scratch each time. It runs over every cell while
+            -- only a slice is re-evaluated, so anything it ADDS would pile up
+            -- pass after pass on the cells it did not just measure.
+            cell.baseThreat = nowHeat + wallHeat
+            cell.baseThreatLater = laterHeat + wallHeat
+            cell.threat = cell.baseThreat
+            cell.threatLater = cell.baseThreatLater
             cell.holds = max(nowHeat, laterHeat) < lethal
             cell.safe = nowHeat < lethal
         else
+            cell.baseThreat = huge
+            cell.baseThreatLater = huge
             cell.threat = huge
             cell.threatLater = huge
             cell.safe = false
@@ -482,9 +541,40 @@ local function evaluateCells(root)
         CL.verdictCache[cell.key] = {
             standable = cell.standable, safe = cell.safe, holds = cell.holds,
             threat = cell.threat, threatLater = cell.threatLater,
+            baseThreat = cell.baseThreat, baseThreatLater = cell.baseThreatLater,
+            wallHeat = cell.wallHeat, blocked = cell.blocked,
         }
     end
     CL.evalCursor = cursor
+
+    -- A cell next to something impassable is worth a little heat of its own.
+    -- Without it the cheapest route hugs every wall, which is exactly where you
+    -- get cornered when an attack lands.
+    if CFG.threatWallSpread then
+        local n, side = CL.reach, CL.side
+        local edgeHeat = CFG.threatWallWeight * 0.35
+        for k = 1, count do
+            local cell = cells[k]
+            if cell.standable then
+                local zeroed = k - 1
+                local di, dj = zeroed % side - n, floor(zeroed / side) - n
+                local touching = false
+                for _, nb in ipairs(NEIGHBOURS) do
+                    local ni, nj = di + nb[1], dj + nb[2]
+                    if ni >= -n and ni <= n and nj >= -n and nj <= n then
+                        local other = cells[(nj + n) * side + (ni + n) + 1]
+                        if not other.standable then touching = true break end
+                    end
+                end
+                -- Assigned, never accumulated.
+                local edge = touching and edgeHeat or 0
+                cell.threat = (cell.baseThreat or huge) + edge
+                cell.threatLater = (cell.baseThreatLater or huge) + edge
+                cell.safe = cell.threat < CFG.threatLethal
+                cell.holds = max(cell.threat, cell.threatLater) < CFG.threatLethal
+            end
+        end
+    end
 
     -- Counted over the whole grid, not just the slice, so the saturated test
     -- stays honest.

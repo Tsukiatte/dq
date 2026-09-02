@@ -11,6 +11,38 @@ file and that table in sync on every edit.
 
 ---
 
+## 3.2.2 - 2026-09-02
+
+### Walls are threats
+The grid only ever asked **"is there a floor within reach"**, which says nothing
+about whether you can actually get there. A wall has a floor. A ledge you would
+have to jump onto has a floor. Both read as open ground, and the bot discovered
+otherwise by walking into them.
+
+- **Cells are probed upward** through the space the character would occupy.
+  Anything solid standing there and the cell is out. `RespectCanCollide` keeps
+  the cast from tripping over this game's decorative walk-through geometry,
+  which is everywhere; where the engine is too old for that property the hit is
+  checked by hand.
+- **A rise above `Step height` (2.5) is reachable but charged**, scaled by how
+  high it is. A jump mid-fight is a moment spent not dodging, so the search
+  should only spend it when the alternative is worse — which is what heat, as
+  opposed to a hard block, expresses.
+- **Ground beside anything impassable is warmed** (`Avoid wall edges`).
+  Otherwise the cheapest route hugs every wall, and a wall is exactly where you
+  get cornered when an attack lands.
+
+**Wall threat** (60), **Step height** and the edge warming are all adjustable,
+and included in Recommended settings.
+
+### A bug caught while writing it
+The edge-warming pass runs over **every** cell, while only a *slice* is
+re-evaluated each pass. Adding heat there would have piled up on the cells it
+had not just measured, growing without bound until everything read lethal. The
+pass assigns from a stored base value now instead of accumulating — the same
+trap the sliced evaluation will set for anything else that post-processes the
+field.
+
 ## 3.2.1 - 2026-09-02
 
 ### Projectile timing was wrong in both directions
