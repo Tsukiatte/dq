@@ -41,6 +41,35 @@ local WS = workspace
 local CENTRE = Vector3.new(-580, 21, 470)      -- arena floor at the middle part
 local ARENA_RADIUS = 95
 
+-- This game loads characters itself and teleports them to the dungeon start
+-- once; the harness loads them and keeps them in the arena.
+Players.CharacterAutoLoads = true
+local ARENA_SPAWN = CFrame.new(CENTRE + Vector3.new(-40, 4, 0))
+local function placeInArena(char)
+    local r = char:WaitForChild("HumanoidRootPart", 5)
+    if r then task.wait(0.3) r.CFrame = ARENA_SPAWN end
+end
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(placeInArena)
+    task.wait(1)
+    if not player.Character then pcall(function() player:LoadCharacter() end) end
+end)
+task.defer(function()
+    for _, player in ipairs(Players:GetPlayers()) do
+        player.CharacterAdded:Connect(placeInArena)
+        if not player.Character then pcall(function() player:LoadCharacter() end) else task.spawn(placeInArena, player.Character) end
+    end
+end)
+task.spawn(function()
+    while true do
+        for _, player in ipairs(Players:GetPlayers()) do
+            local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+            if root and (root.Position - CENTRE).Magnitude > 150 then root.CFrame = ARENA_SPAWN end
+        end
+        task.wait(0.5)
+    end
+end)
+
 local function attr(name, default)
     local v = WS:GetAttribute(name)
     if v == nil then WS:SetAttribute(name, default) return default end
