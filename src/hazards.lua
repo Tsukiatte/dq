@@ -18,6 +18,8 @@ local getVisualRoot = S.getVisualRoot
 local ZN = S.ZN
 local PC = S.PC
 local isKnownEnemyAttack = S.isKnownEnemyAttack
+local isAttackStructure = S.isAttackStructure
+local ATTACK_PARTS = S.ATTACK_PARTS
 local isKnownOwnEffect = S.isKnownOwnEffect
 local isSafeZoneMarker = S.isSafeZoneMarker
 
@@ -500,8 +502,32 @@ local function isDamageBrick(part)
     if visualRoot and part:IsDescendantOf(visualRoot) then return false end
     if part.Name == "Terrain" or part.Name == "Baseplate" then return false end
 
-    -- A fully faded telegraph has already resolved. Checked ahead of every other
-    -- rule, manual picks included, so a marked part stops counting once it fades.
+    -- =====================================================================
+    -- GROUND TRUTH FIRST (3.4.0)
+    --
+    -- Everything below this block is appearance scoring, and appearance
+    -- scoring must never get to veto something the game has already told us
+    -- is an attack. It used to: the transparency rule sat at the top and
+    -- rejected anything at 0.99 or above before a single name was checked.
+    --
+    -- In this game the hitBox - the part that actually damages you - is
+    -- created at Transparency 1. Fully invisible, by design; PrecastHitbox
+    -- does exactly the same. So the rule was throwing away precisely the
+    -- volumes that matter, and a capture of a live fight showed 895 parts
+    -- missed with hammerBotHit.hitBox and spinBotSpin.hitBox among them -
+    -- both names sitting in the table, never reached.
+    -- =====================================================================
+    local structural = isAttackStructure(part)
+    if structural or isKnownEnemyAttack(part) then
+        -- Still ours if we own it: our own abilities are built the same way.
+        if HZ.ownParts[part] then return false end
+        if isKnownOwnEffect(part) then return false end
+        if isOwnedByPlayerOrTeammate(part) then return false end
+        return true
+    end
+
+    -- From here down it is guesswork, and a faded telegraph really has
+    -- resolved, so transparency is a fair veto for anything unrecognised.
     if part.Transparency >= CFG.telegraphTransparencyCutoff then return false end
 
     -- A hand-drawn zone IS the hazard: it exists only because someone said so.
@@ -1278,6 +1304,16 @@ end
 -- A part appearing right after our own cast, right next to us, is our effect.
 -- Its name is learned unless it is generic, so the next cast is recognised on
 -- sight even outside the timing window.
+-- Names that belong to the GAME's attack grammar, not to any one effect.
+-- Learning one of these as "ours" poisons every attack in the game that uses
+-- it - and they all do. A boss precast landing at your feet moments after you
+-- cast something would otherwise teach the script that "precast" is yours.
+local NEVER_OWN = {
+    hitbox = true, precast = true, precasthitbox = true, primarypart = true,
+    part = true, beam = true, ball = true, union = true, mesh = true,
+    handle = true, model = true, hitboxes = true,
+}
+
 local function markOwnIfRecent(part, now)
     local sinceCast = now - RT.lastOwnActionTime
     if sinceCast > CFG.ownAttackWindow then return false end
@@ -1287,8 +1323,13 @@ local function markOwnIfRecent(part, now)
     local offset = part.Position - root.Position
     if Vector3.new(offset.X, 0, offset.Z).Magnitude > CFG.ownAttackRadius then return false end
 
-    HZ.ownParts[part] = true
     local lname = string.lower(part.Name)
+    -- The instance is ours; the NAME may be shared with the whole game.
+    if NEVER_OWN[lname] then
+        HZ.ownParts[part] = true
+        return true
+    end
+    HZ.ownParts[part] = true
     if not GENERIC_PART_NAMES[lname] and not HZ.learnedNames[lname] and not HZ.ownNames[lname] then
         HZ.ownNames[lname] = true
         heavyDebug("OwnAttack", string.format(
@@ -1680,6 +1721,12 @@ local function classifyPoolPart(part, now)
     local maybeTelegraph = not part.CanCollide or HZ.manualParts[part]
     if not maybeTelegraph and next(HZ.learnedNames) ~= nil then
         maybeTelegraph = HZ.learnedNames[string.lower(part.Name)] == true
+    end
+    -- A structural match skips the cheap gate outright. The gate is a guess
+    -- about what an attack looks like, and it has no business overruling the
+    -- game's own answer either.
+    if not maybeTelegraph and ATTACK_PARTS[string.lower(part.Name)] then
+        maybeTelegraph = true
     end
     -- A part matching a zone definition gets a volume attached to it, so the
     -- decoration that only announces an attack starts carrying one.

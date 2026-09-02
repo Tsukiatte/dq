@@ -294,6 +294,27 @@ local function matchesGameName(part, tbl)
     return false
 end
 
+-- The parts every attack Model in this game is built from. The hitBox is the
+-- damage and it is INVISIBLE; the precast is the telegraph and it is not. Both
+-- are recognised by structure, which is the only way to see the hitBox at all.
+local ATTACK_PARTS = { hitbox = true, precast = true, precasthitbox = true }
+
+-- Structure rather than appearance: is this part a known attack volume?
+--
+-- Returns true for a part whose own name or whose ancestor model's name is a
+-- known attack, and for the hitBox/precast pair inside any model that is not
+-- ours. That second rule is what generalises: every boss in this game builds
+-- its attacks the same way, so it catches bosses nobody has dumped.
+local function isAttackStructure(part)
+    if ATTACK_PARTS[string.lower(part.Name)] then
+        -- Only inside a model. A loose part called "hitBox" in the map is
+        -- scenery; one inside hammerBotHit is the thing that kills you.
+        local model = part:FindFirstAncestorOfClass("Model")
+        if model and not model:FindFirstChildOfClass("Humanoid") then return true end
+    end
+    return false
+end
+
 local function isKnownEnemyAttack(part) return matchesGameName(part, ENEMY_ATTACKS) end
 local function isKnownOwnEffect(part) return matchesGameName(part, OWN_EFFECTS) end
 local function isSafeZoneMarker(part) return matchesGameName(part, SAFE_MARKERS) end
@@ -302,6 +323,8 @@ S.ENEMY_ATTACKS = ENEMY_ATTACKS
 S.OWN_EFFECTS = OWN_EFFECTS
 S.SAFE_MARKERS = SAFE_MARKERS
 S.matchesGameName = matchesGameName
+S.isAttackStructure = isAttackStructure
+S.ATTACK_PARTS = ATTACK_PARTS
 S.isKnownEnemyAttack = isKnownEnemyAttack
 S.isKnownOwnEffect = isKnownOwnEffect
 S.isSafeZoneMarker = isSafeZoneMarker
