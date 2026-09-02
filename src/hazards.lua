@@ -67,7 +67,7 @@ local function updateHitboxVisualizer()
         if not cylAdorn then
             cylAdorn = Instance.new("CylinderHandleAdornment")
             cylAdorn.Name = "HitboxPlanarCylinder"
-            cylAdorn.Color3 = Color3.fromRGB(0, 220, 255)
+            cylAdorn.Color3 = CFG.colorHitbox
             cylAdorn.Transparency = 0.65
             cylAdorn.ZIndex = 3
             cylAdorn.AlwaysOnTop = true
@@ -81,9 +81,9 @@ local function updateHitboxVisualizer()
         if not boxAdorn then
             boxAdorn = Instance.new("SelectionBox")
             boxAdorn.Name = "HitboxSolidBox"
-            boxAdorn.Color3 = Color3.fromRGB(0, 255, 200)
+            boxAdorn.Color3 = CFG.colorHitbox
             boxAdorn.LineThickness = 0.03
-            boxAdorn.SurfaceColor3 = Color3.fromRGB(0, 180, 255)
+            boxAdorn.SurfaceColor3 = CFG.colorHitbox
             boxAdorn.SurfaceTransparency = 0.8
             boxAdorn.Parent = folder
         end
@@ -98,7 +98,7 @@ local function updateHitboxVisualizer()
         if not sphere then
             sphere = Instance.new("SphereHandleAdornment")
             sphere.Name = "AbilityRadius"
-            sphere.Color3 = Color3.fromRGB(170, 100, 255)
+            sphere.Color3 = CFG.colorAbilityRadius
             sphere.Transparency = 0.82
             sphere.ZIndex = 1
             sphere.AlwaysOnTop = false
@@ -790,7 +790,7 @@ local function updateHazardHighlights()
                     label.Size = UDim2.fromScale(1, 1)
                     label.BackgroundTransparency = 1
                     label.Font = Enum.Font.GothamBold
-                    label.TextColor3 = Color3.fromRGB(255, 120, 120)
+                    label.TextColor3 = CFG.colorTelegraph
                     label.TextStrokeTransparency = 0.15
                     label.TextSize = 14
                     label.TextScaled = false
@@ -827,7 +827,7 @@ local function updateHazardHighlights()
                     line.CanTouch = false
                     line.CastShadow = false
                     line.Material = Enum.Material.Neon
-                    line.Color = Color3.fromRGB(255, 80, 80)
+                    line.Color = CFG.colorTelegraph
                     line.Transparency = 0.35
                     line.Parent = folder
                     HZ.predictionOwner[line] = part
@@ -863,9 +863,9 @@ local function updateHazardHighlights()
                     local hl = Instance.new("Highlight")
                     hl.Name = highlightId
                     hl.Adornee = part
-                    hl.FillColor = Color3.fromRGB(255, 0, 0)
+                    hl.FillColor = CFG.colorTelegraph
                     hl.FillTransparency = 0.65
-                    hl.OutlineColor = Color3.fromRGB(255, 40, 40)
+                    hl.OutlineColor = CFG.colorTelegraph
                     hl.OutlineTransparency = 0.1
                     hl.Parent = HZ.highlightsFolder
                 elseif isCylinder then
@@ -874,7 +874,7 @@ local function updateHazardHighlights()
                     adorn.Adornee = part
                     adorn.Height = part.Size.X
                     adorn.Radius = math.min(part.Size.Y, part.Size.Z) * 0.5
-                    adorn.Color3 = Color3.fromRGB(255, 30, 30)
+                    adorn.Color3 = CFG.colorTelegraph
                     adorn.Transparency = 0.5
                     adorn.ZIndex = 2
                     adorn.AlwaysOnTop = true
@@ -885,7 +885,7 @@ local function updateHazardHighlights()
                     adorn.Name = highlightId
                     adorn.Adornee = part
                     adorn.Radius = math.min(part.Size.X, part.Size.Y, part.Size.Z) * 0.5
-                    adorn.Color3 = Color3.fromRGB(255, 30, 30)
+                    adorn.Color3 = CFG.colorTelegraph
                     adorn.Transparency = 0.5
                     adorn.ZIndex = 2
                     adorn.AlwaysOnTop = true
@@ -894,9 +894,9 @@ local function updateHazardHighlights()
                     local box = Instance.new("SelectionBox")
                     box.Name = highlightId
                     box.Adornee = part
-                    box.Color3 = Color3.fromRGB(255, 30, 30)
+                    box.Color3 = CFG.colorTelegraph
                     box.LineThickness = 0.04
-                    box.SurfaceColor3 = Color3.fromRGB(255, 0, 0)
+                    box.SurfaceColor3 = CFG.colorTelegraph
                     box.SurfaceTransparency = 0.65
                     box.Parent = HZ.highlightsFolder
                 end
@@ -915,7 +915,7 @@ end
 -- Draws the wall overlay: every invisible collision wall in green. Pooled and
 -- incremental like the hazard overlay - only new adornees get a box, stale ones
 -- are destroyed - so a static set costs nothing to hold on screen.
-local WALL_INVIS_COLOR = Color3.fromRGB(40, 220, 90)
+-- Read from CFG each draw so the Overlays colour picker takes effect live.
 
 local function updateWallHighlights()
     if not CFG.showWalls then
@@ -947,9 +947,9 @@ local function updateWallHighlights()
             local box = Instance.new("SelectionBox")
             box.Name = id
             box.Adornee = part
-            box.Color3 = WALL_INVIS_COLOR
+            box.Color3 = CFG.colorWall
             box.LineThickness = 0.05
-            box.SurfaceColor3 = WALL_INVIS_COLOR
+            box.SurfaceColor3 = CFG.colorWall
             box.SurfaceTransparency = 0.75
             box.Parent = HZ.wallHighlightsFolder
         end

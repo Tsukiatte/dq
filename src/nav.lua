@@ -86,7 +86,7 @@ local function renderCurrentPath()
         table.insert(entries, {
             position = waypoint.Position + NODE_LIFT,
             size = NODE_MAIN_SIZE,
-            color = Color3.fromRGB(0, 160, 255),
+            color = CFG.colorPursuit,
         })
     end
 
@@ -422,7 +422,7 @@ local function renderEscapeRoute()
         table.insert(entries, {
             position = waypoint.Position + Vector3.new(0, 0.25, 0),
             size = Vector3.new(0.5, 0.5, 0.5),
-            color = Color3.fromRGB(255, 170, 0),
+            color = CFG.colorEscape,
         })
     end
 

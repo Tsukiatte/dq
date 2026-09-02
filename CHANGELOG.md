@@ -11,6 +11,66 @@ file and that table in sync on every edit.
 
 ---
 
+## 2.7.0 - 2026-09-01 - "Kitbuilt"
+The interface, rebuilt from the Figma kit, plus the macro follow-ups.
+
+### The GUI
+- **Built from a component kit** (`src/uikit.lua`) ported from the Figma file:
+  the tokens, type styles, spacing and radii all come from that document, so
+  the two stay comparable. Three rules carried over from the design notes:
+  **no image assets** (the chevrons, tick, pencil and bin are built from
+  Frames, so nothing can fail to load); **the accent gradient is defined once**
+  and everything reads it from there; and panel elevation is stacked Frames
+  behind the panel, because Roblox has no box-shadow and the kit takes no
+  assets.
+- **Two windows, both accordions**: *Autofarm* (Combat, Abilities, Navigation,
+  Telegraphs, Attack Book, Overlays, Performance, Debug & config) and *Routes &
+  Data* (Map, Waypoints, Macros, Streamer, Live telegraphs). Sections are
+  collapsed until you open them. Bodies scroll and window height is clamped to
+  the actual viewport, so a full accordion still fits on a 768p laptop.
+- **The HUD is the only thing on screen with the GUI closed**, bottom-left with
+  a margin: title chip, status / target / world stats, and the status chip -
+  which exists because the status used to sit raw on the game world where red
+  went unreadable. **RightShift** opens and closes the windows.
+- **Hover any control for a second** and a small grey box follows your cursor
+  with an explanation of what it does. Every toggle, slider, dropdown, colour
+  row and button has one.
+- **The Legacy / Macro island** sits at the top. Legacy is the pathfinding and
+  dodging bot; Macro replays your recordings. They are alternatives, so the
+  sections belonging to the one you are not using are hidden rather than left
+  on screen to scroll past.
+
+### Everything is configurable now
+- **Every overlay has a switch and a colour**: waypoints, pursuit route, escape
+  route, telegraph highlight, invisible walls, hitbox, ability radius, macro
+  route, plus a GUI accent colour and a HUD switch.
+- **Targeting modes**: closest (as before), lowest HP, highest HP. The HP modes
+  only consider enemies within `CFG.targetHpRange`, so a wounded straggler on
+  the far side of the dungeon does not drag the bot across the map.
+- **Dodging has a master switch**, and **Reset defaults** puts every slider,
+  toggle and colour back to how it shipped without touching your paths, macros
+  or Attack Book.
+
+### Macros
+- **Fixed: the record keybind stopped working after the first recording.**
+  `startRecording` called `disconnectMacroInputs()`, which cleared the same
+  table the global bind listener lived in - so the bind fired once to start,
+  once to stop, and never again. There are two lists now: `MC.connections` for
+  the global bind, `MC.recordConnections` for the per-recording listener.
+- **Rotation is recorded.** Each sample now carries the yaw you were facing,
+  and playback reproduces it. This matters more than it sounds: attacks fire in
+  the direction the camera points, so a click replayed while facing the wrong
+  way hits nothing. Macros recorded before this fall back to looking where they
+  walk. Toggle: *Replay recorded facing*.
+- **Save to map / Play map.** A dropdown picks which of the fourteen dungeons
+  the open recordings belong to, and another loads and plays any map's
+  recordings without switching the GUI over first.
+- **Macros have their own file**, `DungeonAutofarm_macros.json`, keyed by map.
+  A ten-minute recording is thousands of samples; keeping them out of the
+  config leaves that small and hand-editable, and makes the macros easy to copy
+  between machines or hand to someone else. Pre-2.7 macros stored inline in the
+  config are adopted into it on load.
+
 ## 2.6.0 - 2026-09-01 - "Firstperson"
 - **Macros are a top-level mode now.** They had been nested inside the waypoint
   editor's panel behind a Waypoints/Macros selector, which was wrong on its own

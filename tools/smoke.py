@@ -65,7 +65,8 @@ local STRINGY = { Name = "Stub", Text = "", Image = "", ClassName = "Stub", Disp
 local BOOLY = { Anchored = true, CanCollide = true, CanQuery = true, Visible = true, Enabled = false,
     Parent = false, AutoRotate = true, RigidityEnabled = false, AlwaysOnTop = false }
 local VECTORY = { Position = true, Size = true, LookVector = true, AbsoluteSize = true, AbsolutePosition = true,
-    AssemblyLinearVelocity = true, AssemblyAngularVelocity = true, Delta = true, Normal = true }
+    AssemblyLinearVelocity = true, AssemblyAngularVelocity = true, Delta = true, Normal = true,
+    ViewportSize = true }
 local CALLERS = {
     IsA = function() return false end,
     IsDescendantOf = function() return false end,
@@ -108,6 +109,9 @@ local CALLERS = {
     PointToWorldSpace = function() return Vector3.new() end,
     VectorToWorldSpace = function() return Vector3.new() end,
     Lerp = function() return Vector3.new() end,
+    ToHSV = function() return 0, 0, 0 end,
+    ToOrientation = function() return 0, 0, 0 end,
+    GetUserThumbnailAsync = function() return "", true end,
 }
 SMOKE_CONNECTIONS = {}
 CHARACTER_PARTS = { Humanoid = true, HumanoidRootPart = true, Animator = true, PlayerGui = true }
@@ -150,11 +154,19 @@ game = Stub("game")
 workspace = Stub("Workspace")
 Instance = { new = function(class) local s = Stub(class) s.__set.ClassName = class return s end }
 CFrame = setmetatable({}, { __index = function() return function() return Stub("CFrame") end end })
-Color3 = setmetatable({}, { __index = function() return function() return Stub("Color3") end end })
+Color3 = setmetatable({}, { __index = function()
+    return function() local c = Stub("Color3") c.__set.R = 0 c.__set.G = 0 c.__set.B = 0 return c end
+end })
 UDim = { new = function() return Stub("UDim") end }
 UDim2 = setmetatable({}, { __index = function() return function() return Stub("UDim2") end end })
 Enum = setmetatable({}, { __index = function(_, k) return setmetatable({}, { __index = function(_, item) return { Name = item, Value = 2, EnumType = k } end }) end })
 RaycastParams = { new = function() return Stub("RaycastParams") end }
+-- Sequence and font datatypes the UI kit builds gradients and text from.
+ColorSequence = { new = function() return Stub("ColorSequence") end }
+NumberSequence = { new = function() return Stub("NumberSequence") end }
+ColorSequenceKeypoint = { new = function() return Stub("ColorSequenceKeypoint") end }
+NumberSequenceKeypoint = { new = function() return Stub("NumberSequenceKeypoint") end }
+Font = { new = function() return Stub("Font") end }
 task = { spawn = function(fn, ...) return fn(...) end, defer = function(fn, ...) return fn(...) end, delay = function() end, wait = function() end }
 _G = _G or {}
 debug = debug or {}
