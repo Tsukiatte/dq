@@ -392,21 +392,34 @@ local function row(parent, text, order, height, reserve)
     return r, l, layout
 end
 
--- Rows light up under the cursor. A TextButton over the whole row keeps the
--- click target honest for rows that are themselves clickable.
+-- Rows light up under the cursor, and a clickable row reports clicks on ITSELF.
+--
+-- This used to drop a full-width invisible TextButton into the row to catch the
+-- click. That is what made every row label vanish in 2.7.0/2.7.1: a row has a
+-- horizontal UIListLayout, the layout lays out ALL GuiObject children, and the
+-- hit button was Size (1,1) scale at LayoutOrder 0 - so it sorted first, took
+-- the whole width, and pushed the label and the control off the right-hand edge
+-- where the window clipped them. Captions, buttons and list entries were fine
+-- precisely because none of them go through row().
+--
+-- A Frame with Active = true raises InputBegan for mouse buttons on its own, so
+-- no extra child is needed and nothing joins the layout.
 local function hoverable(frame, clickable)
     local base = Theme.SurfaceElement
     frame.MouseEnter:Connect(function() frame.BackgroundColor3 = Theme.SurfaceHover end)
     frame.MouseLeave:Connect(function() frame.BackgroundColor3 = base end)
     if not clickable then return nil end
-    local hit = Instance.new("TextButton")
-    hit.Name = "Hit"
-    hit.BackgroundTransparency = 1
-    hit.Text = ""
-    hit.Size = UDim2.fromScale(1, 1)
-    hit.ZIndex = 10
-    hit.Parent = frame
-    return hit
+    frame.Active = true
+    return {
+        onClick = function(fn)
+            frame.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1
+                    or input.UserInputType == Enum.UserInputType.Touch then
+                    fn()
+                end
+            end)
+        end,
+    }
 end
 
 -- Toggle: 38x20, the knob slides and the track takes the accent when on.
@@ -445,7 +458,7 @@ local function toggle(parent, text, get, set, order, explain)
         knob.Position = UDim2.fromOffset(on and 22 or 2, 3)
     end
     render()
-    hit.MouseButton1Click:Connect(function()
+    hit.onClick(function()
         set(not get())
         render()
     end)
@@ -645,7 +658,7 @@ local function dropdown(parent, text, options, get, set, order, explain)
     end
     render()
 
-    hit.MouseButton1Click:Connect(function()
+    hit.onClick(function()
         menu.Visible = not menu.Visible
         chev.setOpen(menu.Visible)
     end)
@@ -847,7 +860,7 @@ local function colorRow(parent, text, get, set, order, explain)
         end
     end))
 
-    hit.MouseButton1Click:Connect(function()
+    hit.onClick(function()
         picker.Visible = not picker.Visible
     end)
     tip(r, explain)
@@ -1284,7 +1297,7 @@ local function section(parent, title, order, explain)
         headLabel.TextColor3 = open and Theme.AccentMid or Theme.TextPrimary
     end
     setOpen(false)
-    hit.MouseButton1Click:Connect(function() setOpen(not open) end)
+    hit.onClick(function() setOpen(not open) end)
     tip(head, explain)
 
     return { holder = holder, content = content, setOpen = setOpen, isOpen = function() return open end }

@@ -193,33 +193,37 @@ _G.DungeonAutofarmDestruct = destructScript
 -- game world where red went unreadable.
 -- =========================================================================
 local function buildHud(parent)
+    -- Explicit geometry throughout, matching the design's 360x173 HUD: chip at
+    -- y=0 (h34), stats at y=42 (h95), footer at y=145 (h28).
+    --
+    -- Nothing here uses AutomaticSize or a UIListLayout. 2.7.1 did, and the HUD
+    -- came apart in game: an auto-sizing frame, anchored to the bottom, holding
+    -- auto-sizing children, never resolved to a stable size and the stat values
+    -- ended up drawn at the top-left corner of the screen. Fixed numbers cannot
+    -- do that.
     local hud = Instance.new("Frame")
     hud.Name = "HUD"
     hud.BackgroundTransparency = 1
     hud.AnchorPoint = Vector2.new(0, 1)
     hud.Position = UDim2.new(0, 20, 1, -20)
-    hud.Size = UDim2.fromOffset(360, 0)
-    hud.AutomaticSize = Enum.AutomaticSize.Y
+    hud.Size = UDim2.fromOffset(360, 173)
     hud.ZIndex = 2
     hud.Parent = parent
-    K.vlist(hud, T.GapMd)
 
-    -- Title chip: hugs its text rather than filling the HUD width.
+    -- Title chip.
     local chip = Instance.new("Frame")
     chip.Name = "TitleChip"
     chip.BackgroundColor3 = Color3.new(1, 1, 1)
     chip.BorderSizePixel = 0
+    chip.Position = UDim2.fromOffset(0, 0)
     chip.Size = UDim2.fromOffset(326, 34)
     chip.ClipsDescendants = true
-    chip.LayoutOrder = 1
     chip.ZIndex = 3
     chip.Parent = hud
     K.corner(chip, T.RadiusMd)
     K.stroke(chip, T.Hairline, 1)
     K.bodyGradient(chip)
     K.shadow(chip, 6, 2.0, 8, 0.065, T.RadiusMd)
-    K.pad(chip, 0, 12, 0, 12)
-    K.hlist(chip, T.GapMd)
 
     local chipAccent = Instance.new("Frame")
     chipAccent.Name = "AccentBar"
@@ -230,31 +234,29 @@ local function buildHud(parent)
     chipAccent.Parent = chip
     K.accentGradient(chipAccent, 0)
 
-    -- Explicit widths across the chip's 302px of content: title, rule, user,
-    -- rule, fps. Nested automatic sizing is what collapsed this in 2.7.0.
-    local function chipText(text, style, order, width)
-        local l = K.label(chip, text, style, order)
+    local function chipText(text, style, x, width)
+        local l = K.label(chip, text, style, 1)
+        l.Position = UDim2.fromOffset(x, 7)
         l.Size = UDim2.fromOffset(width, 20)
         l.TextTruncate = Enum.TextTruncate.AtEnd
         l.ZIndex = 4
         return l
     end
-    chipText("dqr autofarm", "windowChip", 1, 110)
-    chipText("|", "captionKey", 2, 4).TextColor3 = T.TextMuted
-    local userLabel = chipText("...", "rowStat", 3, 106)
+    chipText("dqr autofarm", "windowChip", 12, 112)
+    chipText("|", "captionKey", 130, 6).TextColor3 = T.TextMuted
+    local userLabel = chipText("...", "rowStat", 144, 104)
     userLabel.TextColor3 = T.TextSub
-    chipText("|", "captionKey", 4, 4).TextColor3 = T.TextMuted
-    local fpsLabel = chipText("fps: --", "monoStat", 5, 52)
+    chipText("|", "captionKey", 252, 6).TextColor3 = T.TextMuted
+    local fpsLabel = chipText("fps: --", "monoStat", 264, 54)
 
     -- Stats panel.
     local stats = Instance.new("Frame")
     stats.Name = "Stats"
     stats.BackgroundColor3 = Color3.new(1, 1, 1)
     stats.BorderSizePixel = 0
-    stats.AutomaticSize = Enum.AutomaticSize.Y
-    stats.Size = UDim2.new(1, 0, 0, 0)
+    stats.Position = UDim2.fromOffset(0, 42)
+    stats.Size = UDim2.fromOffset(360, 95)
     stats.ClipsDescendants = true
-    stats.LayoutOrder = 2
     stats.ZIndex = 3
     stats.Parent = hud
     K.corner(stats, T.RadiusLg)
@@ -271,89 +273,64 @@ local function buildHud(parent)
     statsAccent.Parent = stats
     K.accentGradient(statsAccent, 0)
 
-    local rows = Instance.new("Frame")
-    rows.Name = "Rows"
-    rows.BackgroundTransparency = 1
-    rows.AutomaticSize = Enum.AutomaticSize.Y
-    rows.Size = UDim2.new(1, 0, 0, 0)
-    rows.Position = UDim2.fromOffset(0, 3)
-    rows.ZIndex = 4
-    rows.Parent = stats
-    K.pad(rows, 8, T.GapXl, 8, T.GapXl)
-    K.vlist(rows, 2)
-
     -- Label left in Montserrat, value right in Roboto Mono so the digits sit on
     -- a fixed grid and stop jittering as they tick.
-    local function statRow(name, order)
-        local r = Instance.new("Frame")
-        r.Name = name
-        r.BackgroundTransparency = 1
-        r.Size = UDim2.new(1, 0, 0, 24)
-        r.LayoutOrder = order
-        r.ZIndex = 4
-        r.Parent = rows
-        K.hlist(r, T.GapMd)
-
-        local key = K.label(r, name, "rowStat", 1)
+    local function statRow(name, y)
+        local key = K.label(stats, name, "rowStat", 1)
+        key.Position = UDim2.fromOffset(14, y)
+        key.Size = UDim2.fromOffset(140, 24)
         key.ZIndex = 4
-        K.flexFill(key, 150)
-        local value = K.label(r, "--", "monoStat", 2)
-        value.Size = UDim2.new(0, 0, 1, 0)
-        value.AutomaticSize = Enum.AutomaticSize.X
+
+        local value = K.label(stats, "--", "monoStat", 2)
+        value.Position = UDim2.fromOffset(160, y)
+        value.Size = UDim2.fromOffset(186, 24)
         value.TextXAlignment = Enum.TextXAlignment.Right
+        value.TextTruncate = Enum.TextTruncate.AtEnd
         value.ZIndex = 4
         return value
     end
-    local statusValue = statRow("Status", 1)
-    local targetValue = statRow("Target", 2)
-    local worldValue = statRow("World", 3)
+    local statusValue = statRow("Status", 11)
+    local targetValue = statRow("Target", 37)
+    local worldValue = statRow("World", 63)
 
     -- Footer.
-    local footer = Instance.new("Frame")
-    footer.Name = "Footer"
-    footer.BackgroundTransparency = 1
-    footer.Size = UDim2.new(1, 0, 0, 28)
-    footer.LayoutOrder = 3
-    footer.ZIndex = 3
-    footer.Parent = hud
-    K.hlist(footer, T.GapMd)
-
-    local hint = K.label(footer, "[RSHIFT] to open GUI", "rowLabel", 1)
+    local hint = K.label(hud, "[RSHIFT] to open GUI", "rowLabel", 1)
+    hint.Position = UDim2.fromOffset(0, 147)
+    hint.Size = UDim2.fromOffset(200, 24)
     hint.TextColor3 = T.TextSub
     hint.TextStrokeTransparency = 0.1
     hint.ZIndex = 3
-    K.flexFill(hint, 158)
 
     local status = Instance.new("Frame")
     status.Name = "StatusChip"
     status.BackgroundColor3 = T.SurfaceChip
     status.BorderSizePixel = 0
+    status.Position = UDim2.fromOffset(210, 147)
     status.Size = UDim2.fromOffset(150, 24)
-    status.LayoutOrder = 2
     status.ZIndex = 3
-    status.Parent = footer
+    status.Parent = hud
     K.corner(status, T.RadiusMd)
     K.stroke(status, T.Hairline, 1)
-    K.pad(status, 0, 9, 0, 9)
-    K.hlist(status, T.GapSm)
 
     local dot = Instance.new("Frame")
     dot.Name = "Dot"
-    dot.BackgroundColor3 = T.StatusBad
+    dot.BackgroundColor3 = T.StatusGood
     dot.BorderSizePixel = 0
+    dot.AnchorPoint = Vector2.new(0, 0.5)
+    dot.Position = UDim2.new(0, 9, 0.5, 0)
     dot.Size = UDim2.fromOffset(6, 6)
-    dot.LayoutOrder = 1
     dot.ZIndex = 4
     dot.Parent = status
     K.corner(dot, 3)
 
-    local statusKey = K.label(status, "Autofarm:", "captionKey", 2)
-    statusKey.AutomaticSize = Enum.AutomaticSize.X
-    statusKey.Size = UDim2.fromOffset(0, 16)
+    local statusKey = K.label(status, "Autofarm:", "captionKey", 1)
+    statusKey.Position = UDim2.fromOffset(21, 0)
+    statusKey.Size = UDim2.new(1, -21, 1, 0)
     statusKey.ZIndex = 4
-    local statusValueLabel = K.label(status, "Disabled", "captionStat", 3)
-    statusValueLabel.AutomaticSize = Enum.AutomaticSize.X
-    statusValueLabel.Size = UDim2.fromOffset(0, 16)
+
+    local statusValueLabel = K.label(status, "Disabled", "captionStat", 2)
+    statusValueLabel.Position = UDim2.fromOffset(76, 0)
+    statusValueLabel.Size = UDim2.new(1, -85, 1, 0)
     statusValueLabel.TextColor3 = T.StatusBad
     statusValueLabel.ZIndex = 4
 
@@ -380,7 +357,7 @@ local function buildHud(parent)
 
         local seconds = os.clock() - playStart
         targetValue.Text = UI.hudTarget or "None"
-        worldValue.Text = string.format("%d  /  %d tg  /  %02d:%02d",
+        worldValue.Text = string.format("%d enemies / %d tg / %02d:%02d",
             UI.hudEnemyCount or 0, #HZ.detected,
             math.floor(seconds / 60), math.floor(seconds % 60))
 
