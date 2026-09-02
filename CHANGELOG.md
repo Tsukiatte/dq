@@ -11,6 +11,25 @@ file and that table in sync on every edit.
 
 ---
 
+## 3.0.1 - 2026-09-02
+Three fixes to 3.0.0, all found from a single in-game log.
+
+- **`RT.connections` never existed.** `watchDungeonName` threw on
+  `table.insert` into it, so the map was detected once at startup but never
+  followed after - and because the throw aborted the startup sequence,
+  `watchOwnAbilityRemotes` below it **never ran at all**. Both now use
+  `RT.indexConnections`, which is the table that actually exists and gets torn
+  down properly.
+- **The precast readout was built once and never refreshed**, so it said zero
+  however many attacks had gone past. `precastStep` now refreshes it whenever
+  the counts change.
+- **The payload handler dropped anything it could not read, silently.** That
+  made "listening" and "nothing is arriving" look identical from the outside.
+  It now counts every payload received, prints the first three key by key, and
+  finds the shape name by value if the compressed key is not the one we asked
+  BridgeNet2 for. The panel reports understood-of-received, because those are
+  different failures needing different fixes.
+
 ## 3.0.0 - 2026-09-02 - "Ground truth"
 
 The script stops guessing what an attack is and listens to the game tell it.
