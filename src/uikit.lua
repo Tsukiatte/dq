@@ -887,7 +887,9 @@ local function button(parent, text, style, onClick, order, explain)
         accentGradient(b, 0)
     elseif style == "danger" then
         b.BackgroundColor3 = Theme.StatusBad
-        b.TextColor3 = Color3.new(1, 1, 1)
+        -- Dark on the red, as the design has it. #ff6060 is light enough that
+        -- dark type has more contrast on it than white does.
+        b.TextColor3 = Theme.TextOnAccent
     else
         b.BackgroundColor3 = Theme.SurfaceElement
         b.TextColor3 = Theme.TextPrimary

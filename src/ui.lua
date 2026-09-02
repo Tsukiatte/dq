@@ -14,6 +14,7 @@ local MC = S.MC
 local K = S.UIKit
 local T = S.UIKit.Theme
 local LocalPlayer = S.LocalPlayer
+local Players = S.Players
 local RunService = S.RunService
 local UserInputService = S.UserInputService
 local heavyDebug = S.heavyDebug
@@ -415,11 +416,88 @@ local function createControlUI()
         position = UDim2.fromOffset(24, 24), visible = false,
         info = "Everything the bot does while it is running. Sections stay collapsed until you open them.",
     })
+    local account = K.window(gui, {
+        name = "Account", title = "User", width = 310, height = 172,
+        position = UDim2.fromOffset(716, 24), visible = false,
+    })
+
     local routes = K.window(gui, {
         name = "Routes", title = "Routes & Data", width = 340, height = windowH,
         position = UDim2.fromOffset(360, 24), visible = false,
         info = "Where the bot goes, what it has learned, and how you appear on stream. All of it is stored per map.",
     })
+
+    -- ------------------------------------------------------------------
+    -- Account panel. Headshot, name, rank, and the two actions.
+    -- ------------------------------------------------------------------
+    local accountCard = Instance.new("Frame")
+    accountCard.Name = "PlayerCard"
+    accountCard.BackgroundTransparency = 1
+    accountCard.Size = UDim2.new(1, 0, 0, 66)
+    accountCard.LayoutOrder = 1
+    accountCard.Parent = account.body
+    K.hlist(accountCard, T.GapLg)
+
+    local accountAvatar = Instance.new("ImageLabel")
+    accountAvatar.Name = "Avatar"
+    accountAvatar.BackgroundColor3 = T.SurfaceField
+    accountAvatar.BorderSizePixel = 0
+    accountAvatar.Size = UDim2.fromOffset(66, 66)
+    accountAvatar.LayoutOrder = 1
+    accountAvatar.Parent = accountCard
+    K.corner(accountAvatar, T.RadiusMd)
+    K.stroke(accountAvatar, T.Hairline, 1)
+
+    local accountText = Instance.new("Frame")
+    accountText.BackgroundTransparency = 1
+    accountText.Size = UDim2.new(1, -78, 1, 0)
+    accountText.LayoutOrder = 2
+    accountText.Parent = accountCard
+    K.vlist(accountText, 3)
+
+    local accountName = K.label(accountText, "", "windowTitle", 1)
+    accountName.Size = UDim2.new(1, 0, 0, 20)
+    accountName.TextTruncate = Enum.TextTruncate.AtEnd
+    local accountRank = K.label(accountText, "", "rowLabel", 2)
+    accountRank.Size = UDim2.new(1, 0, 0, 18)
+    accountRank.TextColor3 = T.TextSub
+
+    -- The headshot request yields, so it cannot run inline.
+    local realHeadshot = ""
+    task.spawn(function()
+        local ok, content = pcall(function()
+            return Players:GetUserThumbnailAsync(LocalPlayer.UserId,
+                Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
+        end)
+        if ok and type(content) == "string" then
+            realHeadshot = content
+            if S.refreshAccountPanel then S.refreshAccountPanel() end
+        end
+    end)
+
+    -- Streamer Mode exists so your name is not on screen while you stream, and
+    -- this panel would put both the name and the face back on it the moment you
+    -- opened the GUI. So it masks like everything else does.
+    S.refreshAccountPanel = function()
+        local masked = SM.enabled
+        accountName.Text = "Username: " .. (masked
+            and (SM.fields.username ~= "" and SM.fields.username or "Streamer")
+            or LocalPlayer.Name)
+        accountRank.Text = "Rank: " .. CFG.accountRank
+        accountAvatar.Image = masked and SM.avatarImage or realHeadshot
+    end
+    S.refreshAccountPanel()
+    table.insert(renderers, S.refreshAccountPanel)
+
+    local accountButtons = K.buttonRow(account.body, 2)
+    accountButtons.add("Logout", "accent", function()
+        -- Placeholder: there is no account system behind this yet. It closes
+        -- the interface rather than pretending to sign anything out.
+        heavyDebug("Account", "No account system yet - Logout just closes the interface.")
+        if S.setPanelsOpen then S.setPanelsOpen(false) end
+    end, "There is no account system yet, so this only closes the interface. It is here for when there is one.")
+    accountButtons.add("Detach", "danger", destructScript,
+        "Unload the script completely: stops both loops, puts the world back the way it was and removes the interface.")
 
     -- ------------------------------------------------------------------
     -- The island: which system is in charge. Legacy is the pathfinding and
@@ -1163,7 +1241,12 @@ local function createControlUI()
         "Masks your account identity on screen. Client-side only: the server, other players and every leaderboard still see the real account.")
     local streamerToggle = track(K.toggle(streamerSection.content, "Streamer Mode",
         function() return SM.enabled end,
-        function(v) setStreamerEnabled(v) end, 1,
+        function(v)
+            setStreamerEnabled(v)
+            -- The account panel shows the name and the face, so it has to mask
+            -- the moment the mode changes rather than on the next refresh.
+            if S.refreshAccountPanel then S.refreshAccountPanel() end
+        end, 1,
         "Rewrite what THIS client renders. It hides your name on stream; it does not change your name in the game."))
     SM.syncToggleWidget = streamerToggle.render
 
@@ -1368,8 +1451,10 @@ local function createControlUI()
     local function setOpen(open)
         autofarm.frame.Visible = open
         routes.frame.Visible = open
+        account.frame.Visible = open
         if not open then K.hideTip() end
     end
+    S.setPanelsOpen = setOpen
     table.insert(sliderConnections, UserInputService.InputBegan:Connect(function(input, processed)
         if processed then return end
         if input.KeyCode == Enum.KeyCode.RightShift then
