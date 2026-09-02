@@ -271,6 +271,7 @@ local function buildConfigTable()
         currentMap = RT.currentMap,
         maps = maps,
         attacksByMap = RT.attackData,
+        armDelays = RT.armDelays,
         zonesByMap = RT.zoneData,
     }
 end
@@ -440,6 +441,12 @@ local function applyConfigData(data)
         end
     end
 
+    table.clear(RT.armDelays)
+    if type(data.armDelays) == "table" then
+        for name, delay in pairs(data.armDelays) do
+            if type(name) == "string" and type(delay) == "number" and delay > 0 then RT.armDelays[name] = delay end
+        end
+    end
     table.clear(RT.attackData)
     if type(data.attacksByMap) == "table" then
         for code, list in pairs(data.attacksByMap) do
