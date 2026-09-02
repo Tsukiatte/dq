@@ -76,11 +76,61 @@ local function syncCurrentMapToStore()
     for name in pairs(LD.keepNames) do
         table.insert(keep, name)
     end
-    RT.mapData[RT.currentMap] = {
-        waypath = waypath,
-        keep = keep,
-        macros = serializeMacros(),
-    }
+    RT.mapData[RT.currentMap] = { waypath = waypath, keep = keep }
+    -- Macros are bulky and live in their own file; the map store only carries
+    -- the light data.
+    RT.macroData[RT.currentMap] = serializeMacros()
+end
+
+-- =========================================================================
+-- The macro file. Separate from the config because a single ten-minute
+-- recording is thousands of samples, and keeping it apart means the config
+-- stays small and hand-editable while the macros stay easy to copy between
+-- machines or hand to someone else.
+-- =========================================================================
+local function saveMacroFile()
+    if not hasFileAccess() then return false, "no file access in this executor" end
+    local ok, err = pcall(function()
+        local payload = { version = SCRIPT_VERSION, maps = RT.macroData }
+        writefile(CFG.macroFile, game:GetService("HttpService"):JSONEncode(payload))
+    end)
+    if ok then
+        local total = 0
+        for _, list in pairs(RT.macroData) do total = total + #list end
+        heavyDebug("Config", string.format("Saved %d macro(s) to %s.", total, CFG.macroFile))
+        return true
+    end
+    heavyDebug("Config", "Macro save failed: " .. tostring(err))
+    return false, tostring(err)
+end
+
+local function loadMacroFile()
+    if not hasFileAccess() then return false end
+    local exists = false
+    pcall(function() exists = isfile(CFG.macroFile) end)
+    if not exists then return false end
+
+    local data
+    local ok = pcall(function()
+        data = game:GetService("HttpService"):JSONDecode(readfile(CFG.macroFile))
+    end)
+    if not ok or type(data) ~= "table" or type(data.maps) ~= "table" then
+        heavyDebug("Config", "Macro file unreadable; starting with none.")
+        return false
+    end
+
+    table.clear(RT.macroData)
+    local total = 0
+    for code, list in pairs(data.maps) do
+        if MAP_LABELS[code] and type(list) == "table" then
+            RT.macroData[code] = list
+            total = total + #list
+        end
+    end
+    heavyDebug("Config", string.format("Loaded %d macro(s) across %d map(s) from %s.",
+        total, (function() local c = 0 for _ in pairs(RT.macroData) do c = c + 1 end return c end)(),
+        CFG.macroFile))
+    return true
 end
 
 -- Checks a map's stored data out into the live tables. Does NOT save.
@@ -108,7 +158,7 @@ local function applyMapFromStore(code)
     refreshLowDetail()
     if S.refreshMapPanel then S.refreshMapPanel() end
 
-    local macroCount = loadMacros(entry.macros)
+    local macroCount = loadMacros(RT.macroData[code])
 
     local keepCount = 0
     for _ in pairs(LD.keepNames) do keepCount = keepCount + 1 end
@@ -218,6 +268,7 @@ local function saveConfig()
 
     if ok then
         heavyDebug("Config", "Saved to " .. CONFIG_FILE)
+        saveMacroFile()
         return true
     end
 
@@ -383,8 +434,13 @@ local function loadConfig()
                 RT.mapData[code] = {
                     waypath = type(entry.waypath) == "table" and entry.waypath or {},
                     keep = type(entry.keep) == "table" and entry.keep or {},
-                    macros = type(entry.macros) == "table" and entry.macros or {},
                 }
+                -- Pre-2.7 configs kept the macros inline; adopt them into the
+                -- macro store so nothing recorded before the split is lost.
+                if type(entry.macros) == "table" and #entry.macros > 0
+                    and not RT.macroData[code] then
+                    RT.macroData[code] = entry.macros
+                end
             end
         end
     end
@@ -399,6 +455,7 @@ local function loadConfig()
             "Adopted the pre-2.4 waypoint path into map %s.", RT.currentMap))
     end
 
+    loadMacroFile()
     applyMapFromStore(RT.currentMap)
     local mapCount = 0
     for _ in pairs(RT.mapData) do mapCount = mapCount + 1 end
@@ -417,6 +474,8 @@ end
 S.loadConfig = loadConfig
 S.saveConfig = saveConfig
 S.setCurrentMap = setCurrentMap
+S.saveMacroFile = saveMacroFile
+S.loadMacroFile = loadMacroFile
 S.syncCurrentMapToStore = syncCurrentMapToStore
 S.syncStreamerToggleWidget = syncStreamerToggleWidget
 end

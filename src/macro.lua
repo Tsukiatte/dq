@@ -18,6 +18,7 @@ local getVisualRoot = S.getVisualRoot
 local walkTowardPoint = S.walkTowardPoint
 local clearPointRoute = S.clearPointRoute
 local releaseFacing = S.releaseFacing
+local faceTowards = S.faceTowards
 local setPathEditEnabled = S.setPathEditEnabled
 
 -- =========================================================================
@@ -94,7 +95,7 @@ local function renderMacroRoute(index)
         dot.CanTouch = false
         dot.CastShadow = false
         dot.Material = Enum.Material.Neon
-        dot.Color = Color3.fromRGB(150, 110, 255)
+        dot.Color = CFG.colorMacro
         dot.Transparency = 0.4
         dot.Parent = folder
     end
@@ -132,17 +133,20 @@ local function renderMacroRoute(index)
 end
 
 -- ---------------------------------------------------------------- recording
-local function disconnectMacroInputs()
-    for _, connection in ipairs(MC.connections) do
+-- ONLY the per-recording listener. The global bind listener lives in
+-- MC.connections and must survive this: it used to share the table, so
+-- starting a recording disconnected the record bind and it never fired again.
+local function disconnectRecordInputs()
+    for _, connection in ipairs(MC.recordConnections) do
         connection:Disconnect()
     end
-    table.clear(MC.connections)
+    table.clear(MC.recordConnections)
 end
 
 local function stopRecording()
     if not MC.recording then return end
     MC.recording = false
-    disconnectMacroInputs()
+    disconnectRecordInputs()
 
     local samples = MC.samples or {}
     MC.samples, MC.actions = nil, nil
@@ -197,16 +201,18 @@ local function startRecording()
 
     MC.recording = true
     MC.recordStart = os.clock()
-    MC.samples = { { t = 0, x = root.Position.X, y = root.Position.Y, z = root.Position.Z } }
+    local _, startYaw = root.CFrame:ToOrientation()
+    MC.samples = { { t = 0, x = root.Position.X, y = root.Position.Y, z = root.Position.Z,
+        r = math.floor(startYaw * 1000 + 0.5) / 1000 } }
     MC.actions = {}
     MC.lastActions = MC.actions
     MC.lastSampleTime = MC.recordStart
     MC.lastSamplePosition = root.Position
 
-    disconnectMacroInputs()
+    disconnectRecordInputs()
     -- Actions are logged against the sample index they happened at, which is
     -- what keeps them attached to the place they were aimed at.
-    table.insert(MC.connections, UserInputService.InputBegan:Connect(function(input, processed)
+    table.insert(MC.recordConnections, UserInputService.InputBegan:Connect(function(input, processed)
         if processed or not MC.recording then return end
         local kind
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -248,6 +254,9 @@ local function recordStep()
 
     MC.lastSampleTime = now
     MC.lastSamplePosition = position
+    -- Which way you were FACING, not just where you stood (2.7.0). Yaw only:
+    -- pitch and roll are not yours to set on a humanoid anyway.
+    local _, yaw = root.CFrame:ToOrientation()
     table.insert(MC.samples, {
         t = now - MC.recordStart,
         -- One decimal is well under the arrive radius and keeps the saved JSON
@@ -255,6 +264,7 @@ local function recordStep()
         x = math.floor(position.X * 10 + 0.5) / 10,
         y = math.floor(position.Y * 10 + 0.5) / 10,
         z = math.floor(position.Z * 10 + 0.5) / 10,
+        r = math.floor(yaw * 1000 + 0.5) / 1000,
     })
 
     if #MC.samples >= CFG.macroMaxSamples then
@@ -455,9 +465,20 @@ local function runMacroPlayback(humanoid, root)
 
     -- Walk at the current sample directly: the recorded route is known to be
     -- walkable, so routing around it would be second-guessing the human who
-    -- walked it. Facing follows the direction of travel.
-    releaseFacing(humanoid)
+    -- walked it.
     local target = samplePosition(macro, MC.playCursor)
+
+    -- Facing. With a recorded yaw we reproduce where you were LOOKING, which
+    -- matters because the attacks fire in the direction the camera points -
+    -- a click replayed while facing the wrong way hits nothing. Falls back to
+    -- looking where it walks for macros recorded before 2.7.0.
+    local sample = macro.samples[MC.playCursor]
+    if CFG.macroFaceRecorded and sample and sample.r then
+        faceTowards(root, humanoid,
+            rootPos + Vector3.new(math.sin(sample.r), 0, math.cos(sample.r)) * 12)
+    else
+        releaseFacing(humanoid)
+    end
     if not NAV.lastIssuedMove
         or (NAV.lastIssuedMove - target).Magnitude > CFG.moveReissueThreshold then
         humanoid:MoveTo(target)
@@ -578,10 +599,34 @@ local function loadMacros(list)
     return #MC.macros
 end
 
+-- Save the recordings you have open into ANY map's slot, not only the one you
+-- happen to have selected: you record a route once and file it where it belongs.
+local function saveMacrosToMap(code)
+    RT.macroData[code] = serializeMacros()
+    heavyDebug("Macro", string.format("Filed %d macro(s) under %s.", #MC.macros, code))
+    if S.saveMacroFile then S.saveMacroFile() end
+    if S.refreshMacroPanel then S.refreshMacroPanel() end
+end
+
+-- Load a map's recordings and start playing them. Switching map through
+-- setCurrentMap keeps the waypoints and keep list in step too.
+local function playMapMacros(code)
+    if S.setCurrentMap then S.setCurrentMap(code) end
+    if #MC.macros == 0 then
+        heavyDebug("Macro", string.format("%s has no macros saved.", code))
+        setMovementState("no macros for " .. code)
+        return
+    end
+    setMacroMode("macro")
+    playMacro(1)
+end
+
 local function stopMacroSubsystem()
     if MC.recording then MC.recording = false end
     MC.playing = false
-    disconnectMacroInputs()
+    disconnectRecordInputs()
+    for _, connection in ipairs(MC.connections) do connection:Disconnect() end
+    table.clear(MC.connections)
     clearMacroRoute()
 end
 
@@ -604,4 +649,6 @@ S.loadMacros = loadMacros
 S.renderMacroRoute = renderMacroRoute
 S.clearMacroRoute = clearMacroRoute
 S.stopMacroSubsystem = stopMacroSubsystem
+S.saveMacrosToMap = saveMacrosToMap
+S.playMapMacros = playMapMacros
 end

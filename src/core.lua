@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 2.6.0
+    VERSION : 2.7.0
     BUILD   : 2026-09-01
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "2.6.0"
+local SCRIPT_VERSION = "2.7.0"
 local SCRIPT_BUILD_DATE = "2026-09-01"
-local SCRIPT_CODENAME = "Firstperson"
+local SCRIPT_CODENAME = "Kitbuilt"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "2.7.0", date = "2026-09-01", notes = "The interface is rebuilt from the Figma kit: two accordion windows plus an always-on HUD in the bottom-left, hover tooltips on everything after a second, and a Legacy/Macro island at the top that hides whichever system is not in charge. Every overlay is now switchable and recolourable, targeting gained lowest/highest HP modes and dodging a master switch. Macros record your FACING as well as your position, save to any map you pick from a dropdown into their own DungeonAutofarm_macros.json, and can be played back per map. Fixed: the record keybind stopped working after the first recording because starting one disconnected the listener it shared." },
     { version = "2.6.0", date = "2026-09-01", notes = "Macros are a top-level mode with their own panel and their own button, no longer nested inside the waypoint editor. Recording now switches the free-fly editor OFF: a macro is recorded from your ordinary first-person camera, and a detached camera would capture a route the character never walked. Switching the idle mode to Macros disables the editor for the same reason." },
     { version = "2.5.1", date = "2026-09-01", notes = "Fixed: the macro Record and Bind buttons were unreachable. The Route panel was only opened by the Edit Path button, which also threw the camera into free-fly and paused the loop - so the only way to reach the recorder was to hijack the camera first, which is exactly what makes recording impossible. Opening the panel and arming the free-fly editor are now separate buttons." },
     { version = "2.5.0", date = "2026-09-01", notes = "Macro Waypoints. A dropdown at the top of the path panel switches between the legacy hand-placed waypoints and the new macro mode. Record (with a rebindable key) captures where you went and what you did; the recordings are listed, renamable, reorderable and stored per map alongside the waypoints. Play walks to the start of each macro with the normal routed pathfinding, then replays it. Movement is stored as positions rather than held keys, so the replay self-corrects instead of drifting; the actions are the recorded inputs, anchored to the point along the route where they were made." },
@@ -353,6 +354,36 @@ CFG.macroSkipLimit = 12          -- consecutive skips before the macro is abando
 CFG.macroMaxSamples = 9000       -- roughly 18 minutes; a guard, not a target
 CFG.macroLoop = false            -- restart the list after the last macro
 CFG.macroShowRoute = true        -- draw the selected macro's route in the world
+CFG.macroFaceRecorded = true     -- replay the facing you had, not just where you walked
+CFG.macroFile = "DungeonAutofarm_macros.json"
+
+-- Targeting (2.7.0). "closest" is the historical behaviour; the HP modes pick
+-- among enemies within targetHpRange so the bot does not sprint across the
+-- dungeon for a wounded straggler, falling back to closest when none qualify.
+CFG.targetMode = "closest"       -- closest | lowest HP | highest HP
+CFG.targetHpRange = 150.0
+
+-- Dodging can be switched off wholesale (the Telegraphs section header).
+CFG.dodgeEnabled = true
+
+-- Overlay colours (2.7.0). Everything this script draws in the world reads its
+-- colour from here, so the Overlays section can recolour any of it. accentColor
+-- drives the whole GUI: the three gradient stops are derived from it.
+CFG.colorTelegraph = Color3.fromRGB(255, 30, 30)
+CFG.colorWall = Color3.fromRGB(40, 220, 90)
+CFG.colorHitbox = Color3.fromRGB(0, 220, 255)
+CFG.colorAbilityRadius = Color3.fromRGB(170, 100, 255)
+CFG.colorPursuit = Color3.fromRGB(0, 160, 255)
+CFG.colorEscape = Color3.fromRGB(255, 170, 0)
+CFG.colorWaypoint = Color3.fromRGB(255, 190, 40)
+CFG.colorMacro = Color3.fromRGB(150, 110, 255)
+CFG.accentColor = Color3.fromRGB(255, 182, 38)
+
+-- Overlay visibility, so the Overlays section can switch each one off.
+CFG.showPursuitRoute = true
+CFG.showEscapeRoute = true
+CFG.showWaypoints = true
+CFG.showHud = true
 
 -- The dungeons, as the config keys them. Waypoint paths and low-detail keep
 -- lists are stored per map, so one config carries every dungeon you set up.
@@ -560,6 +591,10 @@ LD.pickerEnabled = false
 -- every map in the config, so saving one map never drops the others.
 RT.currentMap = MAP_CODES[1]
 RT.mapData = {}
+-- Macros live in their own file, keyed by map: they are far bulkier than the
+-- rest of the config (thousands of samples each) and being separate makes them
+-- easy to open, copy between machines and hand to someone else.
+RT.macroData = {}
 
 -- Macros (2.5.0). "legacy" = the hand-placed waypoint path; "macro" = recorded
 -- runs. The dropdown at the top of the path panel picks which one is in charge
@@ -574,7 +609,12 @@ MC.lastSampleTime = 0
 MC.lastSamplePosition = nil
 MC.recordBind = Enum.KeyCode.RightBracket
 MC.bindCapture = false           -- the next key pressed becomes the bind
-MC.connections = {}
+-- TWO connection lists, deliberately. The bind listener is global and must
+-- outlive any recording; the action listener belongs to one recording and is
+-- torn down with it. They shared a table until 2.7.0, so starting a recording
+-- disconnected the bind key and it never fired again.
+MC.connections = {}              -- global: the record bind, and bind capture
+MC.recordConnections = {}        -- per-recording: the action input listener
 MC.playing = false
 MC.playIndex = 1                 -- which macro in the list
 MC.playPhase = "approach"        -- "approach" (walk to its start) then "replay"
@@ -693,6 +733,11 @@ local function printChangelog()
     end
     print(string.rep("=", 62))
 end
+
+-- A snapshot of every tuning value as shipped, taken before the config loader
+-- runs, so "Reset to defaults" has something true to restore.
+RT.cfgDefaults = {}
+for key, value in pairs(CFG) do RT.cfgDefaults[key] = value end
 
 S.CFG = CFG
 S.CollectionService = CollectionService

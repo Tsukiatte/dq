@@ -15,7 +15,7 @@ local BASE = (type(getgenv) == "function" and getgenv().DQ_BASE)
 
 -- Definition order is load-bearing: a module may only import from modules above it.
 -- Keep in sync with tools/modules.py.
-local ORDER = { "core", "hazards", "nav", "path", "macro", "streamer", "config", "ui", "main" }
+local ORDER = { "core", "uikit", "hazards", "nav", "path", "macro", "streamer", "config", "ui", "main" }
 
 local S = {}
 for _, name in ipairs(ORDER) do

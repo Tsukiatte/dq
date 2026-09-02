@@ -1,6 +1,6 @@
 # Dungeon Autofarm — Handoff
 
-Context for whoever picks this up next. Updated at **v2.5.0 "Playback"**.
+Context for whoever picks this up next. Updated at **v2.7.0 "Kitbuilt"**.
 
 - **Repo:** `Tsukiatte/dq`. Source is `src/*.lua` (eight modules, Roblox Luau,
   run through an executor). `DungeonAutofarm.lua` at the root is a **built
@@ -34,14 +34,15 @@ bottom (`S.heavyDebug = heavyDebug`). **Load order is fixed and load-bearing**
 | Order | Module | Holds |
 |---|---|---|
 | 1 | `core` | Version + `SCRIPT_CHANGELOG`, services, **`CFG`** (all tuning, ~100 keys — start here for behaviour changes), the state tables `UI` `SM` `NAV` `HZ` **`RT`**, debug logging, `getVisualRoot` |
-| 2 | `hazards` | Classifiers + memo caches, `isDamageBrick`, hazard geometry, overlays, telegraph feed, **world index**, pickers |
-| 3 | `nav` | Pursuit routing, retry ladder, steering (`steerTowards`), blacklists, escape routing, facing rig, **routed point walking** (`walkTowardPoint`, `followPath`) |
-| 4 | `path` | Manual waypoint path: markers, editing, free-fly editor, progression, **recovery** |
-| 5 | `macro` | **Macro Waypoints**: recording, the macro list, playback |
-| 6 | `streamer` | Streamer Mode (untouched since 1.x) |
-| 7 | `config` | JSON save/load, **per-map storage** |
-| 8 | `ui` | Control window, streamer panel, route panel, attack book panel, map panel, `destructScript` |
-| 9 | `main` | Enemy scan, attack, abilities, remote hook, the two Heartbeat loops, `startAutofarm()` |
+| 2 | `uikit` | **The widget kit**: theme tokens, window, section, row, toggle, slider, dropdown, colour picker, list, buttons, tooltips |
+| 3 | `hazards` | Classifiers + memo caches, `isDamageBrick`, hazard geometry, overlays, telegraph feed, **world index**, pickers |
+| 4 | `nav` | Pursuit routing, retry ladder, steering (`steerTowards`), blacklists, escape routing, facing rig, **routed point walking** (`walkTowardPoint`, `followPath`) |
+| 5 | `path` | Manual waypoint path: markers, editing, free-fly editor, progression, **recovery** |
+| 6 | `macro` | **Macro Waypoints**: recording, the macro list, playback |
+| 7 | `streamer` | Streamer Mode (untouched since 1.x) |
+| 8 | `config` | JSON save/load, **per-map storage** |
+| 9 | `ui` | Control window, streamer panel, route panel, attack book panel, map panel, `destructScript` |
+| 10 | `main` | Enemy scan, attack, abilities, remote hook, the two Heartbeat loops, `startAutofarm()` |
 
 **`RT`** is where the old loose mutable locals live (`RT.farmEnabled`,
 `RT.debugLevel`, `RT.destroyed`, the connections, the render toggles). They are
@@ -64,6 +65,39 @@ footer of its module, add `local name = S.name` to the header of the consumer.
 Run `check.py`; it will tell you if you forgot either half.
 
 ---
+
+## The interface (2.7.0)
+
+`src/uikit.lua` is a port of the Figma kit (file `z7K7RSX8F911V8r4Q01nSU`).
+Every colour, radius, gap and type size comes from that file's variables, so
+the two stay comparable - **if you change a visual constant, change it there
+and nowhere else**. Three rules carried over from the design's own notes:
+
+- **No image assets.** Chevrons, the confirm tick, the pencil and the bin are
+  built from Frames. Nothing can fail to load.
+- **The accent gradient is defined once** (`Theme.AccentA/Mid/B`, applied by
+  `accentGradient`). Every window, button, toggle and slider fill reads it.
+- **Elevation is stacked Frames** behind the panel at low alpha, because Roblox
+  has no box-shadow and the kit takes no assets. Eight layers at 0.07 come to
+  about the design's `0 14px 34px rgba(0,0,0,.45)`.
+
+Two windows, both accordions, plus a HUD. `ui.lua` composes them; it holds no
+visual constants of its own. The **HUD is the only thing on screen with the GUI
+closed** (bottom-left, `CFG.showHud`); **RightShift** toggles the windows. Every
+control takes an explanation string, shown as a tooltip after a second's hover.
+
+**The Legacy / Macro island** at the top of the Autofarm window drives
+`MC.mode`, and `applyMode()` hides the sections belonging to whichever system is
+not in charge - `legacySections` and `macroSections` in `createControlUI`. Add a
+new section to one of those lists or it will show in both modes.
+
+**Widgets that display a value must be registered** with `track(...)` so
+`refreshAllWidgets()` can put them back in step after a config load or a Reset
+to defaults. A widget returns `{ ..., render = fn }` for exactly that.
+
+**A Roblox Instance rejects new fields.** `chevron`, `buttonRow`, `segmented`
+and the rest return TABLES holding their frame plus their functions - do not go
+back to hanging methods off the Instance.
 
 ## Verification
 

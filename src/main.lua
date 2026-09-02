@@ -258,6 +258,7 @@ local function findNearestEnemy()
 
     local nearestEnemy = nil
     local nearestDistance = math.huge
+    local nearestScore = math.huge
     local enemyCount = 0
     local seenModels = {}
     local now = os.clock()
@@ -293,13 +294,31 @@ local function findNearestEnemy()
         seenModels[model] = true
         enemyCount = enemyCount + 1
         local distance = (rootPos - root.Position).Magnitude
+        local health = healthValue or (humanoid and humanoid.Health) or nil
         -- Guarded so the string.format cost is not paid on every entity every
         -- scan while VERBOSE is off, which is almost always.
         if RT.debugLevel >= DEBUG_VERBOSE then
             heavyDebug("Scanner", string.format("Found valid entity via [%s]: %s | Distance: %.1f | HP: %s", sourceTag, model.Name, distance, tostring(healthValue or (humanoid and humanoid.Health))), DEBUG_VERBOSE)
         end
 
-        if distance < nearestDistance then
+        -- Targeting (2.7.0). "closest" scores on distance, as it always did.
+        -- The HP modes score on health but only consider enemies inside
+        -- targetHpRange, so a wounded straggler on the far side of the dungeon
+        -- does not drag the bot across the map; outside that range they fall
+        -- back to distance, which keeps the bot moving toward something.
+        local score, inRange
+        if CFG.targetMode == "lowest HP" and health then
+            inRange = distance <= CFG.targetHpRange
+            score = inRange and health or (1e9 + distance)
+        elseif CFG.targetMode == "highest HP" and health then
+            inRange = distance <= CFG.targetHpRange
+            score = inRange and -health or (1e9 + distance)
+        else
+            score = distance
+        end
+
+        if score < nearestScore then
+            nearestScore = score
             nearestDistance = distance
             nearestEnemy = model
         end
@@ -534,7 +553,7 @@ local function startAutofarm()
             -- sets this; the recovery detector reads it after the branch.
             NAV.driving = false
 
-            local inHazard = not isPositionSafeFromDamageBricks(root.Position, 0.5)
+            local inHazard = CFG.dodgeEnabled and not isPositionSafeFromDamageBricks(root.Position, 0.5)
 
             -- Location-based stuck detection. Deliberately skipped while dodging:
             -- holding still inside a telegraph's clearance is the escape logic

@@ -84,7 +84,7 @@ local function buildMarker(folder, i, withLink)
     orb.CanTouch = false
     orb.CastShadow = false
     orb.Material = Enum.Material.Neon
-    orb.Color = Color3.fromRGB(255, 190, 40)
+    orb.Color = CFG.colorWaypoint
     orb.Transparency = 0.25
     orb.Parent = folder
     marker.orb = orb
@@ -102,7 +102,7 @@ local function buildMarker(folder, i, withLink)
     label.BackgroundTransparency = 1
     label.Font = Enum.Font.GothamBold
     label.Text = "#" .. i
-    label.TextColor3 = Color3.fromRGB(255, 210, 90)
+    label.TextColor3 = CFG.colorWaypoint
     label.TextStrokeTransparency = 0.2
     label.TextScaled = true
     label.Parent = billboard
@@ -119,7 +119,7 @@ local function buildMarker(folder, i, withLink)
         link.CanTouch = false
         link.CastShadow = false
         link.Material = Enum.Material.Neon
-        link.Color = Color3.fromRGB(255, 190, 40)
+        link.Color = CFG.colorWaypoint
         link.Transparency = 0.6
         link.Size = Vector3.new(0.15, 0.15, (pos - prev).Magnitude)
         link.CFrame = CFrame.lookAt(mid, pos)

@@ -187,6 +187,7 @@ def free_names(src):
 KNOWN_GLOBALS = set("""
 game workspace script Instance Vector2 Vector3 CFrame Color3 UDim UDim2 Enum RaycastParams
 Rect Region3 NumberRange NumberSequence ColorSequence TweenInfo BrickColor Random
+Font ColorSequenceKeypoint NumberSequenceKeypoint OverlapParams PhysicalProperties Ray Axes Faces
 task wait spawn delay tick time os math string table coroutine utf8 bit32 debug
 print warn error assert pcall xpcall ipairs pairs next select type typeof tostring tonumber
 unpack rawget rawset rawequal rawlen setmetatable getmetatable require _G _VERSION
