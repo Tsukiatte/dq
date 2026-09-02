@@ -114,6 +114,9 @@ local function buildConfigTable()
         },
         learnedTelegraphNames = learned,
         ownAttackNames = ownNames,
+        -- Plain data by construction (partSignature + name/hits/flags), so it
+        -- round-trips through JSON as-is.
+        attackBook = HZ.attackBook,
         waypath = waypath,
     }
 end
@@ -198,6 +201,9 @@ local function loadConfig()
         if visuals.showWalls ~= nil then CFG.showWalls = visuals.showWalls == true end
         RT.debugLevel = tonumber(visuals.debugLevel) or RT.debugLevel
     end
+    -- Enemy attacks are always highlighted since 2.3.0; an older config that
+    -- saved the toggle off must not switch them off.
+    RT.renderHazardsEnabled = true
 
     local streamer = data.streamer
     if type(streamer) == "table" then
@@ -243,6 +249,20 @@ local function loadConfig()
             if type(name) == "string" then
                 HZ.learnedNames[name] = true
             end
+        end
+    end
+
+    if type(data.attackBook) == "table" then
+        table.clear(HZ.attackBook)
+        for _, record in ipairs(data.attackBook) do
+            if type(record) == "table" and type(record.name) == "string"
+                and type(record.partName) == "string" and tonumber(record.sx) then
+                table.insert(HZ.attackBook, record)
+            end
+        end
+        S.invalidateAttackBook()
+        if #HZ.attackBook > 0 then
+            heavyDebug("Config", string.format("Restored %d attack book entries.", #HZ.attackBook))
         end
     end
 

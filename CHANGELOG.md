@@ -11,6 +11,70 @@ file and that table in sync on every edit.
 
 ---
 
+## 2.3.0 - 2026-09-01 - "Fieldnotes"
+Three requests: learn from damage on "trial runs", predict projectiles, and
+always show enemy attacks with their names.
+
+### Trial runs and the Attack Book
+- **Trial Run** (button where the highlight toggle was): while it is on, every
+  drop in health is a lesson. The suspects for a hit are the hazards already
+  detected in range (strongest evidence - we were standing in one) plus every
+  part that appeared within `CFG.damageCorrelationWindow` (1.5s) before the hit
+  and within `CFG.damageCorrelationRadius` (25 studs) of us. The closest two are
+  written into the **Attack Book** or confirm an existing entry (hit count goes
+  up). A hit with no candidate at all - a melee swing with no spawned part, a
+  DoT tick - learns nothing and says so in the log; that is what keeps the book
+  from filling with scenery.
+- **What a record is**: a plain-data signature of the part (name, parent name,
+  class, material, shape, colour, size) plus a name, hit count, max damage,
+  `moving`, `melee` and `enabled`. A part matches a record **by name** when the
+  name is specific (and by parent name too when that is specific), **by look**
+  (material, shape, anchored, colour within `attackColorTolerance`, size within
+  `attackSizeTolerance`) when the name is generic like `Part`. Matches are
+  memoised per part and cleared when the book changes.
+- **Naming**: the part's own name if it says something, else the parent's name,
+  else `Attack N`. Rename by typing in the panel.
+- **Melee hitboxes start OFF.** A part learned from inside a creature model is
+  that creature's swing hitbox; dodging it keeps the bot out of its own attack
+  range, so the record is created disabled and the log says so. Turn it on in
+  the panel if that is really wanted.
+- **Detection order** in `isDamageBrick`: our visuals, fully transparent, manual
+  telegraph pick, own effect, ownership, **attack book**, creature-part veto,
+  learned telegraph name, **projectile**, CanCollide, heuristics. The book sits
+  above the creature-part veto precisely so an enabled melee record can work.
+- **Attack Book panel**: name box (editable), `N hits, dmg, look, moving, in
+  creature`, ON/OFF, X. Bottom row: **Save** (writes the book with the rest of
+  the config), Clear, Close. The main-window button shows the entry count. The
+  book is restored on load and used for detection whether or not a trial run is
+  on.
+
+### Projectile prediction
+- Parts that appeared in the last `CFG.projectileTrackWindow` (6s) and every
+  detected hazard have their velocity tracked each frame (smoothed half/half so
+  a spawn teleport does not read as speed). Big anchored collidable parts are
+  skipped so a streaming burst does not cost a frame.
+- **A moving hazard is dodged along the strip it will sweep** over the next
+  `CFG.projectileLookahead` (1.2s): `hazardClosestPoint` takes the closest point
+  along that sweep instead of the part's current position, and the safety test,
+  the penalty field and the repulsion vector all go through it. A projectile
+  heading at the character reads as a hazard before it arrives; stepping out of
+  its line reads as safe even while it is still close.
+- **Escape candidates sideways**: each moving hazard adds two candidates
+  perpendicular to its travel, which the swept-strip penalty then ranks.
+- **Projectile discovery**: a small thing (`projectileMaxSize`) that appeared
+  moments ago and is moving faster than `projectileMinSpeed` (8 st/s) is a
+  hazard whatever it is called and however it is anchored - tested before the
+  anchored/non-collidable telegraph rules, which would otherwise reject most
+  projectiles. A young part that *starts* moving is re-classified on the spot.
+
+### Always highlighted, always named
+- The red highlight is no longer a toggle; every detected enemy attack is drawn.
+  Each one carries a **billboard tag**: its Attack Book name (or part name),
+  plus `>> 24 st/s` if moving or its age if not. Moving hazards also get a thin
+  neon **predicted-path line** along the sweep, so the prediction is visible.
+  Tags and lines are pooled with the highlight and cleaned up with it.
+- An old config that saved the highlight toggle off no longer switches it off.
+
 ## 2.2.0 - 2026-09-01 - "Lifeline"
 Priorities 2 and 1 from the handover list (the stuck-on-terrain problem and the
 manual path as the fallback), plus the two extra asks (Q/E radius, own attacks).

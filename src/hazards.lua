@@ -118,6 +118,8 @@ local partShapeCache = {}
 -- Invisible-wall answers are stable per part, but the overlay tests every part on
 -- the map, so the result is memoised like the rest and dropped on the flush.
 local invisWallCache = {}
+-- Attack-book matches are stable per part; cleared here and whenever the book changes.
+local attackMatchCache = {}
 RT.lastCacheFlushTime = os.clock()
 
 local function flushClassificationCaches()
@@ -125,6 +127,7 @@ local function flushClassificationCaches()
     table.clear(mapGeometryCache)
     table.clear(partShapeCache)
     table.clear(invisWallCache)
+    table.clear(attackMatchCache)
     RT.lastCacheFlushTime = os.clock()
 
     -- Benched enemies that died or despawned would otherwise sit in the table
@@ -345,6 +348,142 @@ local function looksLikeTelegraph(part, now)
     return signals >= 3
 end
 
+-- =========================================================================
+-- ATTACK BOOK + MOTION (2.3.0)
+--
+-- The attack book is evidence-based detection: a record is only written when
+-- we actually took damage with that kind of part next to us (see
+-- recordDamageEvent further down). Each record is a plain-data signature of
+-- the part - name, parent name, class, material, shape, colour, size - plus a
+-- display name, hit count and an enabled flag, so it can be saved as JSON and
+-- shown in a panel. A part matches a record by name when the name is specific,
+-- or by look when the name is generic ("Part").
+--
+-- Motion: parts that appeared recently, and every detected hazard, have their
+-- velocity tracked. A hazard that is moving is a projectile for dodging
+-- purposes: it is treated as occupying the strip it will sweep over the next
+-- CFG.projectileLookahead seconds (hazardClosestPoint, below closestPointOnPart).
+-- =========================================================================
+
+-- Names that say nothing about what a part is; never learned or matched by name.
+local GENERIC_PART_NAMES = {
+    part = true, meshpart = true, union = true, unionoperation = true, handle = true,
+    wedge = true, wedgepart = true, cylinder = true, ball = true, block = true, [""] = true,
+    model = true, folder = true, workspace = true, effects = true, effect = true, fx = true,
+}
+local SHAPE_NAMES = { [SHAPE_BOX] = "box", [SHAPE_CYLINDER] = "disc", [SHAPE_SPHERE] = "ball" }
+
+local function isGenericName(lname)
+    return GENERIC_PART_NAMES[lname] == true
+end
+
+local function partSignature(part)
+    local color = part.Color
+    local size = part.Size
+    local parent = part.Parent
+    return {
+        partName = string.lower(part.Name),
+        parentName = (parent and parent ~= Workspace) and string.lower(parent.Name) or "",
+        className = part.ClassName,
+        material = part.Material.Name,
+        shape = classifyPartShape(part),
+        anchored = part.Anchored,
+        r = color.R, g = color.G, b = color.B,
+        sx = size.X, sy = size.Y, sz = size.Z,
+    }
+end
+
+local function sizeClose(a, b)
+    local tolerance = CFG.attackSizeTolerance
+    local function close(x, y)
+        return math.abs(x - y) / math.max(x, y, 0.5) <= tolerance
+    end
+    return close(a.sx, b.sx) and close(a.sy, b.sy) and close(a.sz, b.sz)
+end
+
+local function matchesAttackRecord(sig, record)
+    if not isGenericName(record.partName) then
+        if sig.partName ~= record.partName then return false end
+        -- A specific name under a specific parent: both must match, so "Slam"
+        -- under "FireBoss" is not confused with "Slam" under something else.
+        if not isGenericName(record.parentName) and sig.parentName ~= record.parentName then
+            return false
+        end
+        return true
+    end
+    -- Generic name: match by look.
+    if sig.material ~= record.material or sig.shape ~= record.shape or sig.anchored ~= record.anchored then
+        return false
+    end
+    local dr, dg, db = sig.r - record.r, sig.g - record.g, sig.b - record.b
+    if math.sqrt(dr * dr + dg * dg + db * db) > CFG.attackColorTolerance then return false end
+    return sizeClose(sig, record)
+end
+
+local function findAttackRecord(part)
+    local cached = attackMatchCache[part]
+    if cached ~= nil then return cached or nil end
+    local found = false
+    if #HZ.attackBook > 0 then
+        local sig = partSignature(part)
+        for _, record in ipairs(HZ.attackBook) do
+            if matchesAttackRecord(sig, record) then
+                found = record
+                break
+            end
+        end
+    end
+    attackMatchCache[part] = found
+    return found or nil
+end
+
+local function invalidateAttackBook()
+    table.clear(attackMatchCache)
+    if S.refreshAttackBookPanel then S.refreshAttackBookPanel() end
+end
+
+local function describeRecord(record)
+    return string.format("%s %s %.0fx%.0fx%.0f", record.material,
+        SHAPE_NAMES[record.shape] or "box", record.sx, record.sy, record.sz)
+end
+
+-- Velocity tracking. Smoothed half/half so one frame of teleport (a projectile
+-- being positioned at its spawn point) does not read as speed.
+local function updateMotion(part, now)
+    local record = HZ.motion[part]
+    local position = part.Position
+    if not record then
+        HZ.motion[part] = { position = position, time = now, velocity = Vector3.zero, moving = false }
+        return
+    end
+    local dt = now - record.time
+    if dt < 0.03 then return end
+    local instant = (position - record.position) / dt
+    local velocity = record.velocity * 0.5 + instant * 0.5
+    record.position = position
+    record.time = now
+    record.velocity = velocity
+    record.moving = Vector3.new(velocity.X, 0, velocity.Z).Magnitude >= CFG.projectileMinSpeed
+end
+
+-- The flat velocity of a hazard that is moving, or nil.
+local function getHazardMotion(part)
+    local record = HZ.motion[part]
+    if record and record.moving then return record.velocity end
+    return nil
+end
+
+-- A small thing that appeared moments ago and is moving fast is a projectile,
+-- whatever it is called and however it is anchored.
+local function looksLikeProjectile(part, now)
+    local addedAt = HZ.recentParts[part]
+    if not addedAt or now - addedAt > CFG.projectileTrackWindow then return false end
+    if not getHazardMotion(part) then return false end
+    local size = part.Size
+    local longest = math.max(size.X, size.Y, size.Z)
+    return longest >= 0.5 and longest <= CFG.projectileMaxSize
+end
+
 local function isDamageBrick(part)
     if not part:IsA("BasePart") then return false end
 
@@ -373,6 +512,15 @@ local function isDamageBrick(part)
 
     if isOwnedByPlayerOrTeammate(part) then return false end
 
+    -- The attack book (2.3.0): evidence that this kind of part hurt us. It
+    -- outranks the creature-part veto below because a record learned from a
+    -- part inside a creature is exactly a swing hitbox - but those records are
+    -- OFF by default, see learnAttackPart.
+    local record = findAttackRecord(part)
+    if record then
+        return record.enabled ~= false
+    end
+
     local ancestorModel = part:FindFirstAncestorOfClass("Model")
     if ancestorModel and ancestorModel:FindFirstChildOfClass("Humanoid") then
         return false
@@ -382,9 +530,14 @@ local function isDamageBrick(part)
     -- map-geometry filters that were causing the missed hitboxes.
     if HZ.learnedNames[partName] then return true end
 
+    local now = os.clock()
+
+    -- Projectiles (2.3.0) are often collidable, unanchored, or both, so they are
+    -- tested before the anchored/non-collidable telegraph rules.
+    if looksLikeProjectile(part, now) then return true end
+
     if part.CanCollide then return false end
 
-    local now = os.clock()
     local telegraphShaped = looksLikeTelegraph(part, now)
 
     -- Map geometry only vetoes parts that do not look like an attack marker.
@@ -473,6 +626,24 @@ local function closestPointOnPart(part, worldPosition)
     return part.CFrame:PointToWorldSpace(clampedLocal)
 end
 
+-- The closest point of a hazard to `position`, including where it is GOING:
+-- for a moving hazard the point is taken along the strip it will sweep over
+-- the next CFG.projectileLookahead seconds. Everything that decides "am I in
+-- danger here" goes through this, so a projectile heading at the character
+-- reads as a hazard before it arrives, and stepping sideways out of its line
+-- reads as safe even while it is still close.
+local function hazardClosestPoint(part, position)
+    local closest = closestPointOnPart(part, position)
+    local velocity = getHazardMotion(part)
+    if not velocity then return closest end
+    local sweep = Vector3.new(velocity.X, 0, velocity.Z) * CFG.projectileLookahead
+    local lengthSq = sweep:Dot(sweep)
+    if lengthSq < 0.01 then return closest end
+    local toPoint = Vector3.new(position.X - closest.X, 0, position.Z - closest.Z)
+    local t = math.clamp(toPoint:Dot(sweep) / lengthSq, 0, 1)
+    return closest + sweep * t
+end
+
 local function isPositionSafeFromDamageBricks(position, extraClearance)
     local _, playerRadius, totalHeight = getPlayerHitboxMetrics()
     local clearance = CFG.damageBrickClearance + playerRadius + (extraClearance or 0)
@@ -480,7 +651,7 @@ local function isPositionSafeFromDamageBricks(position, extraClearance)
 
     for _, part in ipairs(HZ.detected) do
         if part.Parent then
-            local closest = closestPointOnPart(part, position)
+            local closest = hazardClosestPoint(part, position)
             local horizontalDist = Vector2.new(position.X - closest.X, position.Z - closest.Z).Magnitude
             local verticalBlocked = CFG.hazardIgnoreVertical or math.abs(position.Y - closest.Y) < halfHeight
 
@@ -501,7 +672,7 @@ local function evaluateHazardPenaltyAtPoint(pos)
 
     for _, part in ipairs(HZ.detected) do
         if part.Parent then
-            local closest = closestPointOnPart(part, pos)
+            local closest = hazardClosestPoint(part, pos)
             local horizontalDist = Vector2.new(pos.X - closest.X, pos.Z - closest.Z).Magnitude
             local verticalBlocked = CFG.hazardIgnoreVertical or math.abs(pos.Y - closest.Y) < halfHeight
 
@@ -528,7 +699,7 @@ local function getActiveHazardRepulsionVector(pos)
 
     for _, part in ipairs(HZ.detected) do
         if part.Parent then
-            local closest = closestPointOnPart(part, pos)
+            local closest = hazardClosestPoint(part, pos)
             local flatOffset = Vector3.new(pos.X - closest.X, 0, pos.Z - closest.Z)
             local dist = flatOffset.Magnitude
             local verticalBlocked = CFG.hazardIgnoreVertical or math.abs(pos.Y - closest.Y) < halfHeight
@@ -556,17 +727,25 @@ local function clearHazardHighlights()
     end
 end
 
-local function updateHazardHighlights()
-    if not RT.renderHazardsEnabled then
-        clearHazardHighlights()
-        return
-    end
+-- What a hazard is called on its tag: the attack-book name if it has earned one,
+-- otherwise the part's own name.
+local function hazardDisplayName(part)
+    local record = findAttackRecord(part)
+    if record then return record.name end
+    return part.Name
+end
 
-    if not HZ.highlightsFolder then
+-- Always on (2.3.0): every detected enemy attack is highlighted, tagged with its
+-- name, and - if it is moving - drawn with the path it is predicted to sweep.
+local function updateHazardHighlights()
+    if not HZ.highlightsFolder or not HZ.highlightsFolder.Parent then
         HZ.highlightsFolder = Instance.new("Folder")
-        HZ.highlightsFolder.Name = "DungeonHazardHighlights"
+        HZ.highlightsFolder.Name = "HazardHighlights"
         HZ.highlightsFolder.Parent = getVisualRoot()
+        table.clear(HZ.predictionOwner)
     end
+    local folder = HZ.highlightsFolder
+    local now = os.clock()
 
     -- Set lookup instead of a table.find per child, which made cleanup O(n*m).
     local activeSet = {}
@@ -574,17 +753,92 @@ local function updateHazardHighlights()
         activeSet[part] = true
     end
 
-    for _, child in ipairs(HZ.highlightsFolder:GetChildren()) do
-        local adornee = child:IsA("Highlight") and child.Adornee or (child:IsA("CylinderHandleAdornment") or child:IsA("SphereHandleAdornment") or child:IsA("SelectionBox")) and child.Adornee
+    for _, child in ipairs(folder:GetChildren()) do
+        local adornee
+        if child:IsA("BasePart") then
+            adornee = HZ.predictionOwner[child]
+        else
+            adornee = child.Adornee   -- Highlight, HandleAdornments, SelectionBox, BillboardGui
+        end
         if not adornee or not adornee.Parent or not activeSet[adornee] then
+            if child:IsA("BasePart") then HZ.predictionOwner[child] = nil end
             child:Destroy()
         end
     end
 
     for _, part in ipairs(HZ.detected) do
         if part.Parent then
-            local highlightId = "Highlight_" .. part:GetDebugId()
-            if not HZ.highlightsFolder:FindFirstChild(highlightId) then
+            local debugId = part:GetDebugId()
+            local velocity = getHazardMotion(part)
+
+            -- Name tag.
+            if CFG.hazardTagEnabled then
+                local tagId = "Tag_" .. debugId
+                local tag = folder:FindFirstChild(tagId)
+                if not tag then
+                    tag = Instance.new("BillboardGui")
+                    tag.Name = tagId
+                    tag.Adornee = part
+                    tag.Size = UDim2.fromOffset(180, 34)
+                    tag.StudsOffsetWorldSpace = Vector3.new(0, part.Size.Y * 0.5 + 2.5, 0)
+                    tag.AlwaysOnTop = true
+                    tag.MaxDistance = 250
+                    local label = Instance.new("TextLabel")
+                    label.Name = "Label"
+                    label.Size = UDim2.fromScale(1, 1)
+                    label.BackgroundTransparency = 1
+                    label.Font = Enum.Font.GothamBold
+                    label.TextColor3 = Color3.fromRGB(255, 120, 120)
+                    label.TextStrokeTransparency = 0.15
+                    label.TextSize = 14
+                    label.TextScaled = false
+                    label.Parent = tag
+                    tag.Parent = folder
+                end
+                local label = tag:FindFirstChild("Label")
+                if label then
+                    local text
+                    if velocity then
+                        text = string.format("%s  >> %.0f st/s", hazardDisplayName(part),
+                            Vector3.new(velocity.X, 0, velocity.Z).Magnitude)
+                    else
+                        text = string.format("%s  %.1fs", hazardDisplayName(part),
+                            math.max(now - (HZ.spawnTimes[part] or now), 0))
+                    end
+                    if label.Text ~= text then label.Text = text end
+                end
+            end
+
+            -- Predicted path of a moving hazard: a thin neon line along the sweep.
+            local lineId = "Pred_" .. debugId
+            local line = folder:FindFirstChild(lineId)
+            if velocity then
+                local sweep = Vector3.new(velocity.X, 0, velocity.Z) * CFG.projectileLookahead
+                local from = part.Position
+                local to = from + sweep
+                if not line then
+                    line = Instance.new("Part")
+                    line.Name = lineId
+                    line.Anchored = true
+                    line.CanCollide = false
+                    line.CanQuery = false
+                    line.CanTouch = false
+                    line.CastShadow = false
+                    line.Material = Enum.Material.Neon
+                    line.Color = Color3.fromRGB(255, 80, 80)
+                    line.Transparency = 0.35
+                    line.Parent = folder
+                    HZ.predictionOwner[line] = part
+                end
+                line.Size = Vector3.new(0.3, 0.3, math.max(sweep.Magnitude, 0.1))
+                line.CFrame = CFrame.lookAt(from:Lerp(to, 0.5), to)
+            elseif line then
+                HZ.predictionOwner[line] = nil
+                line:Destroy()
+            end
+
+            local highlightId = "Highlight_" .. debugId
+            if not folder:FindFirstChild(highlightId) then
                 local isCylinder = false
                 local isSphere = false
                 if part:IsA("Part") then
@@ -899,11 +1153,8 @@ end
 -- frame it appears (that is the telegraph case that matters).
 -- =========================================================================
 
--- Names that say nothing about what a part is; never learned as "ours".
-local GENERIC_PART_NAMES = {
-    part = true, meshpart = true, union = true, unionoperation = true, handle = true,
-    wedge = true, wedgepart = true, cylinder = true, ball = true, block = true, [""] = true,
-}
+-- (GENERIC_PART_NAMES - names never learned as "ours" or as an attack - is
+-- declared with the attack book above, since both use it.)
 
 -- Stamps that one of OUR casts just happened. Fed by the Animator (an
 -- Action-priority animation starting on our character) and by the remote hook
@@ -1039,6 +1290,15 @@ local function indexAdded(inst, now, initial)
             end
             markOwnIfRecent(inst, now)
             HZ.freshParts[#HZ.freshParts + 1] = inst
+            -- Motion-tracked while young (2.3.0), so a projectile is caught by
+            -- its speed and a hit can be correlated with what just appeared.
+            -- Big anchored collidable parts are map geometry streaming in and
+            -- are skipped, or a streaming burst would cost a frame.
+            local size = inst.Size
+            if not inst.CanCollide or not inst.Anchored
+                or math.max(size.X, size.Y, size.Z) <= CFG.projectileMaxSize then
+                HZ.recentParts[inst] = now
+            end
         end
         poolAdd(inst)
     elseif inst:IsA("Humanoid") then
@@ -1064,6 +1324,8 @@ local function indexRemoving(inst)
         end
         HZ.seenAt[inst] = nil
         HZ.spawnTimes[inst] = nil
+        HZ.recentParts[inst] = nil
+        HZ.motion[inst] = nil
     elseif inst:IsA("Humanoid") then
         local model = inst.Parent
         if model then HZ.enemyModels[model] = nil end
@@ -1163,12 +1425,154 @@ local function worldIndexStep()
     end
 end
 
+-- =========================================================================
+-- TRIAL RUNS (2.3.0): learning from damage.
+--
+-- With Trial Run on, every drop in our health is a lesson. The suspects are
+-- the hazards already detected in range (strongest evidence: we were standing
+-- in one) and every part that appeared within CFG.damageCorrelationWindow
+-- before the hit and within CFG.damageCorrelationRadius of us. The closest
+-- few are written into the attack book, or confirm an existing record. A hit
+-- with no candidate at all (a melee swing with no spawned part, a DoT tick) is
+-- logged and learns nothing, which is what keeps the book from filling with
+-- scenery.
+-- =========================================================================
+
+local function autoAttackName(part)
+    local name = part.Name
+    if not isGenericName(string.lower(name)) then return name end
+    local parent = part.Parent
+    if parent and parent ~= Workspace and not isGenericName(string.lower(parent.Name)) then
+        return parent.Name
+    end
+    return string.format("Attack %d", #HZ.attackBook + 1)
+end
+
+local function learnAttackPart(part, damage, now)
+    local record = findAttackRecord(part)
+    if record then
+        record.hits = (record.hits or 0) + 1
+        record.damage = math.max(record.damage or 0, damage)
+        heavyDebug("Trial", string.format("'%s' confirmed (hit #%d, %.0f damage).",
+            record.name, record.hits, damage))
+    else
+        record = partSignature(part)
+        local ancestorModel = part:FindFirstAncestorOfClass("Model")
+        local melee = ancestorModel ~= nil and ancestorModel:FindFirstChildOfClass("Humanoid") ~= nil
+        record.name = autoAttackName(part)
+        record.hits = 1
+        record.damage = damage
+        record.melee = melee
+        -- A part inside a creature model is its swing hitbox. Dodging those
+        -- keeps the bot out of its own attack range, so it starts OFF and the
+        -- user turns it on in the Attack Book if that is really wanted.
+        record.enabled = not melee
+        record.moving = getHazardMotion(part) ~= nil
+        record.learnedAt = os.time()
+        table.insert(HZ.attackBook, record)
+        heavyDebug("Trial", string.format(
+            "NEW attack learned: '%s' (%s%s, %.0f damage)%s",
+            record.name, describeRecord(record), record.moving and ", moving" or "", damage,
+            melee and " - inside a creature model, so OFF by default. Enable it in the Attack Book if wanted."
+                or ". Saved with the config."))
+    end
+    invalidateAttackBook()
+    -- Track it right away rather than waiting for the round-robin.
+    if HZ.partPoolIndex[part] then classifyPoolPart(part, now) end
+end
+
+local function recordDamageEvent(damage, now)
+    local character = LocalPlayer.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    local rootPos = root.Position
+    HZ.damageEvents = HZ.damageEvents + 1
+
+    local suspects = {}
+    local seen = {}
+    for _, part in ipairs(HZ.detected) do
+        if part.Parent and not seen[part] then
+            seen[part] = true
+            local closest = hazardClosestPoint(part, rootPos)
+            suspects[#suspects + 1] = {
+                part = part, detected = true,
+                distance = Vector2.new(rootPos.X - closest.X, rootPos.Z - closest.Z).Magnitude,
+            }
+        end
+    end
+    for part, addedAt in pairs(HZ.recentParts) do
+        if not seen[part] and part.Parent and now - addedAt <= CFG.damageCorrelationWindow
+            and not HZ.ownParts[part] and not HZ.ownNames[string.lower(part.Name)] then
+            local position = part.Position
+            local distance = Vector2.new(rootPos.X - position.X, rootPos.Z - position.Z).Magnitude
+            if distance <= CFG.damageCorrelationRadius and not isOwnedByPlayerOrTeammate(part) then
+                seen[part] = true
+                suspects[#suspects + 1] = { part = part, detected = false, distance = distance }
+            end
+        end
+    end
+
+    if #suspects == 0 then
+        heavyDebug("Trial", string.format(
+            "Took %.0f damage with nothing that appeared nearby in the last %.1fs - melee or DoT; nothing learned.",
+            damage, CFG.damageCorrelationWindow))
+        return
+    end
+
+    table.sort(suspects, function(a, b)
+        if a.detected ~= b.detected then return a.detected end
+        return a.distance < b.distance
+    end)
+    for i = 1, math.min(#suspects, CFG.damageSuspectLimit) do
+        learnAttackPart(suspects[i].part, damage, now)
+    end
+end
+
+local function removeAttackRecord(index)
+    if not HZ.attackBook[index] then return end
+    local record = table.remove(HZ.attackBook, index)
+    heavyDebug("Trial", string.format("Forgot attack '%s'.", record.name))
+    invalidateAttackBook()
+end
+
+local function clearAttackBook()
+    table.clear(HZ.attackBook)
+    heavyDebug("Trial", "Attack book cleared.")
+    invalidateAttackBook()
+end
+
+local function setTrialEnabled(enabled)
+    HZ.trialEnabled = enabled
+    heavyDebug("Trial", enabled
+        and "TRIAL RUN ON: every hit taken is matched to what appeared around you and written into the Attack Book."
+        or "Trial run off. The Attack Book keeps being used for detection.")
+end
+
+-- Per frame: motion for every young part (projectile discovery) and every
+-- current candidate, and pruning of parts that have aged out.
+local function trackRecentParts(now)
+    for part, addedAt in pairs(HZ.recentParts) do
+        if not part.Parent or now - addedAt > CFG.projectileTrackWindow then
+            HZ.recentParts[part] = nil
+            if not HZ.candidateSet[part] then HZ.motion[part] = nil end
+        else
+            updateMotion(part, now)
+            local motion = HZ.motion[part]
+            if motion and motion.moving and not HZ.candidateSet[part] and HZ.partPoolIndex[part] then
+                -- It started moving: it may be a projectile now.
+                classifyPoolPart(part, now)
+            end
+        end
+    end
+end
+
 -- The catalog (which parts are telegraphs / invisible walls) is maintained by
 -- the world index above, not here. This function only does the cheap per-frame
 -- work: filter the catalogued telegraphs down to the ones actually in range
 -- and still active.
 local function scanDamageBricks(rootPosition)
     local now = os.clock()
+    trackRecentParts(now)
     rebuildCatalogArrays()
 
     local found = {}
@@ -1178,7 +1582,8 @@ local function scanDamageBricks(rootPosition)
         if instance.Parent
             and instance.Transparency < CFG.telegraphTransparencyCutoff
             and not isOwnedByPlayerOrTeammate(instance) then
-            local closestPoint = closestPointOnPart(instance, rootPosition)
+            if not HZ.recentParts[instance] then updateMotion(instance, now) end
+            local closestPoint = hazardClosestPoint(instance, rootPosition)
             if (rootPosition - closestPoint).Magnitude <= CFG.damageBrickDetectionRange then
                 table.insert(found, instance)
                 if not HZ.spawnTimes[instance] then
@@ -1324,6 +1729,14 @@ S.updateHazardHighlights = updateHazardHighlights
 S.updateHitboxVisualizer = updateHitboxVisualizer
 S.updateWallHighlights = updateWallHighlights
 S.noteOwnAction = noteOwnAction
+S.getHazardMotion = getHazardMotion
+S.findAttackRecord = findAttackRecord
+S.invalidateAttackBook = invalidateAttackBook
+S.describeRecord = describeRecord
+S.recordDamageEvent = recordDamageEvent
+S.removeAttackRecord = removeAttackRecord
+S.clearAttackBook = clearAttackBook
+S.setTrialEnabled = setTrialEnabled
 S.rebuildCatalogArrays = rebuildCatalogArrays
 S.resetWallCatalog = resetWallCatalog
 S.startWorldIndex = startWorldIndex
