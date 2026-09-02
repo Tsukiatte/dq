@@ -11,6 +11,37 @@ file and that table in sync on every edit.
 
 ---
 
+## 3.6.1 - 2026-09-02
+
+### Fixing the regression 3.6.0 shipped
+The new `velocity` mover wrote the horizontal velocity and then, on the very
+next line, called:
+
+```lua
+humanoid:Move(Vector3.zero, false)
+```
+
+`Move(zero)` is an instruction to **brake**, and the Humanoid re-applies its own
+idea of velocity every physics step. So the mover set a velocity and the
+Humanoid immediately cancelled it, every frame. The two fought and the Humanoid
+always wins — the character stood still in the middle of attacks.
+
+Both must be told the **same direction**. Then they agree: the Humanoid handles
+animation, footing and slopes, and the direct write removes the acceleration
+ramp.
+
+### The default is `steer` now
+Plain `Humanoid:Move` with a direction. It still fixes the two things that made
+MoveTo miss — no ~2 stud arrival tolerance and no internal re-planning — and it
+**cannot stall**, because it is the Humanoid driving itself through its own API.
+`velocity` remains available and is now correct; it is the faster-reacting
+option, not the default one.
+
+### A watchdog, so this cannot happen again
+Any mode that is asked to move and produces no movement for a second falls back
+to `walk` and says so in the log. A bug in a mover should never be able to
+strand the character inside an attack, whatever else it does.
+
 ## 3.6.0 - 2026-09-02 - "Actuator"
 
 ### The dodging was never the problem

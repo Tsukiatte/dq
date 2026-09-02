@@ -36,11 +36,15 @@ local heavyDebug = S.heavyDebug
 -- So the mover is now a choice:
 --
 --   walk      Humanoid:MoveTo. What it always did. Safest, least precise.
---   steer     Humanoid:Move each frame. No arrival tolerance and no re-planning,
---             but the humanoid still accelerates.
---   velocity  Writes the assembly's horizontal velocity directly. Instant
---             direction changes, exact speed, and physics still applies - so
---             walls and floors behave normally. This is the default.
+--   steer     Humanoid:Move each frame, which is the DEFAULT. No arrival
+--             tolerance and no re-planning - most of what was wrong with
+--             MoveTo - and it cannot stall, because it is the Humanoid driving
+--             itself through its own API.
+--   velocity  Humanoid:Move plus a direct write of the assembly's horizontal
+--             velocity, so direction changes land the same frame with no
+--             acceleration ramp. Both must be told the SAME direction; telling
+--             the Humanoid to stop while writing a velocity is an instruction
+--             to brake, re-applied every physics step, and the Humanoid wins.
 --   tween     Moves the root's CFrame straight toward the target. Exact to the
 --             stud and instantaneous, and it ignores collision entirely, which
 --             is both why it is precise and why it is conspicuous. It is the
@@ -53,8 +57,8 @@ local function flatTo(root, target)
     return Vector3.new(delta.X, 0, delta.Z)
 end
 
--- Stops horizontal drift dead rather than letting the character coast past the
--- point it just worked out was the safe one.
+-- Only ever called once the target is reached: telling the Humanoid to stop
+-- while it is still meant to be going somewhere is what broke 3.6.0.
 local function halt(root, humanoid)
     if CFG.moveMode == "velocity" or CFG.moveMode == "tween" then
         local v = root.AssemblyLinearVelocity
@@ -75,7 +79,21 @@ local function driveTo(humanoid, root, target, arrive)
 
     if distance <= arrive then
         halt(root, humanoid)
+        RT.moverProgressAt = nil
         return true
+    end
+
+    -- Watchdog. If a mode is asked to move and the character does not, fall back
+    -- to the one that always works rather than standing in an attack insisting.
+    local now = os.clock()
+    if not RT.moverProgressAt or not RT.moverProgressPos
+        or (root.Position - RT.moverProgressPos).Magnitude > 1.5 then
+        RT.moverProgressPos, RT.moverProgressAt = root.Position, now
+    elseif CFG.moveMode ~= "walk" and now - RT.moverProgressAt > 1.0 then
+        heavyDebug("Mover", "'" .. tostring(CFG.moveMode)
+            .. "' produced no movement for a second; falling back to walk.")
+        CFG.moveMode = "walk"
+        RT.moverProgressAt = now
     end
 
     local mode = CFG.moveMode
@@ -103,18 +121,20 @@ local function driveTo(humanoid, root, target, arrive)
         return false
     end
 
-    -- velocity: the default. Direction changes take effect this frame with no
-    -- acceleration ramp, the speed is exactly WalkSpeed, and gravity and
-    -- collision are untouched because only the horizontal component is written.
+    -- velocity: instant direction changes without the acceleration ramp.
+    --
+    -- The Humanoid must be told to move in the SAME direction, not told to
+    -- stop. It re-asserts its own idea of velocity every physics step, so
+    -- calling Move(zero) here - which is what 3.6.0 did - is an instruction to
+    -- brake, applied every frame, cancelling the velocity written on the line
+    -- above it. The character stood still in the middle of attacks because the
+    -- mover and the Humanoid were fighting and the Humanoid always wins.
+    --
+    -- Told the same thing, they agree: the Humanoid handles animation, footing
+    -- and slopes, and the direct write removes the quarter-second ramp.
+    humanoid:Move(direction, false)
     local vertical = root.AssemblyLinearVelocity.Y
-    -- Ease down over the last stride so it settles on the spot instead of
-    -- overshooting and bouncing back, which reads as a stutter.
-    local approach = math.min(distance / math.max(arrive * 2, 0.01), 1)
-    root.AssemblyLinearVelocity = Vector3.new(
-        direction.X * speed * approach, vertical, direction.Z * speed * approach)
-    -- The humanoid must not also be trying to drive, or the two fight and the
-    -- character judders between them.
-    humanoid:Move(Vector3.zero, false)
+    root.AssemblyLinearVelocity = Vector3.new(direction.X * speed, vertical, direction.Z * speed)
     return false
 end
 
