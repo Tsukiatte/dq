@@ -11,6 +11,44 @@ file and that table in sync on every edit.
 
 ---
 
+## 3.0.2 - 2026-09-02
+
+### The grid was padding every attack far too heavily
+`isPositionSafeFromDamageBricks` added **`CFG.damageBrickClearance` (3.5 studs)
+on top of your body** to every hazard. That constant was tuned for the Legacy
+escape, which commits to a single dash — a fat hedge is cheap insurance there.
+On a dense grid hunting for real pockets it is wrong, and it **stacks**: three
+overlapping attacks and there is nowhere green left to stand at all.
+
+- The test now takes an **exact clearance**, and the grid passes its own disc
+  radius plus **Safety margin** and nothing else. Red means *your body would be
+  in this*.
+- Legacy still gets the old hedge; it is the right trade for a one-shot dash.
+- **Safety margin is now the only padding there is.** Every stud of it is taken
+  off the walkable space between two attacks, which is the honest way to
+  present that dial.
+
+### The footprint is measured properly, and keeps being measured
+- It was `character:GetExtentsSize()`, which **includes accessories and the
+  held weapon** — a big cosmetic sword or a pair of wings convinced the bot it
+  needed several extra studs to fit through a gap.
+- Now only the BaseParts directly under the character count (limbs and torso;
+  an Accessory keeps its Handle a level down), measured in the root's own frame
+  so turning does not change it, and clamped by `cloneMaxFootprint`.
+- **It was sampled once at build**, so the only thing that ever corrected it was
+  dying. It is re-measured on a timer and carried in the grid signature, so
+  equipping something — or the character finishing loading after the script
+  started — resizes the discs on its own.
+
+### Flicker
+A window shift blanked every cell's verdict and repainted before the next
+evaluation could fill them in. At 1.5-stud spacing you cross a cell boundary
+roughly every 0.075s while running, against an 0.08s evaluation interval — so
+it blanked on very nearly every frame you moved. Verdicts are now cached by
+world position and carried across the shift (the cell is in the same place it
+was; the answer from a moment ago beats nothing), and a shift forces an
+immediate re-evaluation for the cells that are genuinely new.
+
 ## 3.0.1 - 2026-09-02
 Three fixes to 3.0.0, all found from a single in-game log.
 

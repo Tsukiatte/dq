@@ -65,23 +65,56 @@ local NEIGHBOURS = {
 }
 local DISC_UPRIGHT = CFrame.Angles(0, 0, math.rad(90))
 
--- The character's real footprint. getPlayerHitboxMetrics measures the root
--- part, which is two studs wide; the body with its limbs is wider, and a disc
--- is a promise that the whole body fits, so it has to be the body's width.
-local function footprintRadius()
+-- The character's real footprint, measured from the BODY.
+--
+-- This used to be character:GetExtentsSize(), which includes accessories and
+-- the held weapon - so a big cosmetic sword or a pair of wings made the bot
+-- believe it needed several extra studs to fit through a gap, and it was
+-- sampled once at build. Now only the BaseParts directly under the character
+-- count (limbs and torso; an Accessory holds its Handle one level down), it is
+-- measured in the root's own frame so turning does not change it, and it is
+-- re-measured on a timer so equipping something is picked up without dying.
+local function measureFootprint()
     local _, rootRadius = getPlayerHitboxMetrics()
     local character = LocalPlayer.Character
-    local radius = rootRadius
-    if character then
-        local ok, extents = pcall(function() return character:GetExtentsSize() end)
-        if ok and extents then radius = math.max(extents.X, extents.Z) * 0.5 end
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    if not root then return rootRadius, rootRadius end
+
+    local rootCF = root.CFrame
+    local reach = rootRadius
+    for _, child in ipairs(character:GetChildren()) do
+        if child:IsA("BasePart") then
+            local ok, localPos = pcall(function() return rootCF:PointToObjectSpace(child.Position) end)
+            if ok then
+                local size = child.Size
+                reach = math.max(reach,
+                    math.abs(localPos.X) + size.X * 0.5,
+                    math.abs(localPos.Z) + size.Z * 0.5)
+            end
+        end
     end
-    return math.max(radius, rootRadius) * CFG.cloneDiscScale, rootRadius
+    return math.clamp(reach, rootRadius, CFG.cloneMaxFootprint), rootRadius
+end
+
+-- Cached; re-measured on its own clock rather than every frame, because it
+-- walks the character's children.
+local function footprintRadius()
+    local now = os.clock()
+    if now - CL.footprintCheckedAt >= CFG.cloneFootprintRefresh then
+        CL.footprintCheckedAt = now
+        CL.footprintRadius = (measureFootprint())
+    end
+    local _, rootRadius = getPlayerHitboxMetrics()
+    return CL.footprintRadius * CFG.cloneDiscScale, rootRadius
 end
 
 local function gridSignature()
-    return string.format("%.2f/%.1f/%d/%s/%.2f", CFG.cloneGridSpacing, CFG.cloneRadius,
-        CFG.cloneMaxCells, tostring(CFG.showClonePrisms), CFG.cloneDiscScale)
+    -- The footprint is in here so that equipping a weapon, or the character
+    -- finishing loading after the script started, resizes the discs. It used
+    -- to be sampled once at build, so the only thing that ever corrected it
+    -- was dying.
+    return string.format("%.2f/%.1f/%d/%s/%.1f", CFG.cloneGridSpacing, CFG.cloneRadius,
+        CFG.cloneMaxCells, tostring(CFG.showClonePrisms), (footprintRadius()))
 end
 
 -- How many cells out from the centre the window reaches, capped by the cell
@@ -107,9 +140,22 @@ end
 -- Builds the pool. A cell is a disc the size of the character's footprint,
 -- and a tall prism on top when those are on; both are world-fixed and only
 -- moved when the window shifts by a whole cell.
+-- Both caches are keyed by world position, so they grow as you cross the map.
+-- Dropping them wholesale is fine: a floor height costs one raycast and a
+-- verdict is refreshed on the next pass anyway.
+local function pruneCaches()
+    local n = 0
+    for _ in pairs(CL.floorCache) do n = n + 1 end
+    if n > 6000 then
+        table.clear(CL.floorCache)
+        table.clear(CL.verdictCache)
+    end
+end
+
 local function buildClones()
     destroyClones()
     table.clear(CL.floorCache)
+    table.clear(CL.verdictCache)
 
     local folder = Instance.new("Folder")
     folder.Name = "CloneGrid"
@@ -230,10 +276,25 @@ local function positionCells(root)
             cell.i, cell.j = ci + di, cj + dj
             cell.key = cell.i .. "," .. cell.j
             cell.x, cell.z = cell.i * spacing, cell.j * spacing
-            local cached = CL.floorCache[cell.key]
-            cell.y = cached and cached.y or nil
-            cell.standable = false
-            cell.safe = false
+            local cachedFloor = CL.floorCache[cell.key]
+            cell.y = cachedFloor and cachedFloor.y or nil
+            -- Carry the last verdict for this world position across the shift.
+            -- Blanking it made every disc vanish and come back each time you
+            -- crossed a cell boundary - and at 1.5 studs apart you cross one
+            -- about every 0.075s while running, against an evaluation interval
+            -- of 0.08s, so it blanked on very nearly every frame you moved.
+            -- The cell is at the same world position it was before; the answer
+            -- from a moment ago is a far better guess than nothing.
+            local verdict = CL.verdictCache[cell.key]
+            if verdict then
+                cell.standable = verdict.standable
+                cell.safe = verdict.safe
+                cell.penalty = verdict.penalty
+            else
+                cell.standable = false
+                cell.safe = false
+                cell.penalty = math.huge
+            end
         end
     end
     return true
@@ -283,8 +344,8 @@ local function evaluateCells(root)
     local safeCount = 0
     -- The test measures from the root radius; add the difference so it is
     -- measuring the disc, and the disc's promise holds.
-    local footprint, rootRadius = footprintRadius()
-    local extraClearance = math.max(footprint - rootRadius, 0)
+    local footprint = footprintRadius()
+    local exactClearance = footprint + CFG.cloneSafetyMargin
     -- How long it would take to walk to a cell, so each one is judged at the
     -- moment we would actually be standing in it rather than right now. The
     -- announced attacks carry real impact times, so this is the difference
@@ -307,14 +368,20 @@ local function evaluateCells(root)
             -- whole body fits, not just the centre point.
             local travel = Vector3.new(cell.x - rootPos.X, 0, cell.z - rootPos.Z).Magnitude / speed
             cell.eta = travel
-            cell.safe = isPositionSafeFromDamageBricks(
-                pos, CFG.cloneSafetyMargin + extraClearance, travel) and true or false
+            -- Exact: the disc's own radius plus whatever margin you dial in,
+            -- and nothing else. Red now means "my body would be in this", not
+            -- "my body plus three and a half studs of hedge".
+            cell.safe = isPositionSafeFromDamageBricks(pos, nil, travel, exactClearance)
+                and true or false
             cell.penalty = cell.safe and evaluateHazardPenaltyAtPoint(pos) or math.huge
             if cell.safe then safeCount = safeCount + 1 end
         else
             cell.safe = false
             cell.penalty = math.huge
         end
+        CL.verdictCache[cell.key] = {
+            standable = cell.standable, safe = cell.safe, penalty = cell.penalty,
+        }
     end
     CL.safeCount = safeCount
 
@@ -509,7 +576,9 @@ end
 local function cloneStep(root)
     if not CL.active then return end
     if gridSignature() ~= CL.signature then buildClones() end
+    pruneCaches()
     local shifted = positionCells(root)
+    if shifted then CL.lastEvalTime = -math.huge end
     local evaluated = evaluateCells(root)
     if shifted or evaluated then paintCells() end
 end

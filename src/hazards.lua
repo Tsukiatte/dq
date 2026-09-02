@@ -671,9 +671,17 @@ end
 -- the game tells us. That is what lets the bot cross a marker that fires in a
 -- second and a half to reach real safety, instead of treating every marker as
 -- a wall and getting cornered by the third one.
-local function isPositionSafeFromDamageBricks(position, extraClearance, atTime)
+--
+-- `exactClearance` (3.0.2) replaces the computed distance outright. The Legacy
+-- escape wants CFG.damageBrickClearance on top of the body, because it commits
+-- to one dash and a fat hedge is cheap insurance. The clone grid wants the
+-- honest question - would my body overlap this - because 3.5 studs of hedge on
+-- every attack stacks, and three overlapping attacks then leave nowhere green
+-- to stand at all.
+local function isPositionSafeFromDamageBricks(position, extraClearance, atTime, exactClearance)
     local _, playerRadius, totalHeight = getPlayerHitboxMetrics()
-    local clearance = CFG.damageBrickClearance + playerRadius + (extraClearance or 0)
+    local clearance = exactClearance
+        or (CFG.damageBrickClearance + playerRadius + (extraClearance or 0))
     local halfHeight = (totalHeight * 0.5) + 2.0
 
     if CFG.usePrecast and #PC.zones > 0 then
