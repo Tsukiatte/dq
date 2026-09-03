@@ -108,7 +108,7 @@ local function trackModel(model)
     local last = seed and seed.last or (first + CFG.defaultLive)
     RD.models[model] = {
         model = model, hb = hb, pc = pc, name = name, spawn = now,
-        from = now + first, untilAt = now + last, long = seed ~= nil and seed.long == true,
+        from = now + first, untilAt = now + last, long = seed ~= nil and seed.long == true, holdFull = seed ~= nil and seed.holdFull == true,
         minT = pc and pc.Transparency or 1, fired = false,
     }
     RD.count = RD.count + 1
@@ -354,7 +354,7 @@ local function readerTick(now)
                 if not r.fired and r.minT < 0.9 and tr > r.minT + 0.08 and tr >= 0.9 then
                     r.fired = true
                     if now < r.from then r.from = now end
-                    if not r.long then r.untilAt = math.min(r.untilAt, math.max(now + CFG.fadeLinger, r.from + 0.2)) end
+                    if not r.long and not r.holdFull then r.untilAt = math.min(r.untilAt, math.max(now + CFG.fadeLinger, r.from + 0.2)) end
                 end
             end
             if now > r.untilAt + 0.5 then RD.models[model] = nil end

@@ -1,5 +1,11 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.31 - 2026-09-03 - "Hold the beam, hop last"
+
+- Reader: seeds may set `holdFull`; the passive beam holds its 2.4 s window through the precast fade.
+- Blink: walk-first gate, `blinkCooldown` 3.0, `blinkPer10s` 2, destination clear through 1.5 s and 26+ studs from any mob.
+- Brain: the back-off line is checked with `stepSafe`; when it crosses an attack the field's spot is used instead.
+
 ## 5.1.30 - 2026-09-03 - "A second clear"
 
 - `blinkTarget` samples the bare metric at 0, 0.25, 0.5, 0.75 and 1.0 s; tie-break by graded danger at 0.6 and 1.2 s.
