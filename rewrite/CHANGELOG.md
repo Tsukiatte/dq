@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.34 - 2026-09-03 - "Lanes are traps, gaps are safe"
+
+- Passive beam `last` 3.5 s; `dodgeShoulder` 1.5.
+
 ## 5.1.33 - 2026-09-03 - "Commit"
 
 - Field: leash is a hard edge (danger 1 past `leashRadius` - 4), no shoulder.
