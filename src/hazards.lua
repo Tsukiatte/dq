@@ -998,6 +998,24 @@ local function updateHazardHighlights()
     -- Nearest few only. Anything drawn last frame and not in the list is
     -- cleaned up by the same pass, so this shrinks as well as caps.
     local shortlist = overlayShortlist()
+    -- Floor is not drawn (4.10.10): thirteen beams and their mage shots
+    -- waiting on their timers filled the arena with boxes that meant nothing
+    -- to the dodge and everything to the person watching. Dropped from the
+    -- shortlist here, so the cleanup pass below removes their boxes and the
+    -- box appears the moment the attack is about to arm.
+    if not CFG.drawPendingHazards then
+        local clockNow = os.clock()
+        local kept = {}
+        for _, part in ipairs(shortlist) do
+            local st = HZ.armState[part]
+            local floorNow = false
+            if st and st.armedAt == nil and st.impactAt then
+                floorNow = (st.impactAt - clockNow) > CFG.dodgeLead
+            end
+            if not floorNow then kept[#kept + 1] = part end
+        end
+        shortlist = kept
+    end
     if not HZ.highlightsFolder or not HZ.highlightsFolder.Parent then
         HZ.highlightsFolder = Instance.new("Folder")
         HZ.highlightsFolder.Name = "HazardHighlights"
@@ -1038,18 +1056,6 @@ local function updateHazardHighlights()
             local eta = pending and st.impactAt and (st.impactAt - now) or nil
             local floorNow = eta ~= nil and eta > CFG.dodgeLead
             local color = floorNow and CFG.colorTelegraphPending or CFG.colorTelegraph
-            -- Floor is not drawn (4.10.10): thirteen beams and their mage
-            -- shots waiting on their timers filled the arena with boxes that
-            -- meant nothing to the dodge and everything to the person
-            -- watching. The box appears the moment the attack is about to arm.
-            if floorNow and not CFG.drawPendingHazards then
-                local stale = folder:FindFirstChild("Highlight_" .. debugId)
-                    or (HZ.highlightsFolder and HZ.highlightsFolder:FindFirstChild("Highlight_" .. debugId))
-                if stale then stale:Destroy() end
-                local staleTag = folder:FindFirstChild("Tag_" .. debugId)
-                if staleTag then staleTag:Destroy() end
-                continue
-            end
 
             -- Name tag.
             if CFG.hazardTagEnabled then
