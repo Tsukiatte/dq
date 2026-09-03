@@ -53,12 +53,26 @@ end
 
 -- Depth of a point inside an oriented box (negative outside, distance to the
 -- surface in the flat plane), and whether it is at the right height.
+-- Orientation-aware: whichever local axis points up is the height, the
+-- other two are the footprint. A hitbox stood on end (its 63-stud length
+-- vertical) used to be read as a 63-stud-wide floor box.
 local function boxDepth(cf, size, px, py, pz, halfHeight)
     local lp = cf:PointToObjectSpace(Vector3.new(px, py, pz))
-    if abs(lp.Y) > size.Y * 0.5 + halfHeight then return -math.huge end
-    local ox, oz = abs(lp.X) - size.X * 0.5, abs(lp.Z) - size.Z * 0.5
-    if ox <= 0 and oz <= 0 then return -max(ox, oz) end   -- inside: positive depth
-    return -sqrt(max(ox, 0) ^ 2 + max(oz, 0) ^ 2)         -- outside: negative distance
+    local ux, uy, uz = abs(cf.RightVector.Y), abs(cf.UpVector.Y), abs(cf.LookVector.Y)
+    local a, b, h, ha, hb
+    if uy >= ux and uy >= uz then
+        a, b, h, ha, hb = lp.X, lp.Z, lp.Y, size.X, size.Z
+        if abs(h) > size.Y * 0.5 + halfHeight then return -math.huge end
+    elseif ux >= uz then
+        a, b, h, ha, hb = lp.Y, lp.Z, lp.X, size.Y, size.Z
+        if abs(h) > size.X * 0.5 + halfHeight then return -math.huge end
+    else
+        a, b, h, ha, hb = lp.X, lp.Y, lp.Z, size.X, size.Y
+        if abs(h) > size.Z * 0.5 + halfHeight then return -math.huge end
+    end
+    local oa, ob = abs(a) - ha * 0.5, abs(b) - hb * 0.5
+    if oa <= 0 and ob <= 0 then return -max(oa, ob) end   -- inside: positive depth
+    return -sqrt(max(oa, 0) ^ 2 + max(ob, 0) ^ 2)         -- outside: negative distance
 end
 -- A cylinder Part lies along its X axis; its round face spans Y/Z.
 local function cylDepth(cf, size, px, py, pz, halfHeight)

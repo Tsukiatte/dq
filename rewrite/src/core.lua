@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.42"
+local SCRIPT_VERSION = "5.1.43"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.43", date = "2026-09-03", notes = "Box footprints follow the part's orientation: whichever local axis points up is the height. At Bob a hitbox stood on end read as a 63-stud floor box, the whole arena counted as lethal, and the blink fired on every cooldown with nothing there." },
     { version = "5.1.42", date = "2026-09-03", notes = "Mage volleys are predicted: two aligned shots within 0.4 s reveal the line, and the next 70 studs of it become a zone firing from 0.3 s, so the field leaves the line instead of standing where the last shot lands. A lone mage killed the character by walking it down that line." },
     { version = "5.1.41", date = "2026-09-03", notes = "Room progress is kept in _G so a reload inside the dungeon no longer sends the character back toward room 1." },
     { version = "5.1.40", date = "2026-09-03", notes = "The boss's body is a wall again for the spot sweep (fifteen collidable parts; the character ran in place against his legs toward a spot behind him), and a spot not reached for 0.6 s of standing still is dropped for another." },
