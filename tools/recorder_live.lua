@@ -250,7 +250,15 @@ task.spawn(function()
                 boss = style and type(style.Value) == "string" and style.Value:lower():find("boss") ~= nil or nil }
             if #R.bossHp > 2000 then table.remove(R.bossHp, 1) end
         end
-        local st = S and S.RT and S.RT.movementState
+        local st = S and ((S.RT and S.RT.movementState) or (S.UI and S.UI.movementStateLabel and S.UI.movementStateLabel.Text))
+        if S and S.NAV then
+            local N = S.NAV
+            R.nav = R.nav or {}
+            R.nav[#R.nav + 1] = { t = now(), wps = N.waypoints and #N.waypoints or 0, idx = N.index, direct = N.routeIsDirect, fails = N.failureStreak,
+                dead = N.navmeshDeadUntil and N.navmeshDeadUntil > os.clock() or false, computing = N.computing, recompute = N.needsRecompute, driving = N.driving,
+                blocked = S.DG and S.DG.pursuitBlocked, gap = S.DG and S.DG.gapWait, hub = S.DG and S.DG.hubHold, reason = S.DG and S.DG.targetReason, state = st }
+            if #R.nav > 1200 then table.remove(R.nav, 1) end
+        end
         local lastState = R.states[#R.states]
         if st and (not lastState or lastState.s ~= st) then
             R.states[#R.states + 1] = { t = now(), s = st }
@@ -264,7 +272,7 @@ task.spawn(function()
     while _G.DQRec == R and not R.stopped do
         task.wait(10)
         pcall(function()
-            writefile("dq_rec.json", HttpService:JSONEncode({ started = R.started, parts = R.parts, events = R.events, hits = R.hits, bossHp = R.bossHp, states = R.states, enemies = R.enemies }))
+            writefile("dq_rec.json", HttpService:JSONEncode({ started = R.started, parts = R.parts, events = R.events, hits = R.hits, bossHp = R.bossHp, states = R.states, enemies = R.enemies, nav = R.nav }))
         end)
     end
 end)
