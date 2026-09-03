@@ -174,6 +174,7 @@ local function decide(root, hum)
     local rx, ry, rz = rp.X, rp.Y, rp.Z
     local dwell = CFG.dodgeDwell
     local here0 = dangerAt(rx, ry, rz, 0)
+    DG.here0 = here0
     DG.dangerHere = max(here0, dangerAt(rx, ry, rz, dwell * 0.5), dangerAt(rx, ry, rz, dwell))
     RT.moveBoost = here0 >= CFG.dodgeMoveAt
     local speed = RT.moveBoost and CFG.tweenEscape or CFG.tweenWalk

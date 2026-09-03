@@ -223,6 +223,19 @@ local function strafePoint(root, e, standoff, now)
     return Vector3.new(px, y or rp.Y, pz)
 end
 
+-- Is the next stretch of a walk safe for the moment it is crossed? Three
+-- samples along it at the times they would be reached, plus a short dwell.
+local function stepSafe(rp, to, speed)
+    local dx, dz = to.X - rp.X, to.Z - rp.Z
+    local len = sqrt(dx * dx + dz * dz)
+    if len < 0.1 then return true end
+    local step = min(len, 6)
+    local ux, uz = dx / len * step, dz / len * step
+    local T = step / max(speed, 4)
+    local d = max(dangerAt(rp.X + ux * 0.5, rp.Y, rp.Z + uz * 0.5, T * 0.5), dangerAt(rp.X + ux, rp.Y, rp.Z + uz, T), dangerAt(rp.X + ux, rp.Y, rp.Z + uz, T + 0.3))
+    return d < CFG.dodgeMoveAt
+end
+
 -- ------------------------------------------------------------ tick
 local function brainTick(now)
     local char = LocalPlayer.Character
@@ -248,13 +261,31 @@ local function brainTick(now)
         if not ok then heavyDebugThrottled("decide_err", 2, "Field", tostring(err)) end
     end
 
-    -- 1. The field's spot outranks everything.
+    -- 1. The field's spot outranks everything while the ground here is
+    -- dangerous now, or when the walk the brain wants is itself unsafe. With
+    -- something always about to arrive somewhere, a spot chosen for future
+    -- danger must not stop a walk whose own next step is clean.
     if DG.target then
-        local speed = RT.moveBoost and CFG.tweenEscape or CFG.tweenWalk
-        driveTo(hum, root, DG.target, speed, 1.2)
-        setMovementState("dodge " .. DG.reason)
-        if target then fight(hum, root, target, now) end
-        return
+        local useSpot = (DG.here0 or 0) >= CFG.dodgeMoveAt
+        if not useSpot then
+            local walkTo
+            if target then
+                local standoff = standoffFor(target)
+                if flat(root.Position, target.root.Position) > standoff + 3 then walkTo = target.root.Position end
+            end
+            if not walkTo then
+                local room = nextRoom(root.Position)
+                walkTo = room and room.position
+            end
+            useSpot = walkTo == nil or not stepSafe(root.Position, walkTo, CFG.tweenWalk)
+        end
+        if useSpot then
+            local speed = RT.moveBoost and CFG.tweenEscape or CFG.tweenWalk
+            driveTo(hum, root, DG.target, speed, 1.2)
+            setMovementState("dodge " .. DG.reason)
+            if target then fight(hum, root, target, now) end
+            return
+        end
     end
 
     -- 2. A target: close to standoff, then fight and strafe.
