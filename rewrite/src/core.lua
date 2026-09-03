@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.62"
+local SCRIPT_VERSION = "5.1.63"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.63", date = "2026-09-03", notes = "Walls (Chris: melee mobs back it into a corner and it dies there). Every spot that passes the floor and sweep checks now looks 24 studs round itself in six directions and costs more the closer the walls are, so an open spot beats a corner. The back-off from a mob tries straight back, then 40, 80 and 120 degrees either side, and takes the most open way the field allows." },
     { version = "5.1.62", date = "2026-09-03", notes = "Telemetry: the field reports how many spots it evaluated and why they were rejected (no floor, not walkable, lethal on arrival) and which one it chose, for the new recorder that traces intent against movement at ten samples a second and gives every death a verdict. The marker is now the closest clean spot (clean path, clean ground), and when it is within blink range the blink goes to the marker itself (Chris)." },
     { version = "5.1.61", date = "2026-09-03", notes = "Champion slam: the landing announcement now starts a reflex - straight out from the landing point at escape speed until 44 studs clear, bending the line only round a live box - instead of leaving it to the spot search, whose rings reach 30 studs and kept picking spots inside the 67-stud circle (three slam deaths in run 30)." },
     { version = "5.1.60", date = "2026-09-03", notes = "Ability range: measured against where the character and target stood at the cast, not half a second later when the geyser appears; the first reading was a 30-stud cap beside a 56-stud reach. A reach beyond a supposed cap discards the cap. Auto standoff only ever moves the bot further out than the slider, never closer, and never past 45. Beam padding and margins back to the 5.1.51 values: the slim passive beam and the 4-stud shoulder came in together and the Champion deaths went up. The take-off ring is not an attack (Chris): the zone placed at Jump Up is gone; only the landing ring at Jump Down is fled." },
@@ -148,7 +149,9 @@ local CFG = {
     dodgeHysteresis = 0.1,
     dodgeDangerWeight = 3.0,      -- the danger term is worth this much against pulls and distance: a lethal spot never beats a clean one
     dodgeDistanceCost = 0.008,
-    dodgeSafeDistanceCost = 0.04, -- among clean spots the nearest wins (Chris: the marker is the closest safe spot, in blink range when possible)
+    dodgeSafeDistanceCost = 0.04,
+    dodgeWallLook = 24,           -- studs of wall look-out round every candidate spot
+    dodgeWallWeight = 0.05,       -- per stud the mean free distance falls short of three quarters of that (melee mobs cornered the bot - Chris) -- among clean spots the nearest wins (Chris: the marker is the closest safe spot, in blink range when possible)
     dodgeFarScale = 1.6,          -- second look this many times further when nothing near is safe
     dodgeFarScale2 = 2.5,         -- and a third, further still
     dodgeOutwardWeight = 0.25,    -- when everything near is hot, prefer spots away from the target: back out

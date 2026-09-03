@@ -514,6 +514,16 @@ local function decide(root, hum)
                 if walkable(rp, x, y, z, params) then
                     c.x, c.y, c.z, c.valid = x, y, z, true
                     st.valid = st.valid + 1
+                    -- Openness: how far the walls are from this spot.
+                    local free = 0
+                    local origin = Vector3.new(x, y + 2.5, z)
+                    for k = 0, 5 do
+                        local a = k * (math.pi / 3)
+                        local hit = Workspace:Raycast(origin, Vector3.new(cos(a), 0, sin(a)) * CFG.dodgeWallLook, params)
+                        free = free + (hit and hit.Distance or CFG.dodgeWallLook)
+                    end
+                    c.open = free / 6
+                    c.cost = c.cost + CFG.dodgeWallWeight * max(0, CFG.dodgeWallLook * 0.75 - c.open)
                     if not best or c.cost < best.cost then best = c end
                 else
                     st.notWalkable = st.notWalkable + 1

@@ -398,8 +398,27 @@ local function brainTick(now)
             local rp, ep = root.Position, target.root.Position
             local away = Vector3.new(rp.X - ep.X, 0, rp.Z - ep.Z)
             if away.Magnitude > 0.5 then
-                local dest = rp + away.Unit * 12
-                if stepSafe(rp, dest, CFG.tweenEscape) then
+                -- The most open way out: straight back when the way is clear,
+                -- else round the side, else past the target. A ray at chest
+                -- height finds the wall; a step under six studs is a corner.
+                local u = away.Unit
+                local params = raycastParams(target.model)
+                local dest, bestScore = nil, -math.huge
+                for _, deg in ipairs({ 0, 40, -40, 80, -80, 120, -120 }) do
+                    local r = math.rad(deg)
+                    local dx, dz = u.X * math.cos(r) - u.Z * math.sin(r), u.X * math.sin(r) + u.Z * math.cos(r)
+                    local dir = Vector3.new(dx, 0, dz)
+                    local hit = Workspace:Raycast(rp + Vector3.new(0, 2, 0), dir * 22, params)
+                    local free = hit and hit.Distance or 22
+                    if free >= 6 then
+                        local cand = rp + dir * min(12, free - 3)
+                        if stepSafe(rp, cand, CFG.tweenEscape) then
+                            local score = free - math.abs(deg) / 40
+                            if score > bestScore then bestScore, dest = score, cand end
+                        end
+                    end
+                end
+                if dest then
                     driveTo(hum, root, dest, CFG.tweenEscape, 1.0)
                     setMovementState("back off")
                     return
