@@ -1,5 +1,10 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.47 - 2026-09-03 - "The whole lane"
+
+- Field: `pathLaneDanger` (0.5) along the remaining path ahead of a moving body.
+- Draw: the sweep strip runs to the end of the path.
+
 ## 5.1.46 - 2026-09-03 - "Stay armed"
 
 - Reader: `RD.leashArmed` mirrored in `_G.DungeonAutofarmLeashArmed`.

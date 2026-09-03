@@ -91,8 +91,9 @@ local function drawTick(now)
                     sweep.Material = Enum.Material.Neon
                     sweep.Parent = p
                 end
-                local len = b.speed * CFG.projectileLookahead
-                sweep.Size = Vector3.new(b.halfW * 2, 0.4, len)
+                -- The whole remaining lane, so the eye sees where it is going.
+                local len = math.min(b.speed * math.max(b.untilAt - now, 0), 260)
+                sweep.Size = Vector3.new(b.halfW * 2, 0.4, math.max(len, 1))
                 sweep.CFrame = CFrame.lookAt(Vector3.new(cx + b.dx * (b.halfL + len * 0.5), y, cz + b.dz * (b.halfL + len * 0.5)), Vector3.new(cx + b.dx * (b.halfL + len), y, cz + b.dz * (b.halfL + len)))
                 sweep.Transparency = 0.88
                 sweep.Color = CFG.colorSoon

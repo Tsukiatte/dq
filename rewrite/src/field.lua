@@ -119,9 +119,16 @@ local function dangerAt(px, py, pz, t, reachO, shoulderO)
                 -- Remote-announced paths carry the boss's height; they are ground attacks.
                 if b.ground or abs(py - b.oy) <= b.halfH + halfHeight then
                     local qx, qz = px - cx, pz - cz
-                    local a = abs(qx * b.dx + qz * b.dz) - b.halfL
+                    local ahead = qx * b.dx + qz * b.dz
+                    local a = abs(ahead) - b.halfL
                     local s = abs(-qx * b.dz + qz * b.dx) - b.halfW
                     depth = (a <= 0 and s <= 0) and -max(a, s) or -sqrt(max(a, 0) ^ 2 + max(s, 0) ^ 2)
+                    -- The rest of its lane, ahead of the body, is a place not to
+                    -- stand: soft danger until the body has passed or the path ends.
+                    if depth + reach < 0 and ahead > b.halfL and s <= reach then
+                        local remaining = b.speed * max(b.untilAt - at, 0)
+                        if ahead - b.halfL <= remaining and worst < CFG.pathLaneDanger then worst = CFG.pathLaneDanger end
+                    end
                 else
                     depth = -math.huge
                 end
