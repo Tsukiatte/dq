@@ -647,11 +647,16 @@ local function decide(root, humanoid)
     -- ordinary weight the distance cost of an eighteen-stud move beat it,
     -- and the character sat at thirty studs "safe here" while the sweep
     -- came round.
+    -- The same stronger pull whenever the box is the approach - pursuit
+    -- stopped at the edge of something - or the quiet gap goes by "safe
+    -- here" at fifty studs, out of ability range.
+    local boxDrives = hold or DG.pursuitBlocked
     local function approachCost(x, z)
         local ax, az = x - approach.X, z - approach.Z
         local dd = sqrt(ax * ax + az * az) - preferred
-        if hold then return approachWeight * CFG.dodgeHubRingWeight * abs(dd) end
-        return approachWeight * max(0, dd)
+        local w = boxDrives and approachWeight * CFG.dodgeHubRingWeight or approachWeight
+        if hold then return w * abs(dd) end
+        return w * max(0, dd)
     end
 
     -- Five samples along the line from here to (rx+ox, rz+oz): three on the
