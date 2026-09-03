@@ -11,6 +11,14 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.11.6 - 2026-09-02 - probe.lua 0.2
+
+- `probe.lua` 0.2: attack lines carry the hitBox position and yaw, part
+  lines the projectile heading, hit lines the boss position and the player's
+  bearing from it. Chris's first real capture (6 deaths, 136 s) answered the
+  timing table; the one open question is whether the beam sweep's angles sit
+  on a fixed 20-degree grid. No change to the script itself.
+
 ## 4.11.5 - 2026-09-02 - probe.lua
 
 - `probe.lua` (repo root): the standalone attack probe HANDOFF section 4

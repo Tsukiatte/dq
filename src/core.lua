@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 4.11.5
+    VERSION : 4.11.6
     BUILD   : 2026-09-02
 
     VERSIONING RULES (semantic):
@@ -20,7 +20,7 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "4.11.5"
+local SCRIPT_VERSION = "4.11.6"
 -- Bump to throw away every learned attack timing in every save, once.
 local LEARN_EPOCH = 2
 local SCRIPT_BUILD_DATE = "2026-09-02"
@@ -28,6 +28,7 @@ local SCRIPT_CODENAME = "Aquatic Temple"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "4.11.6", date = "2026-09-02", notes = "probe.lua 0.2: every attack line carries the hitBox position and yaw, every projectile its heading, and every hit the boss position and the player's bearing from it - the first real capture showed the beam sweep and left one question, whether its angles sit on a fixed grid. No change to the script itself." },
     { version = "4.11.5", date = "2026-09-02", notes = "probe.lua: the standalone attack probe for the rewrite. It moves nothing and presses nothing; it watches every attack Model from the moment it appears, samples the precast at 20 Hz, records the ages the root was inside each hitBox, logs the boss events on the game's clock, and on every hit writes what enclosed the character. No change to the script itself." },
     { version = "4.11.4", date = "2026-09-02", notes = "Probe build for the rewrite. Every change of a precast transparency is written into the attack lifecycle line with its age, next to the hit ages, so one capture says per attack at what age and what transparency the hit lands and when it fades. The 4.11.3 code is frozen under legacy/4.11.3 and tagged v4.11.3-legacy." },
     { version = "4.11.3", date = "2026-09-02", notes = "Harness only: the simulator logged a dead boss with a variable that did not exist yet, the error skipped the rebuild, and every run after a kill had no target. Fixed." },
