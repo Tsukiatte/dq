@@ -42,18 +42,24 @@ local function standoffFor(e)
     return e.extent + CFG.rangedStandoff
 end
 
+-- The room first: a boss three rooms away sits behind gates that open only
+-- when this room is cleared, and pathing at it walked into a wall for good.
 local function pickTarget(rp)
     local best, bestScore = nil, math.huge
+    local boss, bossD = nil, math.huge
     for _, e in ipairs(RD.enemies) do
         if e.humanoid.Health > 0 and e.model.Parent then
             local d = flat(rp, e.root.Position)
-            if d < 400 then
-                local score = e.isBoss and d * 0.5 or d
-                if score < bestScore then best, bestScore = e, score end
+            if e.isBoss then
+                if d < bossD then boss, bossD = e, d end
+            elseif d < 150 and d < bestScore then
+                best, bestScore = e, d
             end
         end
     end
-    return best
+    if best then return best end
+    if boss and bossD < 400 then return boss end
+    return nil
 end
 
 -- ------------------------------------------------------------ travel
@@ -129,6 +135,15 @@ local function travel(hum, root, to, speed, label)
         wp = BR.waypoints[BR.index]
     end
     if not wp then return end
+    -- No progress for a while: the way is shut (a gate, a wall the navmesh
+    -- did not know). Replan, and after that skip the waypoint.
+    if not BR.progressAt or flat(rp, BR.progressPos or rp) > 1.5 then BR.progressAt, BR.progressPos = now, rp end
+    if now - BR.progressAt > 2.5 then
+        BR.progressAt = now
+        if BR.index < #BR.waypoints then BR.index = BR.index + 1 else BR.waypoints = nil end
+        heavyDebugThrottled("stall", 2, "Brain", "no progress; skipping a waypoint")
+        return
+    end
     driveTo(hum, root, wp, speed, 1.5)
     setMovementState(string.format("%s %d/%d", label, BR.index, #BR.waypoints))
 end

@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.3 - 2026-09-03 - "Room first"
+
+- Target picker: mobs within 150 studs before any boss; a boss only when nothing is nearer. Travel with no progress for 2.5 s skips a waypoint.
+
 ## 5.1.2 - 2026-09-03 - "Never a jump"
 
 - Mover: step capped at a 30 fps frame regardless of the real delta; a frame over 0.12 s writes nothing; nothing is written while airborne or over a missing floor. After an anticheat kick that followed lag, a fall through the floor and a jump.
