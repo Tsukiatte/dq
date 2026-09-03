@@ -43,13 +43,23 @@ local function driveTo(hum, root, target, speed, arrive)
     end
     setControls(false)
     local direction = flat.Unit
-    local step = math.min(speed * RT.frameDelta, distance)
+    -- A lag spike must never become a jump: the step is capped at what a 30 fps
+    -- frame allows, and a spike frame writes nothing at all. A kick followed
+    -- exactly this shape once - lag, a fall through the floor, a jump.
+    local dt = RT.frameDelta
+    if dt > 0.12 then return false end
+    local step = math.min(speed * math.min(dt, 1 / 30), distance)
     local params = raycastParams(nil)
 
     -- The root rides above the floor by a measured amount, not an assumed one.
     local above = hum.HipHeight + root.Size.Y * 0.5
     local under = Workspace:Raycast(pos, Vector3.new(0, -(above + 4), 0), params)
-    if under then above = pos.Y - under.Position.Y end
+    if not under then
+        -- Nothing under us: falling, or the floor did not answer. Hold; never
+        -- write a position while airborne.
+        return false
+    end
+    above = pos.Y - under.Position.Y
     local feetY = pos.Y - above
 
     -- Anything wall-like across the step, at knee and at chest.
@@ -74,7 +84,8 @@ local function driveTo(hum, root, target, speed, arrive)
     local floorHit = Workspace:Raycast(Vector3.new(nx, feetY + CFG.maxStepHeight + 0.5, nz),
         Vector3.new(0, -(CFG.maxStepHeight + 0.5 + CFG.maxDropHeight), 0), params)
     if not floorHit then
-        hum:MoveTo(target)
+        -- No floor there: hold rather than step off. The Humanoid is not asked
+        -- to walk either; a ledge is a decision for the field, not the mover.
         return false
     end
     local rise = floorHit.Position.Y - feetY
