@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.66 - 2026-09-03 - "Off the rocks"
+
+- Core: `fanRadius` 85, `dodgeSafeWorst` 0.2, `blinkDoubleGap` 2.0. Reader: fan reflex only from inside radius-12. Field: small-spot penalty on hot ground; second blink inside the cooldown (`RT.lastBlinkDouble`).
+
 ## 5.1.65 - 2026-09-03 - "Per slot"
 
 - Reader: `ourAbilityNames`, `noteOurProjectile`, `RD.abilitySlots[slot] = { name, cap, reach }`; cached geometry for anchor-less records. Brain: `RT.castQueue`; standoff from the least ranged slot; blocked travel goes via the spot. UI: sliders to 80, per-slot caption. Core: `autoStandoffMax` 70, circle pad 10.
