@@ -11,6 +11,18 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.10.3 - 2026-09-02
+
+- A scripted projectile (`PC.paths`) is a hit candidate: where the game's own
+  numbers put a spike right now. A hit while one rolled over us was pinned on
+  whatever floor line we stood in, which taught that line a 6 s window. The
+  hit log says `projectile <name> is here now` and `BLAMED projectile`.
+- `firstbosspassivebeam` is seeded with a window of 0.3-1.2 s
+  (`DEFAULT_ARM_SPANS`). Nothing on the beam Model ever shows, so with no
+  window every beam was a wall for its whole 7 s; a burst of 13 was a wall
+  everywhere, the character froze at the arena edge and the projectiles took
+  it. A hypothesis: a certain hit at a later age widens it on the spot.
+
 ## 4.10.2 - 2026-09-02 - "Read the sweep"
 
 - A hit teaches an attack's window only when the blame is **certain**: the
