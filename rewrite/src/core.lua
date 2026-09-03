@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.22"
+local SCRIPT_VERSION = "5.1.23"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.23", date = "2026-09-03", notes = "Beam lanes: each new beam is matched to any beam of the last 0.8 s that sits 20 degrees away, and that chain's next two lanes become zones; the sweeps run interleaved, so a single last-pair rule never fired." },
     { version = "5.1.22", date = "2026-09-03", notes = "Boss standoff 48: the abilities reach about 53 studs and measured the same damage per second at 40-50 as at 30-40, and the beam lanes are wider further out." },
     { version = "5.1.21", date = "2026-09-03", notes = "The leash is a 40-stud band outside the arena, not everything beyond it: the walk in from room 2 was being scored as lethal. Ranged mobs are fought from 22 studs; at 7-11 a mage shot leaves no time." },
     { version = "5.1.20", date = "2026-09-03", notes = "The escape burst keys off danger within the dwell window, not only danger at this instant. Five big-spike deaths in one fight: the field saw the front coming and walked away from it at 16." },

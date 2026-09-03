@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.23 - 2026-09-03 - "Chains"
+
+- `noteBeam` matches interleaved 20-degree chains (dt 0.08-0.8 s), predicts two lanes per chain, prunes predictions after 0.5 s.
+
 ## 5.1.22 - 2026-09-03 - "Further out"
 
 - `bossStandoff` 48.
