@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.29 - 2026-09-03 - "Bare check"
+
+- `dangerAt` takes optional reach/shoulder overrides; `blinkTarget` accepts any spot outside the boxes (radius 1.2, no shoulder) now and at 0.5 s, tie-broken by the graded danger at 0.6 s.
+
 ## 5.1.28 - 2026-09-03 - "Blink"
 
 - Field: `blinkTarget` + reflex in `decide` (`blink`, `blinkMax` 8, `blinkWindow` 0.45, `blinkCooldown` 1.2). Floor-verified destination, clear sweep, headroom, never airborne, velocity untouched.
