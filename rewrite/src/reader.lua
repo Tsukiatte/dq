@@ -109,7 +109,7 @@ local function trackModel(model)
     RD.models[model] = {
         model = model, hb = hb, pc = pc, name = name, spawn = now,
         from = now + first, untilAt = now + last, long = seed ~= nil and seed.long == true, holdFull = seed ~= nil and seed.holdFull == true,
-        minT = pc and pc.Transparency or 1, fired = false,
+        minT = pc and pc.Transparency or 1, fired = false, pad = seed and seed.pad or 0,
     }
     RD.count = RD.count + 1
     if hb and name:find("passivebeam", 1, true) then noteBeam(hb, now) end
@@ -424,8 +424,12 @@ local function hazards(now)
         local anchor = (r.hb and r.hb.Parent) and r.hb or ((r.pc and r.pc.Parent) and r.pc or nil)
         if anchor then
             local size = anchor.Size
-            if anchor == r.pc and r.hb == nil then size = Vector3.new(size.X, math.max(size.Y, 10), size.Z) end
             local isCyl = anchor:IsA("Part") and anchor.Shape == Enum.PartType.Cylinder
+            if anchor == r.pc and r.hb == nil and not isCyl then size = Vector3.new(size.X, math.max(size.Y, 10), size.Z) end
+            if r.pad > 0 then
+                if isCyl then size = Vector3.new(size.X, size.Y + r.pad * 2, size.Z + r.pad * 2)
+                else size = Vector3.new(size.X + r.pad * 2, size.Y, size.Z + r.pad * 2) end
+            end
             out[#out + 1] = { cframe = anchor.CFrame, size = size, round = isCyl and anchor.Size.Y == anchor.Size.Z, cyl = isCyl,
                 from = r.from, untilAt = r.long and huge or r.untilAt, name = r.name, kind = "model" }
         end
