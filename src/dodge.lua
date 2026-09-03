@@ -643,10 +643,14 @@ local function decide(root, humanoid)
         end
     end
     local hold = DG.hubHold
+    -- The ring pull is stronger than the ordinary approach: at the
+    -- ordinary weight the distance cost of an eighteen-stud move beat it,
+    -- and the character sat at thirty studs "safe here" while the sweep
+    -- came round.
     local function approachCost(x, z)
         local ax, az = x - approach.X, z - approach.Z
         local dd = sqrt(ax * ax + az * az) - preferred
-        if hold then return approachWeight * abs(dd) end
+        if hold then return approachWeight * CFG.dodgeHubRingWeight * abs(dd) end
         return approachWeight * max(0, dd)
     end
 

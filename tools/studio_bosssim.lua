@@ -102,10 +102,12 @@ local enemies = WS:FindFirstChild("enemies")
 if not enemies then enemies = Instance.new("Folder") enemies.Name = "enemies" enemies.Parent = WS end
 
 -- ------------------------------------------------------------ the boss
-local boss = enemies:FindFirstChild("Midgardian Champion")
-if not boss then
-    boss = Instance.new("Model")
-    boss.Name = "Midgardian Champion"
+local boss = nil
+local function makeBoss()
+    local old = enemies:FindFirstChild("Midgardian Champion")
+    if old then old:Destroy() end
+    local m = Instance.new("Model")
+    m.Name = "Midgardian Champion"
     local root = Instance.new("Part")
     root.Name = "HumanoidRootPart"
     root.Size = Vector3.new(6, 10, 6)
@@ -114,7 +116,7 @@ if not boss then
     root.Color = Color3.fromRGB(120, 160, 255)
     root.Material = Enum.Material.Ice
     root.CFrame = CFrame.new(CENTRE + Vector3.new(0, 5, 0))
-    root.Parent = boss
+    root.Parent = m
     local head = Instance.new("Part")
     head.Name = "Head"
     head.Size = Vector3.new(4, 4, 4)
@@ -122,19 +124,24 @@ if not boss then
     head.CanCollide = false
     head.Color = root.Color
     head.CFrame = CFrame.new(CENTRE + Vector3.new(0, 12, 0))
-    head.Parent = boss
+    head.Parent = m
     local hum = Instance.new("Humanoid")
     hum.MaxHealth = attr("DQSimBossHP", 3000)
     hum.Health = hum.MaxHealth
-    hum.Parent = boss
+    hum.BreakJointsOnDeath = false
+    hum.Parent = m
     -- The values the real enemy Models carry.
-    local style = Instance.new("StringValue") style.Name = "enemyStyle" style.Value = "boss1" style.Parent = boss
-    local melee = Instance.new("IntValue") melee.Name = "meleeDistance" melee.Value = 4 melee.Parent = boss
-    local aggro = Instance.new("IntValue") aggro.Name = "aggroRange" aggro.Value = 50 aggro.Parent = boss
-    local speed = Instance.new("IntValue") speed.Name = "moveSpeed" speed.Value = 16 speed.Parent = boss
-    boss.PrimaryPart = root
-    boss.Parent = enemies
+    local style = Instance.new("StringValue") style.Name = "enemyStyle" style.Value = "boss1" style.Parent = m
+    local melee = Instance.new("IntValue") melee.Name = "meleeDistance" melee.Value = 4 melee.Parent = m
+    local aggro = Instance.new("IntValue") aggro.Name = "aggroRange" aggro.Value = 50 aggro.Parent = m
+    local speed = Instance.new("IntValue") speed.Name = "moveSpeed" speed.Value = 16 speed.Parent = m
+    m.PrimaryPart = root
+    m.Parent = enemies
+    boss = m
+    WS:SetAttribute("DQSimBossHP", math.floor(hum.Health))
+    return m
 end
+makeBoss()
 
 -- The fight save carries the real boss Model, parked in the air where the
 -- fight left it. Two enemies of the same name confused the chase; the dummy
@@ -193,8 +200,10 @@ attackRemote.OnServerEvent:Connect(function(player, kind)
             kills = kills + 1
             WS:SetAttribute("DQSimBossKills", kills)
             log(string.format("BOSS DOWN #%d at t=%.0f after %d swings; hits taken so far %d", kills, WS.DistributedGameTime, swings, hits))
+            -- A dead Humanoid stays dead whatever its Health is set to:
+            -- rebuild the boss instead.
             task.delay(5, function()
-                bh.Health = bh.MaxHealth
+                makeBoss()
                 bossDown = false
                 log("boss back")
             end)

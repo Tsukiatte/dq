@@ -11,6 +11,17 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.10.8 - 2026-09-02
+
+- The hub ring pull is `dodgeHubRingWeight` (3) times the ordinary approach
+  weight. At the ordinary weight the distance cost of an 18-stud move beat it
+  and the character sat at 30 studs "safe here" while the sweep came round.
+- With no path and the target within `directHopDistance` (8 studs), walk to
+  it directly. The path to a standoff point a stud or two away was failing
+  ("NO PATH - retrying"), which read as stuck, blacklisted the spot and fled.
+- Simulator: a dead boss is rebuilt (a dead Humanoid cannot be revived by
+  setting Health), so kills per run can be counted.
+
 ## 4.10.7 - 2026-09-02
 
 - The hub ring is held from wherever the last dodge left the character: the
