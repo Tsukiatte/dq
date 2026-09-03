@@ -106,7 +106,7 @@ local function refreshSources()
                 local hard = getEnemyExtent(model) + 1
                 local hub = DG.hubs[model]
                 if not hub then
-                    hub = { times = {}, lastSpawn = -math.huge, period = nil, rate = 0, fire = nil }
+                    hub = { times = {}, lastSpawn = -math.huge, period = nil, rate = 0, fire = nil, angles = {}, pred = {} }
                     DG.hubs[model] = hub
                 end
                 DG.enemies[#DG.enemies + 1] = {
@@ -175,9 +175,20 @@ local function refreshSources()
                                     end
                                 end
                                 hub.lastSpawn = t
+                                -- The line's heading, folded to [0, pi): a line
+                                -- has no front. The Midgardian Champion's beams
+                                -- come 20 degrees apart every half second - a
+                                -- hand sweeping round the boss - and from two of
+                                -- them the third is known before it exists.
+                                local ang = math.atan2(axis.Z, axis.X)
+                                if ang < 0 then ang = ang + pi end
+                                local angles = hub.angles
+                                angles[#angles + 1] = { t = t, a = ang, x = p.X, z = p.Z, y = p.Y, w = min(size.X, size.Z), L = L }
+                                while #angles > 6 do table.remove(angles, 1) end
                             end
                             hub.times[#hub.times + 1] = t
                             if fire and fire > 0 then hub.fire = fire end
+                            if model then hub.name = string.lower(model.Name) end
                         end
                     end
                 end
@@ -192,6 +203,40 @@ local function refreshSources()
             if times[i] < cutoff then table.remove(times, i) else n = n + 1 end
         end
         hub.rate = n / 10
+
+        -- Prediction: when the last two steps of heading agree, the next
+        -- lines are the same step further round, one period apart.
+        local pred = hub.pred
+        table.clear(pred)
+        local angles = hub.angles
+        local na = #angles
+        if na >= 3 and hub.period and hub.period < 5 and clock - angles[na].t < hub.period * 3 then
+            local function wrap(d)
+                while d > pi * 0.5 do d = d - pi end
+                while d <= -pi * 0.5 do d = d + pi end
+                return d
+            end
+            local d1 = wrap(angles[na].a - angles[na - 1].a)
+            local d0 = wrap(angles[na - 1].a - angles[na - 2].a)
+            if abs(d1) > math.rad(3) and abs(d1 - d0) < math.rad(6) then
+                hub.step = d1
+                local last = angles[na]
+                local span = hub.name and RT.armSpans[hub.name]
+                local fire = hub.fire or (span and span.first) or 0
+                local hurt = span and max(span.last - span.first, 0.3) or CFG.dodgePredictedLive
+                for k = 1, CFG.dodgePredictSteps do
+                    local at = last.t + hub.period * k
+                    pred[#pred + 1] = {
+                        a = last.a + d1 * k, x = last.x, z = last.z, y = last.y, w = last.w, L = last.L,
+                        from = at + fire, untilAt = at + fire + hurt + CFG.dodgeLinger,
+                    }
+                end
+            else
+                hub.step = nil
+            end
+        else
+            hub.step = nil
+        end
     end
 end
 
@@ -299,6 +344,36 @@ local function dangerAt(px, py, pz, t)
             if depth <= reach then return 1 end
             if depth <= reach + shoulder then
                 worst = max(worst, 1 - (depth - reach) / shoulder)
+            end
+        end
+    end
+
+    -- 1c. Predicted lines (4.10.2): where a sweeping hub's NEXT lines will
+    -- be, from the step between the last ones. Floor until their time, a
+    -- line for as long as such lines have been seen to hurt.
+    local atc = DG.clock + t
+    for _, hub in pairs(DG.hubs) do
+        local pred = hub.pred
+        if pred then
+            for i = 1, #pred do
+                local L = pred[i]
+                if atc >= L.from - CFG.dodgeLead and atc <= L.untilAt and abs(py - L.y) < halfHeight + 40 then
+                    local dx, dz = math.cos(L.a), math.sin(L.a)
+                    local qx, qz = px - L.x, pz - L.z
+                    local along = abs(qx * dx + qz * dz) - L.L * 0.5
+                    local side = abs(-qx * dz + qz * dx) - L.w * 0.5
+                    local depth
+                    if along <= 0 and side <= 0 then
+                        depth = max(along, side)
+                    else
+                        along, side = max(along, 0), max(side, 0)
+                        depth = sqrt(along * along + side * side)
+                    end
+                    if depth <= reach then return 1 end
+                    if depth <= reach + shoulder then
+                        worst = max(worst, 1 - (depth - reach) / shoulder)
+                    end
+                end
             end
         end
     end
@@ -535,7 +610,12 @@ local function decide(root, humanoid)
             local ax, az = approach.X - rx, approach.Z - rz
             local approachTime = max(sqrt(ax * ax + az * az) - preferred, 0) / speed
             local nextFire = hub.lastSpawn + hub.period + (hub.fire or CFG.dodgeHubFireGuess)
-            if os.clock() + approachTime + CFG.dodgeHubExit > nextFire then
+            local nowc = os.clock()
+            -- A volley that is overdue by a whole period is not coming: the
+            -- burst is over and the hub is quiet. (Held forever otherwise -
+            -- an expected time in the past can never be got ahead of.)
+            local quiet = nowc > nextFire + hub.period
+            if not quiet and nowc + approachTime + CFG.dodgeHubExit > nextFire then
                 -- No time to go in and get out: wait on the hub ring instead
                 -- of wandering off. With nothing pulling inward the radial
                 -- cost alone had the character fifty-five studs out, from

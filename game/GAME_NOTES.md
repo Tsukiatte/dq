@@ -219,10 +219,14 @@ a Studio recreation of the Midgardian Champion room (`tools/studio_install.lua`,
   **`workspace.stunParts.<PlayerName>`** is a stun marker riding on a player.
   **14 `firstBossPassiveBeam` Models are parked at the arena centre** for the
   whole fight. None of these is an attack; all three were once learned as one.
-- **The boss is a hub**: beams fire through its position two at a time every
-  ~2.5 s, live 1.5-5.5 s, deleted at 7 s. At melee standoff the character
-  stands where they cross and cannot clear two in the telegraph; at 20+
-  studs single beams are trivially dodged. Go in only inside a volley gap.
+- **The boss is a hub, and the beams are a sweep.** The fight save parks 18
+  `firstBossPassiveBeam` Models at the centre with yaws 20 degrees apart
+  (18.3, 38.3, 58.3 ... 178.3); the capture saw them appear every 0.5 s in
+  bursts of 4 and 13, ten seconds apart, each deleted at 7.0 s. So a burst is
+  a line sweeping round the boss 20 degrees per half second, and from two
+  lines the third is known before it exists. How long each line HURTS is the
+  one thing no capture has shown (the harness runs both hypotheses:
+  `DQSimBeamHurt` pulse / long). Go in only while the hub is quiet.
 - **Blame the attack that encloses you**, never the nearest part: a beam
   spawned through you a moment ago is nearer than the one burning you.
 - **`StreamingEnabled` is on.** The saved place has no camera controller and

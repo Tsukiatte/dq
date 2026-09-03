@@ -11,6 +11,28 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.10.2 - 2026-09-02 - "Read the sweep"
+
+- A hit teaches an attack's window only when the blame is **certain**: the
+  attack encloses us and no other live one does (`noteAttackHit(part,
+  confident)`; the hit log says `certain` or `ambiguous (n enclosing)`). An
+  ambiguous guess used to stretch the window for the rest of the fight - the
+  mage shot's 0.9-1.2 s became 0.9-6.9 s from being blamed for beams, and every
+  red line on the floor was a wall for 8 s. That was the "hitboxes stay longer
+  than the attack".
+- **The sweep.** The fight save parks the Midgardian Champion's beams 20
+  degrees apart, and the capture saw them every 0.5 s in bursts of 4 and 13,
+  10 s apart. A hub records each line's heading; when the last two steps
+  agree, the next `dodgePredictSteps` lines are placed before they exist
+  (`hub.pred`), floor until their time and a line for as long as such lines
+  have hurt (`dodgePredictedLive` until learned).
+- A hub whose expected volley is a whole period overdue is quiet and the
+  approach is allowed. Before, an expected time in the past held the
+  character out forever.
+- Simulator: bursts of 13 and 4 beams, 20 degrees per 0.5 s, every
+  `DQSimBurstGap` (10 s); `DQSimBeamHurt` = `pulse` (0.3-1.0 s) or `long`
+  (0.5-7 s); the fight save's own floating boss Model is removed.
+
 ## 4.10.1 - 2026-09-02
 
 - While a hub's gate is closed the character waits on a ring

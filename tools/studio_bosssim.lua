@@ -22,6 +22,10 @@
       DQSimVisible   (bool, default true)   show telegraphs (false = blind, like the real mage shots)
       DQSimBeams     (bool) DQSimMages (bool) DQSimStrikes (bool) DQSimProjectiles (bool)
       DQSimRate      (number, default 1.0)  cadence multiplier
+      DQSimBeamHurt  ("pulse" | "long", default "pulse") how long a passive beam hurts:
+                     pulse = 0.3-1.0 s after it appears, long = 0.5-7.0 s (its whole life)
+      DQSimBurstGap  (number, default 10)  seconds between beam bursts
+      DQSimBossHP    (number, default 3000) DQSimSwingDamage (25) DQSimReach (14)
       DQSimHits      (number)               hits taken by the player (read-only counter)
       DQSimDamage    (number)               total damage dealt (read-only)
 ]]
@@ -125,6 +129,16 @@ if not boss then
     hum.Parent = boss
     boss.PrimaryPart = root
     boss.Parent = enemies
+end
+
+-- The fight save carries the real boss Model, parked in the air where the
+-- fight left it. Two enemies of the same name confused the chase; the dummy
+-- is the boss here.
+do
+    local dungeon = WS:FindFirstChild("dungeon")
+    for _, d in ipairs(dungeon and dungeon:GetDescendants() or {}) do
+        if d:IsA("Model") and d.Name == "Midgardian Champion" then d:Destroy() end
+    end
 end
 
 -- ------------------------------------------------------------ the bot's swings
@@ -303,6 +317,13 @@ local beamTemplate = nil
 for _, c in ipairs(WS:GetChildren()) do
     if c.Name == "firstBossPassiveBeam" and c:IsA("Model") then beamTemplate = beamTemplate or c end
 end
+-- What the fight save and the captures say about these beams: the parked
+-- pool holds them at yaws 20 degrees apart (18.3, 38.3, 58.3 ... 178.3), and
+-- the capture saw them appear every 0.5 s in bursts of 4 and 13, ten seconds
+-- apart, each deleted at 7.0 s with nothing on the Model ever visible. So
+-- a burst is a line sweeping round the boss 20 degrees per half second. How
+-- long each line HURTS is the one thing no capture has shown; DQSimBeamHurt
+-- picks the hypothesis ("pulse" or "long").
 local function passiveBeam(angle)
     local cf = CFrame.new(CENTRE + Vector3.new(0, 0, 0)) * CFrame.Angles(0, angle, 0)
     local m, pc, hb
@@ -314,19 +335,19 @@ local function passiveBeam(angle)
     else
         m, pc, hb = makeAttackModel("firstBossPassiveBeam", Vector3.new(8, 2.1, 250), Vector3.new(8, 63.7, 250), cf)
     end
+    m:SetAttribute("DQSim", true)
     m.Parent = WS
     Debris:AddItem(m, 7.0)
     local t0 = tick()
-    -- The game's convention everywhere its client code shows it: the precast
-    -- is the warning, and it FADES at the instant the hit begins. The beam
-    -- then burns invisibly until 5.5 s. (An earlier version of this sim
-    -- faded at the end instead and taught the learner that beams arm at
-    -- 5.4 s.)
-    if visible() and pc then
-        pc.Transparency = 0.6
-        task.delay(1.5, function() if pc.Parent then pc.Transparency = 1 end end)
+    if pc then pc.Transparency = 1 end
+    local hurt = attr("DQSimBeamHurt", "pulse")
+    if hb then
+        if hurt == "long" then
+            addLive(hb, 150, "passive beam", t0 + 0.5, t0 + 7.0)
+        else
+            addLive(hb, 150, "passive beam", t0 + 0.3, t0 + 1.0)
+        end
     end
-    if hb then addLive(hb, 150, "passive beam", t0 + 1.5, t0 + 5.5) end
 end
 
 -- Mage shot: a 60-stud line from a caster position toward the player. Nothing
@@ -417,14 +438,24 @@ end
 
 -- ------------------------------------------------------------ schedule
 local function rate() return math.max(attr("DQSimRate", 1.0), 0.1) end
+local burstIndex = 0
 local angle = 0
 task.spawn(function()
     while true do
-        task.wait(2.5 / rate())
+        task.wait(attr("DQSimBurstGap", 10) / rate())
         if attr("DQSimEnabled", true) and attr("DQSimBeams", true) then
-            angle = angle + math.rad(37)
-            passiveBeam(angle)
-            passiveBeam(angle + math.pi * 0.5)
+            -- Alternate the short and the long burst the capture saw.
+            burstIndex = (burstIndex or 0) + 1
+            local count = (burstIndex % 2 == 1) and 13 or 4
+            local step = math.rad(20) * ((math.random() < 0.5) and 1 or -1)
+            angle = math.random() * math.pi * 2
+            log(string.format("beam burst of %d, step %.0f deg", count, math.deg(step)))
+            for i = 1, count do
+                if not attr("DQSimEnabled", true) then break end
+                passiveBeam(angle)
+                angle = angle + step
+                task.wait(0.5 / rate())
+            end
         end
     end
 end)
@@ -459,7 +490,7 @@ task.spawn(function()
     end
 end)
 
-log("running: beams every 2.5s, mage shot every 3s, strike every 4s, projectile every 8s (x DQSimRate). Telegraphs visible=" .. tostring(visible()))
+log("running: beam bursts (13 then 4, 20 deg per 0.5 s) every " .. tostring(attr("DQSimBurstGap", 10)) .. "s, hurt=" .. tostring(attr("DQSimBeamHurt", "pulse")) .. "; mage shot every 3s, strike every 4s, projectile every 8s (x DQSimRate). Telegraphs visible=" .. tostring(visible()))
 ]==]
 
 local sim = Instance.new("Script")
