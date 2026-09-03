@@ -76,8 +76,10 @@ local function dangerFromDepth(depth, reach, shoulder)
     return 0
 end
 
-local function dangerAt(px, py, pz, t)
-    local reach, halfHeight, shoulder = DG.reach, DG.halfHeight, CFG.dodgeShoulder
+-- `reachO` / `shoulderO` override the padding: the blink asks the bare
+-- question (is this point inside a box, body radius only), not the graded one.
+local function dangerAt(px, py, pz, t, reachO, shoulderO)
+    local reach, halfHeight, shoulder = reachO or DG.reach, DG.halfHeight, shoulderO or CFG.dodgeShoulder
     local now = DG.now
     local at = now + t
     local worst = 0
@@ -212,10 +214,11 @@ local function blinkTarget(root, hum, rx, ry, rz)
         for i = 0, 15 do
             local a = i / 16 * 2 * math.pi
             local x, z = rx + math.cos(a) * dist, rz + math.sin(a) * dist
-            local d0 = dangerAt(x, ry, z, 0)
-            if d0 < CFG.dodgeMoveAt then
+            -- Outside every box now and half a second on, body radius only: the
+            -- graded metric's six studs of padding rejected every spot within 8.
+            if dangerAt(x, ry, z, 0, 1.2, 0) < 0.5 and dangerAt(x, ry, z, 0.5, 1.2, 0) < 0.5 then
                 local d1 = dangerAt(x, ry, z, 0.6)
-                if d1 < 0.5 then
+                do
                     local hit = Workspace:Raycast(Vector3.new(x, ry + 2, z), Vector3.new(0, -(above + 6), 0), params)
                     if hit and hit.Normal.Y > 0.7 and abs(hit.Position.Y - feetY) <= 1.5 then
                         local dest = Vector3.new(x, hit.Position.Y + above, z)
