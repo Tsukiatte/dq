@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.40 - 2026-09-03 - "Walls are walls"
+
+- Field: the target model is no longer excluded from the walkability sweep; `RT.stalledFor` > 0.6 drops the current spot.
+
 ## 5.1.39 - 2026-09-03 - "Look before stepping"
 
 - Brain: `travel` checks `stepSafe` before each drive; blocked steps stand still.

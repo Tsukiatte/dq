@@ -390,9 +390,10 @@ local function decide(root, hum)
         return cost
     end
 
-    -- The target's own body is not a wall: a 60-stud boss beside you made
-    -- every far spot behind him unreachable and left only the near hot ones.
-    local params = raycastParams(ap and ap.model or nil)
+    -- The target's body IS a wall: the Champion has fifteen collidable parts,
+    -- and a spot picked behind him left the character running in place
+    -- against his legs.
+    local params = raycastParams(nil)
     local cands = DG.cands
     table.clear(cands)
     local function evaluate(scale)
@@ -431,6 +432,12 @@ local function decide(root, hum)
         end
     end
 
+    -- A spot we have failed to move toward for half a second is blocked by
+    -- something the sweep missed: drop it and pick another.
+    if DG.target and (RT.stalledFor or 0) > 0.6 then
+        DG.target = nil
+        DG.reason = "stalled"
+    end
     -- Keep the current spot while its line stays clean and nothing beats it
     -- clearly; drop it the moment its line closes.
     local target = DG.target
