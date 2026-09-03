@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.49 - 2026-09-03 - "Danger first"
+
+- Field: `dodgeDangerWeight` 3.0 multiplies the graded danger in `costOf`.
+
 ## 5.1.48 - 2026-09-03 - "Bob's circles"
 
 - `secondbosscriclehitbox` seed first 0.6, last 1.6, pad 3; reader applies seed pads to box sizes.
