@@ -612,7 +612,7 @@ local function decide(root, humanoid)
             -- not only from within a box-length of the boss. Without this,
             -- a dodge that ended eighty studs out left it there.
             local hub = DG.hubs[NAV.cachedEnemy]
-            local hubRing = hub and hub.rate >= CFG.dodgeHubMinRate and (hub.active or hub.imminent)
+            local hubRing = CFG.dodgeHubHold and hub and hub.rate >= CFG.dodgeHubMinRate and (hub.active or hub.imminent)
             if ax * ax + az * az <= near * near or DG.pursuitBlocked or hubRing then
                 approach = p
                 preferred = getEnemyStandoff(NAV.cachedEnemy) - 0.5
@@ -657,7 +657,7 @@ local function decide(root, humanoid)
     -- between them. In the quiet, the ability standoff, to cast. The ring
     -- is held from both sides - inside it is as wrong as outside.
     DG.hubHold = false
-    if approach then
+    if approach and CFG.dodgeHubHold then
         local hub = DG.hubs[NAV.cachedEnemy]
         if hub and hub.rate >= CFG.dodgeHubMinRate and (hub.active or hub.imminent) then
             preferred = CFG.dodgeHubStandoff

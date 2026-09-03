@@ -463,7 +463,7 @@ local function applyConfigData(data)
     -- And an epoch: a save written by a new build still carried the old
     -- values forward (loaded, then re-saved under the new version). Below the
     -- current epoch, learned timing goes whatever the version says.
-    local trustLearned = versionAtLeast(savedVersion, "4.10.2") and (tonumber(data.learnEpoch) or 0) >= S.LEARN_EPOCH
+    local trustLearned = CFG.learnTimingFromHits and versionAtLeast(savedVersion, "4.10.2") and (tonumber(data.learnEpoch) or 0) >= S.LEARN_EPOCH
     if not trustLearned then
         heavyDebug("Config", string.format(
             "Save is from %s: learned attack timing and auto-learned names are discarded (they were wrong); hand picks and the attack book are kept.",

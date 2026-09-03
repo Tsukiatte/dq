@@ -2062,7 +2062,7 @@ local function recordHit(damage)
             lines[#lines + 1] = string.format("     BLAMED %s (%s) at age %.1fs, score %d, %s",
                 best.part.Name, st and st.name or "?", st and (now - st.spawn) or -1, bestScore,
                 confident and "certain" or ("ambiguous (" .. enclosingCount .. " enclosing)"))
-            S.noteAttackHit(best.part, confident)
+            S.noteAttackHit(best.part, confident and CFG.learnTimingFromHits)
         end
     end
 
