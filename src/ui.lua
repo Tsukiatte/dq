@@ -1284,7 +1284,11 @@ local function createControlUI()
             CFG.autoQueue = v
             if S.LB then S.LB.arrivedAt = nil S.LB.lastAttempt = -math.huge end
         end, 2,
-        "Queue and replay on their own. Needs the autofarm master switch on too; off, it only reports."))
+        "Queue and replay on their own."))
+    track(K.toggle(queueSection.content, "Autofarm off in lobby, on in dungeon",
+        function() return CFG.autoFarmByPlace end,
+        function(v) CFG.autoFarmByPlace = v if S.LB then S.LB.farmAppliedFor = nil end end, 2.5,
+        "The master switch follows the place: off on arriving in the lobby, on on arriving in a dungeon. Once per place change, so flipping it yourself inside a place still sticks."))
     local mapOptions = {}
     for i, name in ipairs(S.QUEUE_MAPS or {}) do mapOptions[i] = { value = name, label = name } end
     track(K.dropdown(queueSection.content, "Map", mapOptions,
