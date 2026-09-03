@@ -152,11 +152,19 @@ end
 -- index to the waypoint under the character, which shuffled on the spot for
 -- a whole fight. Straight when the line is clear; otherwise a path, replanned
 -- rarely, resumed past the waypoints already behind.
+local stepSafe
 local function travel(hum, root, to, speed, label, exclude)
     local rp = root.Position
     local now = os.clock()
     if flat(rp, to) < 70 and lineClear(rp, to, exclude) then
         BR.waypoints = nil
+        if not stepSafe(root.Position, to, speed) then
+            -- The next stretch is cut by an attack: stand for the moment rather
+            -- than walk into it (the field moves us if standing is unsafe).
+            releaseMover(hum, root)
+            setMovementState(label .. " blocked")
+            return false
+        end
         driveTo(hum, root, to, speed, 1.5)
         setMovementState(label .. " straight")
         return
@@ -187,6 +195,11 @@ local function travel(hum, root, to, speed, label, exclude)
         if BR.index < #BR.waypoints then BR.index = BR.index + 1 else BR.waypoints = nil end
         heavyDebugThrottled("stall", 2, "Brain", "no progress; skipping a waypoint")
         return
+    end
+    if not stepSafe(root.Position, wp, speed) then
+        releaseMover(hum, root)
+        setMovementState(label .. " blocked")
+        return false
     end
     driveTo(hum, root, wp, speed, 1.5)
     setMovementState(string.format("%s %d/%d", label, BR.index, #BR.waypoints))
@@ -243,7 +256,7 @@ end
 
 -- Is the next stretch of a walk safe for the moment it is crossed? Three
 -- samples along it at the times they would be reached, plus a short dwell.
-local function stepSafe(rp, to, speed)
+stepSafe = function(rp, to, speed)
     local dx, dz = to.X - rp.X, to.Z - rp.Z
     local len = sqrt(dx * dx + dz * dz)
     if len < 0.1 then return true end
