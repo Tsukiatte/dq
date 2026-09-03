@@ -287,7 +287,7 @@ local function brainTick(now)
     local target = pickTarget(root.Position)
     BR.target = target
     if target then
-        DG.approach = { x = target.root.Position.X, z = target.root.Position.Z, standoff = standoffFor(target), model = target.model }
+        DG.approach = { x = target.root.Position.X, z = target.root.Position.Z, standoff = standoffFor(target), model = target.model, isBoss = target.isBoss }
     else
         DG.approach = nil
     end

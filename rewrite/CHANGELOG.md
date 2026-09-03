@@ -1,5 +1,11 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.54 - 2026-09-03 - "Never on a live box"
+
+- Field: boxes may carry `weight`; `score` returns the endpoint danger; lethal-endpoint candidates cost +100; kept target dropped on `spot closed`; mob retreat via `dodgeMobRetreat`.
+- Reader: `circle line` weight 0.5; `chain()` both directions on the first circle.
+- Brain: `DG.approach.isBoss`. Draw: weighted boxes at 0.85 transparency.
+
 ## 5.1.53 - 2026-09-03 - "A quarter second"
 
 - Mob seeds: `last` 1.5 with `holdFull`; `fadeLinger` 0.55.

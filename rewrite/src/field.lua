@@ -149,6 +149,7 @@ local function dangerAt(px, py, pz, t, reachO, shoulderO)
             local d
             if b.slim then d = dangerFromDepth(depth, math.min(reach, b.slim), math.min(shoulder, CFG.slimShoulder))
             else d = dangerFromDepth(depth, reach, shoulder) end
+            if b.weight then d = d * b.weight end
             if d > worst then worst = d if worst >= 1 then return 1 end end
         end
     end
@@ -371,13 +372,15 @@ local function decide(root, hum)
             n = n + 1
         end
         local cx, cz = rx + ox, rz + oz
+        local endWorst = 0
         for _, extra in ipairs({ 0, dwell * 0.5, dwell }) do
             local d = dangerAt(cx, ry, cz, T + extra)
             total = total + d
             if d > worst then worst = d end
+            if d > endWorst then endWorst = d end
             n = n + 1
         end
-        return worst, worst * 0.5 + (total / n) * 0.5
+        return worst, worst * 0.5 + (total / n) * 0.5, endWorst
     end
 
     local function costOf(ox, oz, dist, graded)
@@ -391,9 +394,15 @@ local function decide(root, hum)
         end
         -- Standing in danger with a target: prefer backing away from it. A
         -- spot behind you is the one that is not in the next attack.
-        if ap and here0 >= CFG.dodgeMoveAt and adist > 1 then
+        if ap and DG.dangerHere >= CFG.dodgeMoveAt and adist > 1 then
             local toward = (ox * ax + oz * az) / dist
-            cost = cost + CFG.dodgeOutwardWeight * (toward + 1) * 0.5
+            local back = (toward + 1) * 0.5   -- 0 straight back, 0.5 sideways, 1 toward
+            if ap.isBoss then
+                cost = cost + CFG.dodgeOutwardWeight * back
+            else
+                -- Mobs (Chris): back off rather than sidestep toward the walls.
+                cost = cost + CFG.dodgeOutwardWeight * CFG.dodgeMobRetreat * sqrt(back)
+            end
         end
         -- The pull toward the target's band applies at every distance: in a
         -- field of attacks the spot outranks travel, so the spots themselves
@@ -427,8 +436,13 @@ local function decide(root, hum)
     local function evaluate(scale)
         for _, off in ipairs(DG.offsets) do
             local ox, oz, dist = off.x * scale, off.z * scale, off.dist * scale
-            local worst, graded = score(ox, oz, dist)
-            cands[#cands + 1] = { ox = ox, oz = oz, dist = dist, danger = worst, cost = costOf(ox, oz, dist, graded) }
+            local worst, graded, endWorst = score(ox, oz, dist)
+            -- The spot itself must not be inside anything firing while we stand
+            -- there (Chris: the marker never touches a box about to go off).
+            -- Such spots sort last; they are taken only when nothing else exists.
+            local cost = costOf(ox, oz, dist, graded)
+            if endWorst >= 0.999 then cost = cost + 100 end
+            cands[#cands + 1] = { ox = ox, oz = oz, dist = dist, danger = worst, endDanger = endWorst, cost = cost }
         end
         table.sort(cands, function(a, b) return a.cost < b.cost end)
         local best, checked = nil, 0
@@ -476,8 +490,13 @@ local function decide(root, hum)
             target = nil
             DG.target = nil
         else
-            local worst, graded = score(tx, tz, d)
-            if here0 >= moveAt then
+            local worst, graded, endWorst = score(tx, tz, d)
+            if endWorst >= 0.999 then
+                -- The spot itself is about to be hit: never keep it.
+                target = nil
+                DG.target = nil
+                DG.reason = "spot closed"
+            elseif here0 >= moveAt then
                 -- Escaping: the spot is kept until reached, or until a clearly
                 -- better one exists. Dropping it the moment its line reads hot
                 -- re-picked a different direction every frame when everything

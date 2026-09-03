@@ -195,18 +195,29 @@ noteCircle = function(pc, now)
     end
     -- The whole line is the attack: every circle of the chain lands on it, so
     -- the way out is sideways, never along it (Chris: left or right, not
-    -- toward the smaller circle). Width is the widest circle still to come.
+    -- toward the smaller circle). The line is a soft band (never a spot to
+    -- pick, but crossable: a hard line made every escape path read lethal and
+    -- the choice arbitrary); the circles themselves carry the timing.
     local width = size + 6
     if measured and growth > 0 then width = size + growth * 9 + 6 end
-    addZone({ name = "circle line", cframe = CFrame.lookAt(pos, pos + dir), size = Vector3.new(width, 12, 400), from = now, untilAt = now + 3.0, telegraphed = true, madeAt = now })
-    if measured then
+    addZone({ name = "circle line", cframe = CFrame.lookAt(pos, pos + dir), size = Vector3.new(width, 12, 400), from = now, untilAt = now + 3.0, telegraphed = true, madeAt = now, weight = 0.5 })
+    local function chain(d, sp, gr, step)
         for k = 1, 9 do
-            local c = pos + dir * (spacing * k)
-            local diam = size + growth * k + 6
+            local c = pos + d * (sp * k)
+            local diam = size + gr * k + 6
             if diam < 16 then break end
-            local at = now + dt * k + 0.6
+            local at = now + step * k + 0.6
             addZone({ name = "circle next", cframe = CFrame.new(c.X, pos.Y, c.Z), size = Vector3.new(diam, 12, diam), round = true, from = at, untilAt = at + 1.0, telegraphed = true, madeAt = now })
         end
+    end
+    if measured then
+        chain(dir, spacing, growth, dt)
+    else
+        -- Direction unknown until the second circle: both ways, circles wider
+        -- away from Bob and narrower toward him (the wrong half is removed
+        -- 0.27 s later).
+        chain(dir, 22, 6, 0.27)
+        chain(-dir, 22, -6, 0.27)
     end
 end
 

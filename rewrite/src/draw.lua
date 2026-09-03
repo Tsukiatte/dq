@@ -122,7 +122,7 @@ local function drawTick(now)
                 local edge = p:FindFirstChild("edge")
                 if edge then edge.Color3 = c end
             end
-            p.Transparency = CFG.hazardTransparency
+            p.Transparency = b.weight and 0.85 or CFG.hazardTransparency   -- soft bands stay faint
             end
         end
     end
