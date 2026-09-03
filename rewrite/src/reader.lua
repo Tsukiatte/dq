@@ -94,7 +94,7 @@ local function ownedByPlayer(inst)
 end
 
 -- ------------------------------------------------------------ model attacks
-local noteBeam
+local noteBeam, noteVolley
 local function trackModel(model)
     if RD.models[model] or isOurs(model) or ownedByPlayer(model) then return end
     if model:FindFirstChildOfClass("Humanoid") then return end
@@ -113,6 +113,7 @@ local function trackModel(model)
     }
     RD.count = RD.count + 1
     if hb and name:find("passivebeam", 1, true) then noteBeam(hb, now) end
+    if hb and name:find("mageshot", 1, true) then noteVolley(hb, now) end
 end
 
 local function trackPart(part)
@@ -151,6 +152,30 @@ end
 -- shifting offsets - a fan nothing inside 125 studs survives; the brain backs
 -- out past the beams' reach while RD.fanUntil holds.
 local function wrap180(a) a = a % 180 if a > 90 then a = a - 180 end return a end
+
+-- A mage volley is a chain of shots marching from the mage toward the player,
+-- one every tenth of a second, the last landing on the player. Two aligned
+-- shots reveal the line; the rest of it becomes one zone at once, so the
+-- field steps off the line instead of standing on it as the shots arrive.
+noteVolley = function(hb, now)
+    local prev = RD.lastShot
+    local pos = hb.Position
+    local look = hb.CFrame.LookVector
+    RD.lastShot = { t = now, pos = pos, look = look }
+    if not prev or now - prev.t > 0.4 then return end
+    local step = pos - prev.pos
+    local flat = Vector3.new(step.X, 0, step.Z)
+    if flat.Magnitude < 6 or flat.Magnitude > 40 then return end
+    local dir = flat.Unit
+    for i = #RD.zones, 1, -1 do
+        local z = RD.zones[i]
+        if z.name == "volley next" and z.madeAt < now - 0.3 then table.remove(RD.zones, i) end
+    end
+    local length = 70
+    local centre = Vector3.new(pos.X, pos.Y, pos.Z) + dir * (length * 0.5)
+    local cf = CFrame.lookAt(centre, centre + dir)
+    addZone({ name = "volley next", cframe = cf, size = Vector3.new(hb.Size.X, math.max(hb.Size.Y, 12), length), from = now + 0.3, untilAt = now + 2.2, telegraphed = true, madeAt = now })
+end
 noteBeam = function(hb, now)
     local look = hb.CFrame.LookVector
     local yaw = math.deg(math.atan2(look.X, look.Z)) % 180

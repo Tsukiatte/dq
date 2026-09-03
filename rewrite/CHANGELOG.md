@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.42 - 2026-09-03 - "The volley line"
+
+- Reader: `noteVolley` adds a `volley next` zone along the march of a mage volley.
+
 ## 5.1.41 - 2026-09-03 - "Remember the room"
 
 - Brain: `reachedOrder` mirrored in `_G.DungeonAutofarmReached`.
