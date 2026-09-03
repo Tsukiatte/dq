@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.30"
+local SCRIPT_VERSION = "5.1.31"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.31", date = "2026-09-03", notes = "Fourth kick: three or four blinks in a row. Root cause was the reader ending a passive beam's danger when its precast faded at 0.6 s while the beam kills for two seconds, so hops landed in beams the model called safe and hopped again. Beams now hold their full window. The blink is walk-first (only when the field's own spot cannot be reached before the box fires), 3 s apart, at most two in ten seconds, destinations clear for 1.5 s and at least 26 studs from any mob." },
     { version = "5.1.30", date = "2026-09-03", notes = "A blink destination must stay clear of every box for a full second (five samples), moving bodies included; it was checked only now and at 0.5 s, and Chris watched the character land where the next shot arrived." },
     { version = "5.1.29", date = "2026-09-03", notes = "Blink destinations only have to be outside the boxes themselves (body radius, no shoulder): with the field's padded metric a spot 8 studs beside a 7-wide mage shot still read as danger and the reflex never found anywhere to go. Three room-1 deaths inside live shots with no blink." },
     { version = "5.1.28", date = "2026-09-03", notes = "Blink reflex, asked for by Chris after the second script's video: when a lethal box covers the character and fires within 0.45 s, hop at most 8 studs to the nearest clear floor. Runs every frame outside the movement logic. The destination's floor is raycast and must match the current feet within 1.5 studs; the sweep there must be clear and there must be headroom; never while airborne; rotation, velocity and WalkSpeed untouched; 1.2 s between hops. Off switch and size in the Dodge window." },
@@ -99,7 +100,8 @@ local CFG = {
     blink = true,                 -- reflex hop out of a lethal box that fires before a walk could clear it
     blinkMax = 8,                 -- studs, at most; the other script's hop is barely visible
     blinkWindow = 0.45,           -- hop when the box on us fires within this many seconds (0 = already live)
-    blinkCooldown = 1.2,          -- seconds between hops
+    blinkCooldown = 3.0,          -- seconds between hops; four kicks say chained hops are what the server flags
+    blinkPer10s = 2,              -- and no more than this many in any ten seconds
     dodgeMoveAt = 0.15,           -- danger here at or above this: relocate
     dodgeHysteresis = 0.1,
     dodgeDistanceCost = 0.008,
@@ -157,7 +159,7 @@ local TIMING = {
     spearmanstrikehitbox        = { first = 0.6, last = 1.2 },
     northernwarriorlinestrike   = { first = 0.6, last = 1.2 },
     northernwarriorcirclestrike = { first = 0.6, last = 1.2 },
-    firstbosspassivebeam        = { first = 0.3, last = 2.0 },   -- deaths inside beams start 0.3-0.4 s after the Model appears; a fresh beam can be stepped out of
+    firstbosspassivebeam        = { first = 0.3, last = 2.4, holdFull = true },   -- hurts 0.3-2.2 s after the Model appears; its precast fades at 0.6 s, which must NOT end the danger
     firstbossjumpslam           = { first = 1.8, last = 5.0 },
     secondbosscriclehitbox      = { first = 1.2, last = 2.5 },
     secondbosshorizontalbeam    = { first = 1.1, last = 5.0 },

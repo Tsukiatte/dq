@@ -220,8 +220,17 @@ local function blinkTarget(root, hum, rx, ry, rz)
             -- including where projectiles will be; a spot clear now but hit at
             -- 0.7 s was a teleport into the attack.
             local clear = true
-            for _, tt in ipairs({ 0, 0.25, 0.5, 0.75, 1.0 }) do
+            for _, tt in ipairs({ 0, 0.25, 0.5, 0.75, 1.0, 1.5 }) do
                 if dangerAt(x, ry, z, tt, 1.2, 0) >= 0.5 then clear = false break end
+            end
+            -- Never land beside a mob: its strike is centred on it.
+            if clear then
+                for _, e in ipairs(RD.enemies) do
+                    if not e.isBoss then
+                        local ddx, ddz = x - e.x, z - e.z
+                        if ddx * ddx + ddz * ddz < (CFG.mobStandoff - 8) ^ 2 then clear = false break end
+                    end
+                end
             end
             if clear then
                 local d1 = math.max(dangerAt(x, ry, z, 0.6), dangerAt(x, ry, z, 1.2))
@@ -273,8 +282,21 @@ local function decide(root, hum)
     -- Rotation, velocity and WalkSpeed are untouched; the height comes from
     -- the floor at the destination.
     if CFG.blink and here0 >= 0.999 and grace <= CFG.blinkWindow and now - (RT.lastBlinkAt or -math.huge) >= CFG.blinkCooldown then
-        local dest = blinkTarget(root, hum, rx, ry, rz)
+        -- Walk first: if the spot the field already holds is reachable before
+        -- the box fires, the legs do it. Only a box that fires sooner than the
+        -- walk can clear earns a hop, and no more than blinkPer10s of them.
+        local walkOk = false
+        if DG.target then
+            local tx, tz = DG.target.X - rx, DG.target.Z - rz
+            walkOk = sqrt(tx * tx + tz * tz) / CFG.tweenEscape + 0.2 <= grace
+        end
+        RT.blinkTimes = RT.blinkTimes or {}
+        local recent = 0
+        for i = #RT.blinkTimes, 1, -1 do if now - RT.blinkTimes[i] <= 10 then recent = recent + 1 else break end end
+        local dest = (not walkOk and recent < CFG.blinkPer10s) and blinkTarget(root, hum, rx, ry, rz) or nil
         if dest then
+            RT.blinkTimes[#RT.blinkTimes + 1] = now
+            if #RT.blinkTimes > 20 then table.remove(RT.blinkTimes, 1) end
             RT.lastBlinkAt = now
             RT.blinks = (RT.blinks or 0) + 1
             RT.lastBlink = { at = now, from = rp, to = dest, dist = (Vector3.new(dest.X, 0, dest.Z) - Vector3.new(rx, 0, rz)).Magnitude, grace = grace }

@@ -323,9 +323,18 @@ local function brainTick(now)
             local rp, ep = root.Position, target.root.Position
             local away = Vector3.new(rp.X - ep.X, 0, rp.Z - ep.Z)
             if away.Magnitude > 0.5 then
-                driveTo(hum, root, rp + away.Unit * 12, CFG.tweenEscape, 1.0)
-                setMovementState("back off")
-                return
+                local dest = rp + away.Unit * 12
+                if stepSafe(rp, dest, CFG.tweenEscape) then
+                    driveTo(hum, root, dest, CFG.tweenEscape, 1.0)
+                    setMovementState("back off")
+                    return
+                elseif DG.target then
+                    -- The straight line back is through an attack (the mage volleys
+                    -- were walked into this way); take the field's spot instead.
+                    driveTo(hum, root, DG.target, CFG.tweenEscape, 1.0)
+                    setMovementState("back off via spot")
+                    return
+                end
             end
         end
         if CFG.strafe then
