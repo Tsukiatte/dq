@@ -64,15 +64,29 @@ local function drawTick(now)
             if not p or not p.Parent then p = newBox() DR.parts[key] = p end
             used[key] = true
             if b.moving then
-                -- The rectangle it sweeps over the window we look ahead.
-                local len = b.speed * CFG.projectileLookahead + b.halfL * 2
+                -- The body where it is now, drawn solid; the stretch it covers
+                -- over the next second only as a faint strip.
                 local along = b.offset + b.speed * math.max(now - b.pathStart, 0)
-                local cx, cz = b.ox + b.dx * (along + len * 0.5 - b.halfL), b.oz + b.dz * (along + len * 0.5 - b.halfL)
-                p.Size = Vector3.new(b.halfW * 2, 1, len)
+                local cx, cz = b.ox + b.dx * along, b.oz + b.dz * along
                 local y = (b.ground and rp) and (rp.Y - 2.4) or (b.oy - b.halfH + 0.6)
+                p.Size = Vector3.new(b.halfW * 2, 1, b.halfL * 2)
                 p.CFrame = CFrame.lookAt(Vector3.new(cx, y, cz), Vector3.new(cx + b.dx, y, cz + b.dz))
                 p.Shape = Enum.PartType.Block
+                local sweep = p:FindFirstChild("sweep")
+                if not sweep then
+                    sweep = Instance.new("Part")
+                    sweep.Name = "sweep"
+                    sweep.Anchored, sweep.CanCollide, sweep.CanQuery, sweep.CanTouch, sweep.CastShadow = true, false, false, false, false
+                    sweep.Material = Enum.Material.Neon
+                    sweep.Parent = p
+                end
+                local len = b.speed * CFG.projectileLookahead
+                sweep.Size = Vector3.new(b.halfW * 2, 0.4, len)
+                sweep.CFrame = CFrame.lookAt(Vector3.new(cx + b.dx * (b.halfL + len * 0.5), y, cz + b.dz * (b.halfL + len * 0.5)), Vector3.new(cx + b.dx * (b.halfL + len), y, cz + b.dz * (b.halfL + len)))
+                sweep.Transparency = 0.88
+                sweep.Color = CFG.colorSoon
             elseif b.round then
+                local sw = p:FindFirstChild("sweep") if sw then sw:Destroy() end
                 p.Shape = Enum.PartType.Cylinder
                 p.Size = Vector3.new(0.6, b.size.X, b.size.X)
                 p.CFrame = b.cframe * CFrame.Angles(0, 0, math.rad(90))
