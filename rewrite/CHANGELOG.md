@@ -1,5 +1,10 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.28 - 2026-09-03 - "Blink"
+
+- Field: `blinkTarget` + reflex in `decide` (`blink`, `blinkMax` 8, `blinkWindow` 0.45, `blinkCooldown` 1.2). Floor-verified destination, clear sweep, headroom, never airborne, velocity untouched.
+- UI: toggle and distance slider in Dodge; HUD shows blink count. Recorder/poll carry blink counts.
+
 ## 5.1.27 - 2026-09-03 - "Reach"
 
 - `abilityRadius` 42.

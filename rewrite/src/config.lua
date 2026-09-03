@@ -19,7 +19,7 @@ end
 local PERSIST = {
     "abilityRadius", "attackRange", "autoAttack", "autoE", "autoQ", "autoFarmByPlace",
     "autoQueue", "autoQueueDelay", "autoQueueDifficulty", "autoQueueHardcore", "autoQueueMap", "autoQueuePrivate", "autoQueueReplay", "autoStartDungeon",
-    "bossStandoff", "mobStandoff", "strafe", "strafeSpeedFraction", "tweenEscape", "tweenWalk",
+    "blink", "blinkMax", "bossStandoff", "mobStandoff", "strafe", "strafeSpeedFraction", "tweenEscape", "tweenWalk",
     "colorFloor", "colorLive", "colorSoon", "drawHazards", "drawTarget", "hazardTransparency",
     "debugPrints",
     "menuKey",

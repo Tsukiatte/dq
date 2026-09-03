@@ -124,6 +124,8 @@ local function buildUI()
 
     -- ---------------------------------------------------------------- Dodge
     local d = dodge.body
+    track(K.toggle(d, "Blink out of hitboxes", function() return CFG.blink end, function(v) CFG.blink = v end, 0, "A hop of a few studs when a lethal box covers you and fires before you could walk out. Only onto floor at the same height."))
+    track(K.slider(d, "Blink distance", "studs", 4, 8, false, function() return CFG.blinkMax end, function(v) CFG.blinkMax = v end, 0, "At most this far; the nearest clear spot wins."))
     K.caption(d, "Every attack becomes a box with a live window. A ring of spots round you is scored at the moments each would be reached; danger already on you is discounted only until the ground under you fires.", 1)
     track(K.slider(d, "Reach", "studs", 8, 30, false, function() return CFG.dodgeReach end, function(v) CFG.dodgeReach = v end, 2, "Radius of the ring of spots."))
     track(K.slider(d, "Lead", "s", 0.3, 2.0, true, function() return CFG.dodgeLead end, function(v) CFG.dodgeLead = v end, 3, "A standing telegraph counts as live this long before it fires."))
@@ -238,7 +240,7 @@ local function buildUI()
         hudStatus.TextColor3 = RT.farmEnabled and (T.StatusGood or Color3.fromRGB(90, 220, 120)) or (T.StatusBad or Color3.fromRGB(230, 90, 90))
         local t = BR.target
         hudTarget.Text = t and string.format("target: %s  %.0f%%", t.model.Name, t.humanoid.Health / math.max(t.humanoid.MaxHealth, 1) * 100) or "target: none"
-        hudWorld.Text = string.format("%d enemies  %d hazards  fps %d  %.1fms", #RD.enemies, RD.count, math.floor(fps + 0.5), RT.tickMs or 0)
+        hudWorld.Text = string.format("%d enemies  %d hazards  fps %d  %.1fms  blinks %d", #RD.enemies, RD.count, math.floor(fps + 0.5), RT.tickMs or 0, RT.blinks or 0)
     end)
 end
 
