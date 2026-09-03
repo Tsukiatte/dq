@@ -61,7 +61,11 @@ local function saveConfig()
     local ok, json = pcall(function() return game:GetService("HttpService"):JSONEncode(snapshot()) end)
     if not ok then return false end
     local wrote = pcall(writefile, FILE, json)
-    if wrote then CF.lastJson = json end
+    if wrote then
+        CF.lastJson = json
+        local tr = RT.configTrace
+        if tr then tr.saves = (tr.saves or 0) + 1 tr.lastSaveAt = os.clock() tr.lastStandoff = CFG.bossStandoff end
+    end
     return wrote
 end
 
@@ -73,6 +77,7 @@ local function loadConfig()
     local ok, data = pcall(function() return game:GetService("HttpService"):JSONDecode(readfile(FILE)) end)
     if not ok or type(data) ~= "table" then return false end
     apply(data)
+    RT.configTrace = { loadedAt = os.clock(), fileVersion = data.__version, standoff = data.bossStandoff, ranged = data.rangedStandoff, saves = 0 }
     heavyDebug("Config", "loaded " .. FILE)
     return true
 end
