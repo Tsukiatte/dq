@@ -135,3 +135,18 @@ leaving rotation, velocity and WalkSpeed alone, at most once per
 `blinkCooldown` (1.2 s). Chris's rule: the character is never clipped into the
 ground. If this ever draws a kick, the bound has been found and the toggle
 goes off.
+
+### Bob the Frost Giant (measured 2026-09-03, run 25)
+
+- **Circle chain.** `secondBossCricleHitbox` Models have no hitBox, only an
+  invisible precast Cylinder. They march outward from Bob along the line
+  through the player: one every 0.27 s, 22 studs further, diameter 22 + 6 per
+  step (up to 76), lethal about 0.6 s after each appears, Model gone at ~2 s.
+  The first circle fixes the chain; `noteCircle` predicts the next nine.
+- **Wall.** The `Second Boss Moving Beam` announcement puts the path 100-200
+  studs from the real wall. The wall Model (`secondBossMovingBeam`: ball1 and
+  ball2 52 studs apart, middleBeam between) sweeps at ~19 studs/s; `RD.walls`
+  measures it and the remote handler is gone.
+- **Orb.** `secondBoss<Colour>Orb` follows the player and explodes when close;
+  it must be led behind the matching crystal (red -144,23,268; green
+  -159,23,335; yellow -105,23,377; Bob at -45,30,298). Deferred by Chris.
