@@ -1,5 +1,12 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.9 - 2026-09-03 - "From the announcement"
+
+- Moving bodies (criss cross, big spike, seeking spike, projectiles) are danger from the moment they are known, at their origin until their start time; no 0.4 s lead gate.
+- Remote paths ignore height (`ground`); drawn at the character's floor.
+- Field floor check allows a rise of 0.2 studs per stud of distance (ramps).
+- Brain plans walks at the Humanoid's WalkSpeed; the burst is only an escape.
+
 ## 5.1.8 - 2026-09-03 - "On its own legs"
 
 - Third kick, server-side, during ordinary driving. The mover writes no positions: every move is a Humanoid walk; the escape burst is a temporary WalkSpeed of `tweenEscape`, restored after. Stalls against a wall for half a second hop.

@@ -14,6 +14,8 @@ local dangerAt = S.dangerAt
 local driveTo = S.driveTo
 local faceToward = S.faceToward
 local releaseMover = S.releaseMover
+-- The speed a walk is planned at: the Humanoid's own, once the mover has read it.
+local function walkSpeed() return RT.walkSpeed or CFG.tweenWalk end
 local Workspace = S.Workspace
 local LocalPlayer = S.LocalPlayer
 local PathfindingService = S.PathfindingService
@@ -214,7 +216,7 @@ local function strafePoint(root, e, standoff, now)
     local px, pz = rp.X + tx * stepLen + ux * max(min(radial, clampR), -clampR), rp.Z + tz * stepLen + uz * max(min(radial, clampR), -clampR)
     local params = raycastParams(e.model)
     local y = floorY(px, rp.Y, pz, params)
-    local blocked = (not y) or abs(y - rp.Y) > CFG.maxStepHeight + 3 or dangerAt(px, rp.Y, pz, stepLen / CFG.tweenWalk) >= CFG.dodgeMoveAt
+    local blocked = (not y) or abs(y - rp.Y) > CFG.maxStepHeight + 3 or dangerAt(px, rp.Y, pz, stepLen / walkSpeed()) >= CFG.dodgeMoveAt
     if blocked or now - BR.strafeFlipAt > 4 then
         BR.strafeDir = -BR.strafeDir
         BR.strafeFlipAt = now
@@ -277,10 +279,10 @@ local function brainTick(now)
                 local room = nextRoom(root.Position)
                 walkTo = room and room.position
             end
-            useSpot = walkTo == nil or not stepSafe(root.Position, walkTo, CFG.tweenWalk)
+            useSpot = walkTo == nil or not stepSafe(root.Position, walkTo, walkSpeed())
         end
         if useSpot then
-            local speed = RT.moveBoost and CFG.tweenEscape or CFG.tweenWalk
+            local speed = RT.moveBoost and CFG.tweenEscape or walkSpeed()
             driveTo(hum, root, DG.target, speed, 1.2)
             setMovementState("dodge " .. DG.reason)
             if target then fight(hum, root, target, now) end
@@ -293,7 +295,7 @@ local function brainTick(now)
         local standoff = standoffFor(target)
         local d = flat(root.Position, target.root.Position)
         if d > standoff + 3 then
-            local speed = (target.isBoss and d > 45) and CFG.tweenEscape or CFG.tweenWalk
+            local speed = (target.isBoss and d > 45) and CFG.tweenEscape or walkSpeed()
             travel(hum, root, target.root.Position, speed, "approach", target.model)
             if d <= CFG.abilityRadius then fight(hum, root, target, now) end
             return
@@ -303,7 +305,7 @@ local function brainTick(now)
         if CFG.strafe then
             local p = strafePoint(root, target, standoff, now)
             if p then
-                local speed = (target.melee and d < standoff - 2) and CFG.tweenEscape or CFG.tweenWalk * CFG.strafeSpeedFraction
+                local speed = (target.melee and d < standoff - 2) and CFG.tweenEscape or walkSpeed() * CFG.strafeSpeedFraction
                 driveTo(hum, root, p, speed, 1.0)
                 setMovementState("strafe")
                 return
@@ -317,7 +319,7 @@ local function brainTick(now)
     -- 3. Nothing to fight: on to the next room.
     local room = nextRoom(root.Position)
     if room then
-        travel(hum, root, room.position, CFG.tweenWalk, "to " .. room.name)
+        travel(hum, root, room.position, walkSpeed(), "to " .. room.name)
         return
     end
     releaseMover(hum, root)
