@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 4.11.4
+    VERSION : 4.11.3
     BUILD   : 2026-09-02
 
     VERSIONING RULES (semantic):
@@ -20,7 +20,7 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "4.11.4"
+local SCRIPT_VERSION = "4.11.3"
 -- Bump to throw away every learned attack timing in every save, once.
 local LEARN_EPOCH = 2
 local SCRIPT_BUILD_DATE = "2026-09-02"
@@ -28,7 +28,6 @@ local SCRIPT_CODENAME = "Aquatic Temple"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
-    { version = "4.11.4", date = "2026-09-02", notes = "Probe build for the rewrite. Every change of a precast transparency is written into the attack lifecycle line with its age, next to the hit ages, so one capture says per attack at what age and what transparency the hit lands and when it fades. The 4.11.3 code is frozen under legacy/4.11.3 and tagged v4.11.3-legacy." },
     { version = "4.11.3", date = "2026-09-02", notes = "Harness only: the simulator logged a dead boss with a variable that did not exist yet, the error skipped the rebuild, and every run after a kill had no target. Fixed." },
     { version = "4.11.2", date = "2026-09-02", notes = "A Model tracked before its hitBox replicated was keyed by its bare name and armed as known live, and stayed that way. When the hitBox turns up it is keyed properly and given the timing that key knows; a window an event stamped on it is kept." },
     { version = "4.11.1", date = "2026-09-02", notes = "The laser's window stamp goes to the nearest Model whose key starts with model, not to whatever attack sits within the radius: in the harness a mage shot took it. And the simulator fires the criss cross in volleys round the player - Chris counts fifteen crossing the map at once in the real fight." },

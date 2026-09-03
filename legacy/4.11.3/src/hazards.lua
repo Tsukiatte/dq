@@ -2924,17 +2924,6 @@ local function updateArming(now)
                     if tr < st.minT then st.minT = tr end
                 end
                 local on, partMin, soundOn, anyChannel = channelState(st)
-                -- Probe (4.11.4): every change of the precast transparency
-                -- goes into the lifecycle line with its age, next to the HIT
-                -- ages. One capture then says, per attack, at what age and
-                -- what transparency the hit lands and when it fades.
-                if partMin < math.huge then
-                    local last = st.trNoted
-                    if last == nil or math.abs(partMin - last) >= 0.05 then
-                        st.trNoted = partMin
-                        note(st, age, string.format("tr%.2f", partMin))
-                    end
-                end
                 if st.dormant and (on > 0 or soundOn) then
                     st.dormant = nil
                     note(st, age, "woke")

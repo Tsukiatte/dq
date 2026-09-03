@@ -11,15 +11,6 @@ file and that table in sync on every edit.
 
 ---
 
-## 4.11.4 - 2026-09-02 - probe build
-
-- Every change (>= 0.05) of a precast transparency is noted in the attack
-  lifecycle line with its age (`tr0.70`, `tr0.35`, `tr1.00`), next to the
-  `HIT` ages. One capture now says, per attack, at what age and transparency
-  the hit lands and when it fades.
-- The 4.11.3 code is frozen under `legacy/4.11.3` (tag `v4.11.3-legacy`,
-  branch `legacy-4.11`) ahead of the rewrite.
-
 ## 4.11.3 - 2026-09-02
 
 - Harness only: the simulator logged a dead boss with a variable that did
