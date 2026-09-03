@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.16"
+local SCRIPT_VERSION = "5.1.17"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.17", date = "2026-09-03", notes = "Champion: the next two beam lanes of the slow sweep are zones (20 degrees on, half a second apart); the fast fan is detected and the boss is left for its 125-stud reach until it ends; the jump's target is a slam zone 2.5 s ahead. Standoff 35 (the abilities' best band). Dodge rings reach 30 studs so a 40-wide body can be sidestepped; far looks at 48 and 75." },
     { version = "5.1.16", date = "2026-09-03", notes = "A room counts as reached when the character stands inside its bounding box, not only within 25 studs of its first spawn part (the bot walked back toward room 2 after two boss kills). The field decides every frame: the aimed criss cross kills on spawn and a moving character survives it far more often than a parked one." },
     { version = "5.1.15", date = "2026-09-03", notes = "Dodge tuning keys are no longer persisted; the saved 0.6 s dwell was overriding 5.1.14 on load." },
     { version = "5.1.14", date = "2026-09-03", notes = "Dwell 1.5 s: a spot must stay clear for 1.5 s after arrival and here counts as dangerous when something arrives within 1.5 s. The big spike's front leaves the boss 1.4 s after its announcement at 100 studs/s; with a 0.6 s window the field noticed it 0.9 s out and could not clear 23 studs." },
@@ -58,7 +59,7 @@ local CFG = {
     meleeStandoff = 20,           -- studs past a melee mob's body: they close fast and one swing kills
     meleeBuffer = 4,              -- the field treats a melee mob as dangerous this far past its swing
     rangedStandoff = 10,          -- studs from a ranged mob
-    bossStandoff = 26,            -- inside ability range, outside its melee
+    bossStandoff = 35,            -- the abilities' best band: 11-15%/s of boss health at 30-40 studs, nothing past 40
     meleeMobMaxReach = 8,         -- a mob whose meleeDistance is at most this is melee
     strafe = true,                -- circle the target at standoff instead of standing
     strafeSpeedFraction = 0.6,    -- of tweenWalk
@@ -74,7 +75,7 @@ local CFG = {
 
     -- Dodge field.
     dodgeInterval = 0.016,
-    dodgeReach = 18,
+    dodgeReach = 30,              -- rings at 10/20/30: a 40-wide body needs 23 studs of sidestep
     dodgeRings = 3,
     dodgeRays = 16,
     dodgeMargin = 2.0,            -- studs of clearance round the character; hits landed 1.5-3.3 studs outside their boxes            -- studs of clearance round the character
@@ -85,8 +86,8 @@ local CFG = {
     dodgeMoveAt = 0.15,           -- danger here at or above this: relocate
     dodgeHysteresis = 0.1,
     dodgeDistanceCost = 0.008,
-    dodgeFarScale = 2.5,          -- second look this many times further when nothing near is safe
-    dodgeFarScale2 = 4.0,         -- and a third, further still
+    dodgeFarScale = 1.6,          -- second look this many times further when nothing near is safe
+    dodgeFarScale2 = 2.5,         -- and a third, further still
     dodgeOutwardWeight = 0.25,    -- when everything near is hot, prefer spots away from the target: back out
     dodgeInsideWeight = 0.85,
     dodgeStrafeWeight = 0.15,     -- preference for moving across the target's line rather than along it

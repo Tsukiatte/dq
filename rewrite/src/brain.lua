@@ -40,7 +40,9 @@ local sqrt, abs, max, min = math.sqrt, math.abs, math.max, math.min
 local function flat(a, b) local dx, dz = a.X - b.X, a.Z - b.Z return sqrt(dx * dx + dz * dz) end
 
 local function standoffFor(e)
-    if e.isBoss then return CFG.bossStandoff end
+    -- During the beam fan the boss is left alone: nothing inside the beams'
+    -- 125-stud reach lives through it.
+    if e.isBoss then return (os.clock() < (RD.fanUntil or -math.huge)) and 135 or CFG.bossStandoff end
     if e.melee then return e.extent + CFG.meleeStandoff end
     return e.extent + CFG.rangedStandoff
 end
@@ -319,6 +321,16 @@ local function brainTick(now)
         end
         BR.waypoints = nil
         fight(hum, root, target, now)
+        if target.isBoss and d < standoff - 12 then
+            -- Well inside the band (the boss leapt onto us, or the fan began): straight out.
+            local rp, ep = root.Position, target.root.Position
+            local away = Vector3.new(rp.X - ep.X, 0, rp.Z - ep.Z)
+            if away.Magnitude > 0.5 then
+                driveTo(hum, root, rp + away.Unit * 12, CFG.tweenEscape, 1.0)
+                setMovementState("back off")
+                return
+            end
+        end
         if CFG.strafe then
             local p = strafePoint(root, target, standoff, now)
             if p then

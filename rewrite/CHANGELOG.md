@@ -1,5 +1,12 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.17 - 2026-09-03 - "Lanes"
+
+- Reader: `noteBeam` predicts the next two sweep lanes as `beam next` zones; four beams within 0.5 s set `RD.fanUntil`.
+- Reader: `First Boss Jump Down` (Vector3) adds a 67-stud `slam soon` zone 2.5 s ahead.
+- Brain: boss standoff becomes 135 during the fan; a `back off` branch walks straight out when well inside the band.
+- `bossStandoff` 35, `dodgeReach` 30, far scales 1.6 / 2.5.
+
 ## 5.1.16 - 2026-09-03 - "Inside the room"
 
 - `nextRoom`: reached = inside the room's bounding box (cached) or within 25 studs of its anchor.
