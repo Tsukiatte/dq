@@ -334,7 +334,10 @@ local function decide(root, hum)
     -- everything and the bot teleported all over the arena (run 29).
     local inFight = apB ~= nil and sqrt((apB.x - rx) ^ 2 + (apB.z - rz) ^ 2) <= 70
         and (not apB.isBoss or (apB.model and BLINK_BOSSES[string.lower(apB.model.Name)] == true))
-    if CFG.blink and inFight and grace <= CFG.blinkWindow and now - (RT.lastBlinkAt or -math.huge) >= CFG.blinkCooldown then
+    local sinceBlink = now - (RT.lastBlinkAt or -math.huge)
+    local blinkReady = sinceBlink >= CFG.blinkCooldown
+        or (grace <= 0.15 and sinceBlink >= CFG.blinkDoubleGap and now - (RT.lastBlinkDouble or -math.huge) >= 20)
+    if CFG.blink and inFight and grace <= CFG.blinkWindow and blinkReady then
         -- Walk first: if the spot the field already holds is reachable before
         -- the box fires, the legs do it. Only a box that fires sooner than the
         -- walk can clear earns a hop, and no more than blinkPer10s of them.
@@ -366,6 +369,7 @@ local function decide(root, hum)
         if dest then
             RT.blinkTimes[#RT.blinkTimes + 1] = now
             if #RT.blinkTimes > 20 then table.remove(RT.blinkTimes, 1) end
+            if now - (RT.lastBlinkAt or -math.huge) < CFG.blinkCooldown then RT.lastBlinkDouble = now end
             RT.lastBlinkAt = now
             RT.blinks = (RT.blinks or 0) + 1
             RT.lastBlink = { at = now, from = rp, to = dest, dist = (Vector3.new(dest.X, 0, dest.Z) - Vector3.new(rx, 0, rz)).Magnitude, grace = grace }
@@ -495,8 +499,10 @@ local function decide(root, hum)
             if endWorst >= 0.999 then cost = cost + 100 end
             -- Clean path and clean ground: the nearest such spot is the marker
             -- (Chris: the closest available safe spot, so a blink can reach it).
-            local safe = worst < 0.5 and endWorst < CFG.dodgeMoveAt
+            local safe = worst < CFG.dodgeSafeWorst and endWorst < CFG.dodgeMoveAt
             if safe then cost = cost - 10 + dist * CFG.dodgeSafeDistanceCost end
+            -- Hot ground and a spot four studs away: that is dithering, not a dodge.
+            if (DG.dangerHere or 0) >= 0.5 and dist < 8 then cost = cost + 1 end
             cands[#cands + 1] = { ox = ox, oz = oz, dist = dist, danger = worst, endDanger = endWorst, cost = cost, safe = safe }
         end
         table.sort(cands, function(a, b) return a.cost < b.cost end)

@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.65"
+local SCRIPT_VERSION = "5.1.66"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.66", date = "2026-09-03", notes = "Champion fan: out to 85 studs, not 100, which was against the rocks (the trace showed 4 studs a second while commanded 22), and the reflex no longer re-arms once the bot is near that radius. A spot counts as clean only under 0.2 path danger, and a spot under eight studs costs extra while the ground here is hot. The blink may hop a second time inside its cooldown, two seconds on and once per twenty seconds, when a box is already on the character (the aimed criss cross spawns on you)." },
     { version = "5.1.65", date = "2026-09-03", notes = "Ability range per slot (Chris): every cast is queued with its slot, and the projectile that appears takes the measurement, so Q and E are measured separately and the least ranged one sets the fight distance - two studs inside a known cap, one past a reach that is only a lower bound. The Ability radius and Boss standoff sliders go to 80; auto standoff can go to 70. Bob: a circle whose precast is destroyed when it fires vanished from the field at that moment (three deaths just outside circles the model no longer had); the last geometry is kept while the window is open, and the circles are padded ten studs. A blocked travel step takes the spot instead of standing still beside the box." },
     { version = "5.1.64", date = "2026-09-03", notes = "Bob: the spread and horizontal beams kill at least 2.2 studs outside their 12-wide hitbox (the recorder saw a death there right after a blink to a spot the model called clear), so their padding is 2.5 studs with a 1-stud shoulder, and a blink destination must be 2.5 studs clear of every box." },
     { version = "5.1.63", date = "2026-09-03", notes = "Walls (Chris: melee mobs back it into a corner and it dies there). Every spot that passes the floor and sweep checks now looks 24 studs round itself in six directions and costs more the closer the walls are, so an open spot beats a corner. The back-off from a mob tries straight back, then 40, 80 and 120 degrees either side, and takes the most open way the field allows." },
@@ -108,7 +109,7 @@ local CFG = {
     -- Standing.
     mobStandoff = 34,             -- from any mob, melee or ranged: abilities only, never within weapon reach (Chris)
     meleeBuffer = 10,             -- soft band past a melee mob's swing where spots are merely disfavoured
-    fanRadius = 100,              -- during the Champion's beam fan: out to here from the hub, between the lanes
+    fanRadius = 85,               -- during the Champion's beam fan: out to here from the hub, between the lanes (100 was against the rocks: 4 studs/s while commanded 22)
     leashRadius = 122,            -- Champion arena: death past ~128 studs from the boss; the respawn point is 131-137 out
     bonusBoss = false,            -- after the last boss: stay for the bonus boss? Its arena is not mapped; off
     bonusVoteDelay = 2.0,         -- seconds after the vote appears before answering
@@ -143,6 +144,7 @@ local CFG = {
     blink = true,                 -- reflex hop out of a lethal box that fires before a walk could clear it
     blinkMax = 8,                 -- studs, at most; an 8-wide beam needs 5.2 from its centre, and the other script's hop is barely visible
     blinkWindow = 0.6,            -- hop when the ground here goes lethal within this many seconds (0 = already live)
+    blinkDoubleGap = 2.0,         -- a second hop inside the cooldown is allowed, once per twenty seconds, for a box already on us
     blinkCooldown = 5.0,          -- seconds between hops; kicks four and five came from hopping too often (3 s, chained)
     blinkPerMinute = 4,           -- and no more than this many in any sixty seconds
     stepBlockAt = 0.6,            -- a travel step is refused at or above this danger during the crossing (lanes at 0.5 may be crossed)
@@ -152,6 +154,7 @@ local CFG = {
     dodgeDangerWeight = 3.0,      -- the danger term is worth this much against pulls and distance: a lethal spot never beats a clean one
     dodgeDistanceCost = 0.008,
     dodgeSafeDistanceCost = 0.04,
+    dodgeSafeWorst = 0.2,         -- a spot counts as clean only under this path danger (0.47 four studs away was being taken)
     dodgeWallLook = 24,           -- studs of wall look-out round every candidate spot
     dodgeWallWeight = 0.05,       -- per stud the mean free distance falls short of three quarters of that (melee mobs cornered the bot - Chris) -- among clean spots the nearest wins (Chris: the marker is the closest safe spot, in blink range when possible)
     dodgeFarScale = 1.6,          -- second look this many times further when nothing near is safe

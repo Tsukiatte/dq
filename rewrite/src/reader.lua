@@ -308,7 +308,12 @@ noteBeam = function(hb, now)
         RD.fanUntil = now + 1.5
         -- Out to the edge: the lanes are 38 studs apart at 110 from the hub and
         -- 14 at 40. The reflex runs until the character is 100 studs out.
-        RT.reflex = { name = "fan", from = hb.Position, radius = CFG.fanRadius, untilAt = now + 2.5 }
+        local c = LocalPlayer.Character
+        local rt = c and c:FindFirstChild("HumanoidRootPart")
+        local far = rt and Vector3.new(rt.Position.X - hb.Position.X, 0, rt.Position.Z - hb.Position.Z).Magnitude or 0
+        if far < CFG.fanRadius - 12 then
+            RT.reflex = { name = "fan", from = hb.Position, radius = CFG.fanRadius, untilAt = now + 2.5 }
+        end
     end
     -- Predictions older than half a second are stale, whatever came of them.
     for i = #RD.zones, 1, -1 do
