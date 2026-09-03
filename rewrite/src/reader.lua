@@ -141,19 +141,23 @@ local function noteGeyser(model)
     task.defer(function()
         local castAt = RT.lastCastAt or -math.huge
         if os.clock() - castAt > 0.8 then return end
-        local c = LocalPlayer.Character
-        local rt = c and c:FindFirstChild("HumanoidRootPart")
+        local castPos, targetPos = RT.lastCastPos, RT.lastCastTargetPos
         local ring = model:FindFirstChild("geyserRing") or model:FindFirstChildWhichIsA("BasePart")
-        if not rt or not ring then return end
-        local d = (Vector3.new(ring.Position.X, 0, ring.Position.Z) - Vector3.new(rt.Position.X, 0, rt.Position.Z)).Magnitude
-        local targetD = RT.lastCastTargetDist or 0
-        if targetD > d + 3 then
-            -- Landed short: this is the cap.
+        if not castPos or not targetPos or not ring then return end
+        local g = Vector3.new(ring.Position.X, 0, ring.Position.Z)
+        local d = (g - Vector3.new(castPos.X, 0, castPos.Z)).Magnitude
+        local toTarget = (g - Vector3.new(targetPos.X, 0, targetPos.Z)).Magnitude
+        local targetD = (Vector3.new(targetPos.X, 0, targetPos.Z) - Vector3.new(castPos.X, 0, castPos.Z)).Magnitude
+        if toTarget <= 8 then
+            -- On the target: the range is at least this.
+            if d > (RD.abilityReach or 0) then RD.abilityReach = math.floor(d + 0.5) end
+        elseif targetD > d + 3 then
+            -- Short of the target, along the aim: the cap.
             local cap = math.floor(d + 0.5)
             if cap >= 15 and cap <= 80 and cap > (RD.abilityRange or 0) then RD.abilityRange = cap end
-        elseif d > (RD.abilityReach or 0) then
-            RD.abilityReach = math.floor(d + 0.5)   -- reached the target from at least this far
         end
+        -- A reach beyond the supposed cap means the cap was misread.
+        if RD.abilityRange and RD.abilityReach and RD.abilityReach > RD.abilityRange + 2 then RD.abilityRange = nil end
     end)
 end
 
@@ -334,14 +338,6 @@ local HANDLERS = {
     -- The jump's target is where the 67-stud slam lands about 2.5 s later; the
     -- slam Model itself appears only at landing.
     ["First Boss Jump Down"] = function(a) if typeof(a) == "Vector3" then circleZone("slam soon", a, 38, gameClock() + 2.5, 1.5) end end,
-    -- The landing is where the player stood when the boss took off (Jump Down
-    -- arrived 27 studs from a moving player), so the zone goes down at Jump Up:
-    -- three seconds to leave a 67-stud circle instead of two.
-    ["First Boss Jump Up"] = function()
-        local c = LocalPlayer.Character
-        local rt = c and c:FindFirstChild("HumanoidRootPart")
-        if rt then circleZone("slam soon", rt.Position, 40, gameClock() + 3.0, 2.5) end
-    end,
     ["First Boss Criss Cross Projectile"] = function(a) if args(a, 5) then addPath("criss cross", a[5], a[1], a[2], a[3], a[4], 7.5, 7.5, 8) end end,
     ["First Boss Seeking Spike"] = function(a) if args(a, 5) then addPath("seeking spike", a[5], a[1], a[2], a[3], a[4], 10, 10, 4) end end,
     ["First Boss Big Spike"] = function(a) if args(a, 5) then addPath("big spike", a[5], a[1], a[2], a[3], a[4], 28, 28, 6) end end,

@@ -42,7 +42,10 @@ local function flat(a, b) local dx, dz = a.X - b.X, a.Z - b.Z return sqrt(dx * d
 -- How far the abilities reach: measured range plus the geyser's own radius,
 -- else the configured cast radius.
 S.abilityReach = function()
-    if CFG.autoStandoff and RD.abilityRange then return RD.abilityRange + 5 end
+    if CFG.autoStandoff then
+        local measured = math.max(RD.abilityRange or 0, RD.abilityReach or 0)
+        if measured > 0 then return math.max(CFG.abilityRadius, math.min(measured, CFG.autoStandoffMax) + 5) end
+    end
     return CFG.abilityRadius
 end
 
@@ -52,7 +55,12 @@ local function standoffFor(e)
     -- With the ability's range measured, the boss is fought from just inside
     -- it (Chris: the safest spot that still hits).
     if e.isBoss then
-        if CFG.autoStandoff and RD.abilityRange then return RD.abilityRange + CFG.autoStandoffOffset end
+        if CFG.autoStandoff then
+            local measured = math.max(RD.abilityRange or 0, RD.abilityReach or 0)
+            if measured > 0 then
+                return math.max(CFG.bossStandoff, math.min(measured + CFG.autoStandoffOffset, CFG.autoStandoffMax))
+            end
+        end
         return CFG.bossStandoff
     end
     return e.extent + CFG.mobStandoff
@@ -235,7 +243,7 @@ local function fight(hum, root, e, now)
         local cast = false
         if CFG.autoQ and now - RT.lastQ >= CFG.abilityInterval then RT.lastQ = now pressKey(Enum.KeyCode.Q) cast = true end
         if CFG.autoE and now - RT.lastE >= CFG.abilityInterval then RT.lastE = now pressKey(Enum.KeyCode.E) cast = true end
-        if cast then RT.lastCastAt = now RT.lastCastTargetDist = d end   -- the reader measures the range from where the geyser lands
+        if cast then RT.lastCastAt = now RT.lastCastPos = root.Position RT.lastCastTargetPos = ep end   -- the reader measures the range from where the geyser lands
     end
     if CFG.autoAttack and d <= CFG.attackRange + e.extent and now - RT.lastClick >= CFG.clickInterval then
         RT.lastClick = now

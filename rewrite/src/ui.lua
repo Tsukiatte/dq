@@ -344,7 +344,7 @@ local function buildUI()
         statusValue.Text = tostring(RT.movementState or "idle")
         if rangeCaption and rangeCaption.Parent then
             local r = RD.abilityRange
-            rangeCaption.Text = r and string.format("Ability range measured: %d studs (fighting bosses from %d)", r, r + CFG.autoStandoffOffset)
+            rangeCaption.Text = r and string.format("Ability range measured: %d studs (fighting bosses from %d)", r, math.max(CFG.bossStandoff, math.min(r + CFG.autoStandoffOffset, CFG.autoStandoffMax)))
                 or (RD.abilityReach and string.format("Ability reached a target from %d studs; cap not seen yet", RD.abilityReach) or "Ability range: not measured yet (cast at a far target)")
         end
         local ping = 0
