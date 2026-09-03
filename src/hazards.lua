@@ -2735,6 +2735,7 @@ local function applyStamp(st, model, stamp, now)
     st.impactAt = stamp.first
     st.liveUntil = stamp.last + CFG.armAssumedLinger
     st.armedAt, st.armedBy, st.doneAt = nil, nil, nil
+    st.stamped = true
     note(st, now - st.spawn, string.format("window:event %.1f-%.1f", stamp.first - st.spawn, stamp.last - st.spawn))
 end
 
@@ -2827,6 +2828,35 @@ local function updateArming(now)
                 -- a new part appearing mid-life is often the hit itself.
                 if now - st.channelsAt > 0.5 then
                     st.channelsAt = now
+                    -- A Model tracked before its hitBox replicated was keyed
+                    -- by its bare name and armed as "known live". When the
+                    -- hitBox turns up, key it properly and give it the timing
+                    -- that key knows (a stamp already applied is kept).
+                    if not st.hitBox then
+                        local hb = model:FindFirstChild("hitBox") or model:FindFirstChild("hitbox")
+                        if hb then
+                            st.hitBox = hb
+                            st.hbSig = hitBoxSignature(hb)
+                            local key = attackKey(model, hb)
+                            if key ~= st.name then
+                                st.name = key
+                                if not st.stamped then
+                                    local span = RT.armSpans[key]
+                                    local delay = RT.armDelays[key]
+                                    if span then
+                                        st.impactAt = st.spawn + span.first
+                                        st.liveUntil = st.spawn + span.last + CFG.armAssumedLinger
+                                        st.armedAt, st.armedBy, st.doneAt = nil, nil, nil
+                                    elseif delay and delay > 0 then
+                                        st.impactAt = st.spawn + delay
+                                        st.armedAt, st.armedBy = nil, nil
+                                    end
+                                end
+                                applyWindowStamps(st, model, now)
+                                note(st, age, "keyed " .. key)
+                            end
+                        end
+                    end
                     -- Pooled attacks (the 14 passive beams parked at the arena
                     -- centre) sit unchanged for the whole fight and are moved
                     -- into place when used. Movement is a fresh spawn.
