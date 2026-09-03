@@ -1,5 +1,10 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.21 - 2026-09-03 - "Band"
+
+- Leash danger only within 40 studs outside `leashRadius`.
+- `rangedStandoff` 22.
+
 ## 5.1.20 - 2026-09-03 - "Burst early"
 
 - `RT.moveBoost` follows `DG.dangerHere` (dwell-aware) instead of `here0`.
