@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.46 - 2026-09-03 - "Stay armed"
+
+- Reader: `RD.leashArmed` mirrored in `_G.DungeonAutofarmLeashArmed`.
+
 ## 5.1.45 - 2026-09-03 - "Sweep the floor"
 
 - Draw: `sweepForeign` removes non-Hazards children of the visuals root every 3 s.
