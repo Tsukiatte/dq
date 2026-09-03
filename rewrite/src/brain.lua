@@ -55,6 +55,9 @@ local function standoffFor(e)
     -- With the ability's range measured, the boss is fought from just inside
     -- it (Chris: the safest spot that still hits).
     if e.isBoss then
+        -- During the beam fan the fight is from the edge: the lanes are far
+        -- enough apart there to stand between and hop across.
+        if os.clock() < (RD.fanUntil or -math.huge) + 1.0 then return CFG.fanRadius end
         if CFG.autoStandoff then
             local measured = math.max(RD.abilityRange or 0, RD.abilityReach or 0)
             if measured > 0 then
@@ -318,6 +321,37 @@ local function brainTick(now)
         DG.lastDecision = now
         local ok, err = pcall(decide, root, hum)
         if not ok then heavyDebugThrottled("decide_err", 2, "Field", tostring(err)) end
+    end
+
+    -- 0. A reflex: an announced instadeath with a known centre (the slam).
+    -- Straight out from it at escape speed until clear of its radius, the
+    -- field consulted only to bend the line round a live box.
+    local rf = RT.reflex
+    if rf then
+        if now > rf.untilAt then
+            RT.reflex = nil
+        else
+            local rp = root.Position
+            local away = Vector3.new(rp.X - rf.from.X, 0, rp.Z - rf.from.Z)
+            local dist = away.Magnitude
+            if dist >= rf.radius then
+                RT.reflex = nil
+            else
+                if dist < 0.5 then away = Vector3.new(1, 0, 0) dist = 1 end
+                local u = away / dist
+                local dest
+                for _, deg in ipairs({ 0, 35, -35, 70, -70 }) do
+                    local r = math.rad(deg)
+                    local dx, dz = u.X * math.cos(r) - u.Z * math.sin(r), u.X * math.sin(r) + u.Z * math.cos(r)
+                    local cand = rp + Vector3.new(dx, 0, dz) * 14
+                    if stepSafe(rp, cand, CFG.tweenEscape) then dest = cand break end
+                end
+                dest = dest or (rp + u * 14)
+                driveTo(hum, root, dest, CFG.tweenEscape, 1.0)
+                setMovementState(string.format("flee %s %.0f/%.0f", rf.name, dist, rf.radius))
+                return
+            end
+        end
     end
 
     -- 1. The field's spot outranks everything while the ground here is

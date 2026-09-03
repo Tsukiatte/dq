@@ -85,7 +85,7 @@ local function drawTick(now)
                 local sweep = p:FindFirstChild("sweep")
                 -- Only announced paths show where they are going; a bare
                 -- projectile's strip was the yellow that stayed on the floor.
-                if b.kind == "part" then
+                if b.kind == "part" and b.speed < 2 then
                     if sweep then sweep:Destroy() end
                 else
                 if not sweep then

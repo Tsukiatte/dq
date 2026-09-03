@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.61 - 2026-09-03 - "Slam reflex"
+
+- Reader: `First Boss Jump Down` sets `RT.reflex` (centre, radius 44, 3.2 s). Brain: step 0 flees the reflex centre at `tweenEscape`, trying 0/35/70 degrees either side through `stepSafe`.
+
 ## 5.1.60 - 2026-09-03 - "Measured at the cast"
 
 - Reader `noteGeyser` uses `RT.lastCastPos` / `RT.lastCastTargetPos`; on-target within 8 studs = reach, short along the aim = cap; a reach past the cap clears it.

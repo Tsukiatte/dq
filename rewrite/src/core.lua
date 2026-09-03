@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.60"
+local SCRIPT_VERSION = "5.1.61"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.61", date = "2026-09-03", notes = "Champion slam: the landing announcement now starts a reflex - straight out from the landing point at escape speed until 44 studs clear, bending the line only round a live box - instead of leaving it to the spot search, whose rings reach 30 studs and kept picking spots inside the 67-stud circle (three slam deaths in run 30)." },
     { version = "5.1.60", date = "2026-09-03", notes = "Ability range: measured against where the character and target stood at the cast, not half a second later when the geyser appears; the first reading was a 30-stud cap beside a 56-stud reach. A reach beyond a supposed cap discards the cap. Auto standoff only ever moves the bot further out than the slider, never closer, and never past 45. Beam padding and margins back to the 5.1.51 values: the slim passive beam and the 4-stud shoulder came in together and the Champion deaths went up. The take-off ring is not an attack (Chris): the zone placed at Jump Up is gone; only the landing ring at Jump Down is fled." },
     { version = "5.1.59", date = "2026-09-03", notes = "After the last boss the game asks whether to stay for the bonus boss; run 29 sat on that vote with the timer frozen for ten minutes. The vote is now answered two seconds in, no by default (its arena is not mapped), yes with the new Queue toggle. Once a run is complete the bot stands still instead of walking the rooms again." },
     { version = "5.1.58", date = "2026-09-03", notes = "The ability's range is measured from where its geyser lands when the target is further away (the client script carries no range; the server caps the placement), and the boss is fought from two studs inside it (Chris). Shown in the Standing section. The blink is limited to the Champion, Bob and mob fights until the third boss is mapped: it teleported all over that arena. Margins: 2.5 studs of reach and a 4-stud shoulder, so spots on a box's edge cost and the bot stops further out (it was grazed on an edge). Every drawn hitbox now carries a faint second outline at the size the bot treats as unsafe." },
@@ -103,6 +104,7 @@ local CFG = {
     -- Standing.
     mobStandoff = 34,             -- from any mob, melee or ranged: abilities only, never within weapon reach (Chris)
     meleeBuffer = 10,             -- soft band past a melee mob's swing where spots are merely disfavoured
+    fanRadius = 100,              -- during the Champion's beam fan: out to here from the hub, between the lanes
     leashRadius = 122,            -- Champion arena: death past ~128 studs from the boss; the respawn point is 131-137 out
     bonusBoss = false,            -- after the last boss: stay for the bonus boss? Its arena is not mapped; off
     bonusVoteDelay = 2.0,         -- seconds after the vote appears before answering
