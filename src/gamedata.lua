@@ -388,9 +388,11 @@ local DEFAULT_ARM_SPANS = {
     -- 1.0 s after they appeared. The beam is the laser; it hurts from the
     -- moment it exists, and the visible line is the warning to be out of
     -- it already. Live from spawn until its line fades.
-    -- Run 3: killed beside beams 3.6-4.8 s old while reading safe. It hurts
-    -- for all seven seconds it exists.
-    firstbosspassivebeam = { first = 0, last = 6.5 },
+    -- Run 3 re-read: the deaths beside old beams were aimed projectiles
+    -- landing at the same instant (14 of 16 deaths; origin within 3.6 studs).
+    -- The beam is lethal young - run 2 and run 3 both killed inside beams
+    -- 0.5-1.0 s old - and nothing shows it lethal once its line has faded.
+    firstbosspassivebeam = { first = 0, last = 2.0 },
     northernmageshot = { first = 0.5, last = 1.2 },
     spearmanstrikehitbox = { first = 0.6, last = 1.2 },
     northernwarriorlinestrike = { first = 0.6, last = 1.2 },

@@ -1221,7 +1221,25 @@ local function keepOffWalls(root, goal, enemy)
     return goal + side * shift
 end
 
+-- Closing on a boss from far out is the walk that gets you shot: after a
+-- death the respawn is 130 studs from the Champion and its aimed shot comes
+-- every few seconds. WalkSpeed goes up for that walk and back on arrival.
+-- The client's own checker resets WalkSpeed above 45; this stays well under.
+local function applyApproachSpeed(humanoid, enemy, root, enemyRoot)
+    if not humanoid or not enemyRoot then return end
+    local boost = CFG.approachWalkSpeed or 0
+    local far = (root.Position - enemyRoot.Position).Magnitude > CFG.approachBoostDistance
+    local isBoss = S.isBossModel and S.isBossModel(enemy)
+    if boost > 0 and isBoss and far then
+        if humanoid.WalkSpeed ~= boost then RT.walkSpeedBefore = RT.walkSpeedBefore or humanoid.WalkSpeed humanoid.WalkSpeed = math.min(boost, 40) end
+    elseif RT.walkSpeedBefore then
+        humanoid.WalkSpeed = RT.walkSpeedBefore
+        RT.walkSpeedBefore = nil
+    end
+end
+
 local function updatePursuitMovement(enemy, humanoid, root, enemyRoot)
+    applyApproachSpeed(humanoid, enemy, root, enemyRoot)
     local benchedUntil = NAV.benched[enemy]
     if benchedUntil and os.clock() < benchedUntil then
         setMovementState("target unreachable, reselecting")

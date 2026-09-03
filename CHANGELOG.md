@@ -11,6 +11,14 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.12.12 - 2026-09-03 - "Re-read"
+
+Run 3 re-read (`game/captures/nl_run3_2026-09-03_c.json`): 14 of 16 audited deaths coincide with an aimed criss cross whose origin is within 3.6 studs of the death; the two others were inside beams under 1 s old. Chris was right that the beam is not lethal for 7 s.
+
+- Beam seed back to `{0, 2.0}`.
+- **Approach boost** (`approachWalkSpeed` 22, `approachBoostDistance` 45): WalkSpeed is raised while closing on a boss from beyond 45 studs and restored on arrival (and on destruct). Every aimed shot in run 3 landed on a character 103-156 studs from the boss, where the respawn puts it and where it stayed.
+- `S.isBossModel` exported for nav. Game notes updated with the aimed-shot cadence.
+
 ## 4.12.11 - 2026-09-03 - "Blink"
 
 Run 3 (4.12.10): 7 deaths in 107 s, all the Champion's beams; two while the dodge read "safe here" beside beams 3.6-4.8 s old.

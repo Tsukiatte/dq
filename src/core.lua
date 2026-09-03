@@ -20,7 +20,7 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "4.12.11"
+local SCRIPT_VERSION = "4.12.12"
 -- Bump to throw away every learned attack timing in every save, once.
 local LEARN_EPOCH = 2
 local SCRIPT_BUILD_DATE = "2026-09-02"
@@ -28,6 +28,7 @@ local SCRIPT_CODENAME = "Aquatic Temple"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "4.12.12", date = "2026-09-03", notes = "Run 3 re-read, and Chris was right: the beam does not stay lethal for seven seconds. Fourteen of the sixteen deaths coincide with an aimed projectile whose origin is within 3.6 studs of where the character died; the two beam deaths were inside beams under a second old. Beam seed back to live-from-spawn until its line fades. Every aimed shot in the run was fired at a character 103-156 studs from the boss, because after each death the character respawns 130 studs out and never closed the gap: it walked. The approach to a boss from beyond 45 studs now raises WalkSpeed to 22 (the client resets it above 45) and drops it back on arrival." },
     { version = "4.12.11", date = "2026-09-03", notes = "Blink, and the beam for its whole life. Run 3: seven deaths, all the Champion's beams, two of them while the dodge read safe here beside beams four seconds old - the beam hurts for all seven seconds it exists, so it is seeded that way. Last resort, as Chris asked: when the ground under you fires before you could walk to the spot the dodge chose, and that spot is within fourteen studs with a floor and no wall in between, the character is placed there instead of walking; at most once every 0.8 s, and only while standing in danger. Painting the invisible hitBoxes is off by default - the beam fan became a field of 64-stud pink slabs and cost frames - and the highlight cap drops to twelve. The HUD shows the script's own cost per tick beside the frame rate." },
     { version = "4.12.10", date = "2026-09-03", notes = "Bob the Frost Giant, seven deaths pinned. Five were on the circle line, every one with the box sent 45 studs away and the field reading 'danger 0.00': the scorer discounted danger already on you for every sample along the way, including samples after the moment the circle under you fires, so a long walk through a band that fires in a second scored clean. The discount now stops at the fire time of whatever you are standing in. The circle fires at 1.3 s (its sound); the horizontal beam burns to 5 s, so the default live window is 1.5 s and the beam is seeded to its end. Done attacks no longer keep their red box. The quick tween is used only while escaping danger here, and the dodge estimates travel at whichever speed it will use. Melee mobs (the game's own meleeDistance at most 8) are fought from 14 studs past their body. The config autosaves whenever it changes and as a teleport begins - it was only written by a Save button, and a teleport killed the script first, so nothing survived a run. The HUD dot follows the switch." },
     { version = "4.12.9", date = "2026-09-02", notes = "Seeds from the second live run, thirteen deaths pinned. The Champion's passive beam killed from inside at 0.5 to 1.0 s after it appeared: it is the laser, live from the moment it exists until its line fades, not from 1.3 s. The jump slam killed at 1.9 s and again at 3.3 s: it lingers on the ground, so its window runs to 5 s. A mage shot killed at 0.5 s and a spearman strike at 0.9 s, earlier than their seeds, because the Model appears some time after the server's cast; the earliest seen hit is now the seed. Time spent inside the attack already on you costs more (dodgeInsideWeight 0.85), so a 35-stud line is left sideways in three studs rather than lengthwise in seventeen." },
@@ -668,6 +669,8 @@ CFG.diagnoseFile = "DungeonAutofarm_attacklog.txt"
 CFG.moveMode = "tween"
 CFG.tweenSpeed = 22              -- studs per second for the tween mover; 0 = the Humanoid's WalkSpeed. The client's own checker resets WalkSpeed above 45 and watches Freefall; the tween stays on the floor and well under that (4.12.8)
 CFG.tweenSpeedMax = 40           -- hard ceiling for tweenSpeed
+CFG.approachWalkSpeed = 22       -- WalkSpeed while closing on a boss from further than approachBoostDistance; 0 = leave it (4.12.12). The client resets WalkSpeed above 45.
+CFG.approachBoostDistance = 45   -- studs from the boss beyond which the approach is boosted
 -- Take the player's controls while using a Move-based mode, and hand them back
 -- the moment it stops.
 CFG.moveTakeControls = true

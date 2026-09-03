@@ -306,3 +306,14 @@ it appears. A human stands off the line before it arrives.
 the player and kill on touch; each must be led into the matching-coloured
 crystal (three in the arena). The bot will need to path around a crystal so
 the orb touches it while dodging everything else.
+
+**Midgardian Champion, run 3 (2026-09-03, `game/captures/nl_run3_2026-09-03_c.json`):**
+18 deaths in 300 s, solo. 28 aimed criss-cross shots (origin = the player's
+position, random direction) on a 4-second grid (gaps of 4, 8, 12, 16, 20,
+24 s). 14 of 16 audited deaths coincide with one within 0.4 s and 3.6 studs.
+Every aimed origin was 103-156 studs from the boss, which is where the
+character was for the whole fight: the respawn is 130 studs out and it never
+closed the gap. The two non-aimed deaths were inside beams 0.5-1.0 s old at
+78 and 88 studs. No death beside a beam older than 2 s once aimed shots are
+accounted for; the "7 s lethal beam" reading of 4.12.11 was wrong. The bot
+still took the boss from 83% to 23% in 298 s while dying.
