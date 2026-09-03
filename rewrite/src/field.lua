@@ -346,7 +346,23 @@ local function decide(root, hum)
         RT.blinkTimes = RT.blinkTimes or {}
         local recent = 0
         for i = #RT.blinkTimes, 1, -1 do if now - RT.blinkTimes[i] <= 60 then recent = recent + 1 else break end end
-        local dest = (not walkOk and recent < CFG.blinkPerMinute) and blinkTarget(root, hum, rx, ry, rz) or nil
+        local dest = nil
+        if not walkOk and recent < CFG.blinkPerMinute then
+            -- The marker first, when it is within reach and its ground is clear
+            -- for the next second; the ring search only when it is not.
+            local tg = DG.target
+            if tg then
+                local tx, tz = tg.X - rx, tg.Z - rz
+                if sqrt(tx * tx + tz * tz) <= CFG.blinkMax + 0.5 then
+                    local clear = true
+                    for _, tt in ipairs({ 0, 0.25, 0.5, 0.75, 1.0 }) do
+                        if dangerAt(tg.X, ry, tg.Z, tt, 1.2, 0) >= 0.5 then clear = false break end
+                    end
+                    if clear then dest = Vector3.new(tg.X, tg.Y + hum.HipHeight + root.Size.Y * 0.5, tg.Z) end
+                end
+            end
+            dest = dest or blinkTarget(root, hum, rx, ry, rz)
+        end
         if dest then
             RT.blinkTimes[#RT.blinkTimes + 1] = now
             if #RT.blinkTimes > 20 then table.remove(RT.blinkTimes, 1) end
@@ -477,21 +493,33 @@ local function decide(root, hum)
             -- Such spots sort last; they are taken only when nothing else exists.
             local cost = costOf(ox, oz, dist, graded)
             if endWorst >= 0.999 then cost = cost + 100 end
-            cands[#cands + 1] = { ox = ox, oz = oz, dist = dist, danger = worst, endDanger = endWorst, cost = cost }
+            -- Clean path and clean ground: the nearest such spot is the marker
+            -- (Chris: the closest available safe spot, so a blink can reach it).
+            local safe = worst < 0.5 and endWorst < CFG.dodgeMoveAt
+            if safe then cost = cost - 10 + dist * CFG.dodgeSafeDistanceCost end
+            cands[#cands + 1] = { ox = ox, oz = oz, dist = dist, danger = worst, endDanger = endWorst, cost = cost, safe = safe }
         end
         table.sort(cands, function(a, b) return a.cost < b.cost end)
         local best, checked = nil, 0
+        local st = DG.evalStats
+        st.total = st.total + #cands
         for _, c in ipairs(cands) do
             if best and c.cost >= best.cost then break end
             checked = checked + 1
+            if (c.endDanger or 0) >= 0.999 then st.lethalEnd = st.lethalEnd + 1 end
             local x, z = rx + c.ox, rz + c.oz
             local y = floorY(x, ry, z, params)
             -- A far spot may sit up a ramp: the allowed rise grows with distance.
             if y and y - (ry - DG.halfHeight) <= CFG.maxStepHeight + 3 + c.dist * 0.2 and y >= ry - CFG.maxDropHeight then
                 if walkable(rp, x, y, z, params) then
                     c.x, c.y, c.z, c.valid = x, y, z, true
+                    st.valid = st.valid + 1
                     if not best or c.cost < best.cost then best = c end
+                else
+                    st.notWalkable = st.notWalkable + 1
                 end
+            else
+                st.noFloor = st.noFloor + 1
             end
             if checked >= 14 and best and best.danger < moveAt then break end
             if checked >= 40 then break end
@@ -499,6 +527,7 @@ local function decide(root, hum)
         return best
     end
 
+    DG.evalStats = { total = 0, valid = 0, noFloor = 0, notWalkable = 0, lethalEnd = 0 }
     local best = evaluate(1)
     for _, scale in ipairs({ CFG.dodgeFarScale, CFG.dodgeFarScale2 }) do
         if best and best.danger < moveAt then break end
@@ -572,6 +601,7 @@ local function decide(root, hum)
 
     if best then
         DG.target = Vector3.new(best.x, best.y, best.z)
+        DG.chosen = { dist = best.dist, danger = best.danger, endDanger = best.endDanger, cost = best.cost }
         local v = Vector3.new(best.ox, 0, best.oz)
         if v.Magnitude > 0.5 then DG.heading, DG.headingAt = v.Unit, now end
         DG.reason = string.format("danger %.2f, %.0f studs", best.danger, best.dist)
