@@ -92,7 +92,15 @@ local function getEnemyStandoff(model)
     if isBossModel(model) then
         return math.max(CFG.bossStandoff, getEnemyMeleeReach(model) + 1)
     end
-    return math.max(math.min(getEnemyMeleeReach(model), CFG.attackRange - 1.5), extent + 1)
+    local standoff = math.max(math.min(getEnemyMeleeReach(model), CFG.attackRange - 1.5), extent + 1)
+    -- A melee mob closes fast and one swing kills (Chris, 2026-09-02): stand
+    -- further out than its swing and let the abilities do the work. The
+    -- game's own meleeDistance says which mobs those are.
+    local melee = enemyValue(model, "meleeDistance")
+    if type(melee) == "number" and melee > 0 and melee <= CFG.meleeMobMaxReach then
+        standoff = math.max(standoff, extent + CFG.meleeStandoff)
+    end
+    return standoff
 end
 
 local function clearHitboxVisualizer()
@@ -998,6 +1006,17 @@ local function updateHazardHighlights()
     -- Nearest few only. Anything drawn last frame and not in the list is
     -- cleaned up by the same pass, so this shrinks as well as caps.
     local shortlist = overlayShortlist()
+    -- Over is over: the reader marks an attack done seconds before the game
+    -- deletes its Model, and a box drawn for those seconds cluttered the
+    -- field with attacks that were finished (4.12.10).
+    do
+        local kept = {}
+        for _, part in ipairs(shortlist) do
+            local st = HZ.armState[part]
+            if not (st and st.doneAt) then kept[#kept + 1] = part end
+        end
+        shortlist = kept
+    end
     -- Floor is not drawn (4.10.10): thirteen beams and their mage shots
     -- waiting on their timers filled the arena with boxes that meant nothing
     -- to the dodge and everything to the person watching. Dropped from the

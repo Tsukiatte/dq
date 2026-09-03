@@ -274,6 +274,41 @@ end
 -- Danger 0..1 at a point, `t` seconds from now. Max over sources, not sum:
 -- the question is "does something hit me here", and two half-hits are not a
 -- whole one.
+-- Seconds until the ground under the character fires: the soonest impact
+-- among the attacks it is standing in, zero if one is already live, huge if
+-- none. Danger "already on you" is discounted only until then (4.12.10):
+-- before that moment, time inside costs nothing extra; after it, it is the
+-- hit. Without the cutoff a 45-stud walk through a band of circles that
+-- fired in a second read "danger 0.00", and the character took it.
+local function graceHere(px, py, pz)
+    local grace = math.huge
+    local reach, halfHeight = DG.reach, DG.halfHeight
+    local point = Vector3.new(px, py, pz)
+    for i = 1, #HZ.volumes do
+        local volume = HZ.volumes[i]
+        local part = volume.part
+        if (not part or part.Parent) and not (part and DG.moverSet[part]) then
+            local st = part and HZ.armState[part]
+            if not (st and (st.doneAt or st.dormant)) then
+                local closest = volumeClosestPoint(volume, point)
+                if abs(py - closest.Y) < halfHeight then
+                    local dx, dz = px - closest.X, pz - closest.Z
+                    if sqrt(dx * dx + dz * dz) - reach <= 0 then
+                        local eta = 0
+                        if st and not st.armedAt and st.impactAt then eta = max(st.impactAt - DG.clock, 0) end
+                        if eta < grace then grace = eta end
+                    end
+                end
+            end
+        end
+    end
+    if S.precastTimeToImpact then
+        local ok, eta = pcall(S.precastTimeToImpact, point, reach)
+        if ok and eta and eta < grace then grace = max(eta, 0) end
+    end
+    return grace
+end
+
 local function dangerAt(px, py, pz, t)
     local reach, halfHeight = DG.reach, DG.halfHeight
     local shoulder = CFG.dodgeShoulder
@@ -562,8 +597,6 @@ local function decide(root, humanoid)
 
     local rootPos = root.Position
     local rx, ry, rz = rootPos.X, rootPos.Y, rootPos.Z
-    -- The mover's real speed, so a spot reachable in time is judged in time.
-    local speed = max(S.moverSpeed and S.moverSpeed(humanoid) or humanoid.WalkSpeed, 4)
     local dwell = CFG.dodgeDwell
     -- Where the feet are. Heights below are judged from here, not from the
     -- root: the root rides about three studs up, and comparing a floor
@@ -581,6 +614,11 @@ local function decide(root, humanoid)
     local here0 = dangerAt(rx, ry, rz, 0)
     DG.dangerHere = max(here0, dangerAt(rx, ry, rz, dwell * 0.5), dangerAt(rx, ry, rz, dwell))
     DG.gapWait = false
+    -- Standing in danger: the quick tween is for exactly this, and the
+    -- travel times below are judged at the speed the mover will use.
+    RT.moveBoost = here0 >= CFG.dodgeMoveAt
+    local speed = max(S.moverSpeed and S.moverSpeed(humanoid, RT.moveBoost) or humanoid.WalkSpeed, 4)
+    local grace = here0 > 0 and graceHere(rx, ry, rz) or math.huge
 
     -- The direction we were last sent, if it was recent. Two safe sides of a
     -- beam score the same to the last decimal, and re-picking between them
@@ -713,7 +751,9 @@ local function decide(root, humanoid)
             -- but time spent in it still is, so a residual stays in the
             -- average: three samples inside the ball cost more than one, and
             -- the nearest edge wins over the far one.
-            local fresh = d - here0
+            -- Discounted only until the ground under us fires; a sample
+            -- after that moment inside anything is the hit, not old news.
+            local fresh = (T * f < grace) and (d - here0) or d
             if fresh < 0 then fresh = 0 end
             local stale = d < here0 and d or here0
             total = total + fresh + stale * inside

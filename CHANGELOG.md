@@ -11,6 +11,19 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.12.10 - 2026-09-03 - "Grace"
+
+Bob the Frost Giant, seven deaths pinned in `game/captures/nl_run2_2026-09-02_b.json`.
+
+- **Grace cutoff in the dodge scorer.** Five deaths were on the circle line, each with the box sent 45 studs away and the field reading "danger 0.00". The scorer discounted danger "already on you" for every sample along the way, including samples after the moment the circle under you fires, so a 2.8 s walk through a band that fired in 1.1 s scored clean. `graceHere` is the soonest fire time of whatever you are standing in; the discount stops there.
+- **Seeds**: `secondbosscriclehitbox` fires at 1.3 s (its sound), seeded 1.2 to 2.5; `secondbosshorizontalbeam` killed at 2.6 and 3.1 s, seeded 1.1 to 5.0. `armDefaultLive` 0.6 -> 1.5: the beams showed 0.6 s is too short as a default.
+- **Done attacks drop their red box**: the telegraph highlight skipped only floor, so a finished attack kept its box until the game deleted the Model.
+- **Quick tween only while escaping**: `RT.moveBoost` is set by the dodge when danger here is at or above `dodgeMoveAt`; the mover boosts only then, and the dodge estimates travel at the speed it will actually use.
+- **Melee standoff** (`meleeStandoff` 14, `meleeMobMaxReach` 8): a mob whose own `meleeDistance` is at most 8 is fought from 14 studs past its body.
+- **Config autosave** (`autosaveInterval` 10): the settings file was written only by a Save button and a teleport killed the script first, so nothing survived a run. Now written whenever it changes, on teleport start, and on destruct.
+- HUD: the status dot follows the switch even before the first flip (it sat green beside a red "Disabled").
+- Recorder writes the enemies' own numbers (`dq_enemies.json`).
+
 ## 4.12.9 - 2026-09-02 - "Pinned"
 
 Live run 2 (`game/captures/nl_run2_2026-09-02_b.json`), 16 deaths, each with the parts around the character and the reader's verdict at that instant.

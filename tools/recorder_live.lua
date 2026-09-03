@@ -91,6 +91,24 @@ local function recordPart(p)
     end)
 end
 
+-- The enemies' own numbers, once, for the standoff rules.
+task.spawn(function()
+    task.wait(3)
+    local list = {}
+    for _, m in ipairs(Workspace:GetDescendants()) do
+        if m:IsA("Model") and m:FindFirstChildOfClass("Humanoid") and m:FindFirstChild("enemyStyle") then
+            local e = { name = m.Name }
+            for _, k in ipairs({ "enemyStyle", "meleeDistance", "aggroRange", "moveSpeed", "attackSpeed", "level", "damage" }) do
+                local v = m:FindFirstChild(k)
+                if v and v:IsA("ValueBase") then e[k] = v.Value end
+            end
+            list[#list + 1] = e
+        end
+    end
+    R.enemies = list
+    pcall(writefile, "dq_enemies.json", HttpService:JSONEncode(list))
+end)
+
 -- Sweep what is already there, then watch.
 for _, d in ipairs(workspace:GetDescendants()) do if attackLike(d) then recordPart(d) end end
 R.conns[#R.conns + 1] = workspace.DescendantAdded:Connect(function(d)

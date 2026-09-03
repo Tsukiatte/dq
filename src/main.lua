@@ -489,6 +489,7 @@ local function startAutofarm()
     -- Loaded before the UI is built so sliders and toggles come up already
     -- showing the saved values rather than the defaults.
     local configLoaded, wantsStreamerMode = loadConfig()
+    if S.startAutosave then S.startAutosave() end
 
     createControlUI()
 
@@ -542,6 +543,7 @@ local function startAutofarm()
         local now = os.clock()
         -- The loop outside the fight runs whether or not there is a fight.
         local okLobby, errLobby = pcall(lobbyTick, now)
+        if S.autosaveTick then pcall(S.autosaveTick, now) end
         if not okLobby then heavyDebugThrottled("lobby_error", 2.0, "Queue", "Auto queue threw: " .. tostring(errLobby)) end
         if RT.originalNamecall and now - RT.hookInstalledAt >= CFG.remoteHookLifetime then
             unhookAttackRemotes()
