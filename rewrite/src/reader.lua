@@ -38,6 +38,8 @@ local RD = {
     lastEnemyScan = -math.huge,
     timeSync = nil,
     count = 0,
+    beams = {},         -- recent passive-beam spawns: { t, yaw, hub, size }
+    fanUntil = -math.huge, -- the beam fan is on until this os.clock()
 }
 
 local lower = string.lower
@@ -92,6 +94,7 @@ local function ownedByPlayer(inst)
 end
 
 -- ------------------------------------------------------------ model attacks
+local noteBeam
 local function trackModel(model)
     if RD.models[model] or isOurs(model) or ownedByPlayer(model) then return end
     if model:FindFirstChildOfClass("Humanoid") then return end
@@ -109,6 +112,7 @@ local function trackModel(model)
         minT = pc and pc.Transparency or 1, fired = false,
     }
     RD.count = RD.count + 1
+    if hb and name:find("passivebeam", 1, true) then noteBeam(hb, now) end
 end
 
 local function trackPart(part)
@@ -139,6 +143,36 @@ local function addZone(z)
     RD.zones[#RD.zones + 1] = z
     if #RD.zones > 96 then table.remove(RD.zones, 1) end
 end
+
+-- The Champion's passive beams (8 x 250 through the hub, lethal from the
+-- moment they appear) come in two rhythms. Slow: one every half second,
+-- each 20 degrees on from the last - a sweep, so the next two lanes are
+-- known and go in as zones. Fast: eighteen a second for seven seconds with
+-- shifting offsets - a fan nothing inside 125 studs survives; the brain backs
+-- out past the beams' reach while RD.fanUntil holds.
+local function wrap180(a) a = a % 180 if a > 90 then a = a - 180 end return a end
+noteBeam = function(hb, now)
+    local look = hb.CFrame.LookVector
+    local yaw = math.deg(math.atan2(look.X, look.Z)) % 180
+    local beams = RD.beams
+    beams[#beams + 1] = { t = now, yaw = yaw, hub = hb.Position, size = hb.Size }
+    if #beams > 8 then table.remove(beams, 1) end
+    local recent = 0
+    for i = #beams, 1, -1 do if now - beams[i].t <= 0.5 then recent = recent + 1 else break end end
+    if recent >= 4 then RD.fanUntil = now + 1.5 end
+    for i = #RD.zones, 1, -1 do if RD.zones[i].name == "beam next" then table.remove(RD.zones, i) end end
+    if now < RD.fanUntil or #beams < 2 then return end
+    local a, b = beams[#beams - 1], beams[#beams]
+    local dt = b.t - a.t
+    local step = wrap180(b.yaw - a.yaw)
+    if dt < 0.3 or dt > 0.8 or math.abs(step) < 15 or math.abs(step) > 25 then return end
+    for k = 1, 2 do
+        local yaw = math.rad(b.yaw + step * k)
+        local at = now + dt * k
+        local cf = CFrame.lookAt(b.hub, b.hub + Vector3.new(math.sin(yaw), 0, math.cos(yaw)))
+        addZone({ name = "beam next", cframe = cf, size = b.size, from = at, untilAt = at + 2.0, telegraphed = true })
+    end
+end
 -- A body rolling along a line: origin, direction, distance over duration from
 -- t0 to t1 (game clock). Half sizes across / along / up. Boxed at the moment
 -- asked for by the field.
@@ -167,6 +201,9 @@ end
 local SPIKE_RADIUS = { small = 15, medium = 25, large = 40 }
 local function args(a, n) return type(a) == "table" and #a >= n end
 local HANDLERS = {
+    -- The jump's target is where the 67-stud slam lands about 2.5 s later; the
+    -- slam Model itself appears only at landing.
+    ["First Boss Jump Down"] = function(a) if typeof(a) == "Vector3" then circleZone("slam soon", a, 33.5, gameClock() + 2.5, 1.5) end end,
     ["First Boss Criss Cross Projectile"] = function(a) if args(a, 5) then addPath("criss cross", a[5], a[1], a[2], a[3], a[4], 7.5, 7.5, 8) end end,
     ["First Boss Seeking Spike"] = function(a) if args(a, 5) then addPath("seeking spike", a[5], a[1], a[2], a[3], a[4], 10, 10, 4) end end,
     ["First Boss Big Spike"] = function(a) if args(a, 5) then addPath("big spike", a[5], a[1], a[2], a[3], a[4], 20, 20, 6) end end,
