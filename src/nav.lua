@@ -1429,7 +1429,7 @@ local function updatePursuitMovement(enemy, humanoid, root, enemyRoot)
             heavyDebug("Movement", string.format("MoveTo waypoint %d/%d", NAV.index, #NAV.waypoints), DEBUG_VERBOSE)
         end
         setMovementState(string.format("PURSUE wp %d/%d", NAV.index, #NAV.waypoints))
-    elseif (root.Position - targetPosition).Magnitude > CFG.waypointAdvanceDistance then
+    elseif (root.Position - targetPosition).Magnitude > CFG.directHopDistance then
         NAV.driving = true
         NAV.needsRecompute = true
         NAV.lastIssuedMove = nil
