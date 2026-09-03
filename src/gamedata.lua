@@ -358,6 +358,14 @@ local DEFAULT_ARM_DELAYS = {
 -- window makes the attack floor before its lead and floor again after
 -- `last` plus the linger, whatever its visuals are doing.
 local DEFAULT_ARM_SPANS = {
+    -- The Midgardian Champion's passive beams: a hypothesis, not a
+    -- measurement. Nothing on the Model ever shows, so without a window every
+    -- beam is a wall for its whole seven seconds, and a burst of thirteen
+    -- twenty degrees apart is a wall everywhere: the character froze at the
+    -- arena edge and the projectiles took it. A sweeping laser that hurts
+    -- for a pulse as it passes is the reading that makes the fight playable
+    -- by anyone; a certain hit at a later age corrects it on the spot.
+    firstbosspassivebeam = { first = 0.3, last = 1.2 },
     northernmageshot = { first = 0.9, last = 1.2 },
     spearmanstrikehitbox = { first = 0.85, last = 1.2 },
     northernwarriorlinestrike = { first = 0.85, last = 1.2 },

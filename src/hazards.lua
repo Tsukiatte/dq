@@ -1947,6 +1947,36 @@ local function recordHit(damage)
                 end
             end
         end
+        -- Scripted projectiles are candidates too: where the game's numbers
+        -- put one right now. A hit while a spike rolled over us was pinned on
+        -- whatever floor line we stood in, which taught that line a
+        -- six-second window.
+        local projectile = nil
+        do
+            local paths = PC.paths
+            if paths and #paths > 0 then
+                local gnow = Workspace:GetServerTimeNow()
+                for i = 1, #paths do
+                    local p = paths[i]
+                    if gnow >= p.t0 - 0.15 and gnow <= p.t1 + 0.15 then
+                        local k = (gnow - p.t0) / p.dur
+                        if k < 0 then k = 0 elseif k > 1 then k = 1 end
+                        local s = k * p.dist + p.offset
+                        local cx, cz = p.ox + p.dx * s, p.oz + p.dz * s
+                        local qx, qz = origin.X - cx, origin.Z - cz
+                        local along = math.abs(qx * p.dx + qz * p.dz) - p.halfLength
+                        local side = math.abs(-qx * p.dz + qz * p.dx) - p.halfWidth
+                        if along <= playerRadius + 0.5 and side <= playerRadius + 0.5 and math.abs(origin.Y - p.oy) < p.halfHeight + 4 then
+                            projectile = p
+                            enclosingCount = enclosingCount + 1
+                            anyEnclosing = true
+                            lines[#lines + 1] = string.format("     projectile %s is here now (%.0f%% along its path)", tostring(p.name), k * 100)
+                            break
+                        end
+                    end
+                end
+            end
+        end
         local best, bestScore = nil, -1
         for i = 1, math.min(#ranked, 12) do
             local r = ranked[i]
@@ -1971,6 +2001,10 @@ local function recordHit(damage)
                 end
                 if score > bestScore then best, bestScore = r, score end
             end
+        end
+        if projectile and not (best and best.distance <= playerRadius + 0.5 and enclosingCount == 1) then
+            lines[#lines + 1] = string.format("     BLAMED projectile %s", tostring(projectile.name))
+            best = nil
         end
         if best then
             local st = HZ.armState[best.part]
