@@ -31,19 +31,38 @@ end
 -- Everything that appears in workspace, kept for a few seconds: the killer
 -- that the reader never boxed shows up here.
 R.spawns = {}
-R.conns[#R.conns + 1] = workspace.ChildAdded:Connect(function(inst)
+R.conns[#R.conns + 1] = workspace.DescendantAdded:Connect(function(inst)
+    if not (inst:IsA("BasePart") or inst:IsA("Model")) then return end
+    local top = inst
+    while top.Parent and top.Parent ~= workspace do top = top.Parent end
+    if top.Name == "DungeonAutofarmVisuals" or (lp.Character and top == lp.Character) or top.Name == "dungeon" and inst.Parent and inst.Parent.Name == "enemyFolder" then return end
     local rt = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
     local p = inst:IsA("BasePart") and inst or (inst:IsA("Model") and (inst.PrimaryPart or inst:FindFirstChildWhichIsA("BasePart")))
     local d = (p and rt) and r1((Vector3.new(p.Position.X, 0, p.Position.Z) - Vector3.new(rt.Position.X, 0, rt.Position.Z)).Magnitude) or nil
-    R.spawns[#R.spawns + 1] = { at = os.clock(), name = inst.Name, class = inst.ClassName, dist = d,
+    R.spawns[#R.spawns + 1] = { at = os.clock(), name = (top ~= inst and (top.Name .. "/") or "") .. inst.Name, class = inst.ClassName, dist = d,
         size = p and string.format("%.0fx%.0fx%.0f", p.Size.X, p.Size.Y, p.Size.Z) or nil }
     if #R.spawns > 400 then table.remove(R.spawns, 1) end
 end)
+-- Boss announcements land in the same buffer.
+pcall(function()
+    local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("remotes")
+    for _, r in ipairs(remotes and remotes:GetChildren() or {}) do
+        if r:IsA("RemoteEvent") and r.Name:lower():find("bossspecficevents") then
+            R.conns[#R.conns + 1] = r.OnClientEvent:Connect(function(name, args)
+                local rt = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+                local pos = typeof(args) == "Vector3" and args or (typeof(args) == "CFrame" and args.Position) or (type(args) == "table" and typeof(args[5]) == "CFrame" and args[5].Position) or nil
+                local d = (pos and rt) and r1((Vector3.new(pos.X, 0, pos.Z) - Vector3.new(rt.Position.X, 0, rt.Position.Z)).Magnitude) or nil
+                R.spawns[#R.spawns + 1] = { at = os.clock(), name = "EVENT " .. tostring(name), class = typeof(args), dist = d, size = (type(args) == "table" and #args >= 4) and string.format("dist%.0f dur%.1f", tonumber(args[1]) or 0, tonumber(args[2]) or 0) or nil }
+            end)
+        end
+    end
+end)
+
 local function recentSpawns(t)
     local out = {}
     for i = #R.spawns, 1, -1 do
         local sp = R.spawns[i]
-        if t - sp.at > 2.5 then break end
+        if t - sp.at > 4 then break end
         if not sp.name:lower():find("passivebeam") or (sp.dist or 99) < 12 then
             out[#out + 1] = string.format("%.1fs %s(%s) d%s %s", t - sp.at, sp.name, sp.class, tostring(sp.dist), sp.size or "")
         end

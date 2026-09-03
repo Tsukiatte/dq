@@ -23,6 +23,25 @@ if R then
         out.hits[#out.hits + 1] = { t = h.t, fatal = h.fatal, bossDist = h.bossDist, state = h.state, here = h.dangerHere, grace = h.grace, near = near, cands = cands, spawns = h.spawns }
     end
     out.totalHits = #R.hits
+    -- Effective ability range: the largest distance at which the boss lost
+    -- health over the following second (the abilities are the only damage
+    -- beyond attackRange), and a histogram of damage by distance band.
+    local far, bands, secs = 0, {}, {}
+    for i = 1, #R.samples - 1 do
+        local a, b = R.samples[i], R.samples[i + 1]
+        if a.hp and b.hp and a.dist and a.target == b.target then
+            local band = tostring(math.floor(a.dist / 10) * 10)
+            secs[band] = (secs[band] or 0) + 1
+            if b.hp < a.hp - 0.05 then
+                if a.dist > far then far = a.dist end
+                bands[band] = (bands[band] or 0) + (a.hp - b.hp)
+            end
+        end
+    end
+    out.damageReach = far
+    local dps = {}
+    for band, s in pairs(secs) do dps[band] = string.format("%.2f%%/s over %ds", (bands[band] or 0) / s, s) end
+    out.damageByDistance = dps
     local first = R.samples[1]
     local last = R.samples[#R.samples]
     out.bossHp = { first = first and first.hp, last = last and last.hp, dist = last and last.dist, target = last and last.target }
