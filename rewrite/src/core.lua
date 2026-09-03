@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.37"
+local SCRIPT_VERSION = "5.1.38"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.38", date = "2026-09-03", notes = "Blink only inside a fight (a target within 70 studs); hops while walking between rooms made the sixth kick. A bare projectile that has been still for 0.6 s is spent: a thrown spear in the ground blocked the field for five seconds." },
     { version = "5.1.37", date = "2026-09-03", notes = "No more jumping: the mover's stall hop fired in place whenever walking did nothing (a hovering character after a hop), which read as jump spam and helped nothing. Stalls are recorded for the brain instead." },
     { version = "5.1.36", date = "2026-09-03", notes = "Blink lands at the Humanoid's standing height with a small downward velocity, and never fires mid-jump; a hop that inherited a mid-stride height left the character hovering until the anti-hover yanked it down. Hop is 4 or 6 studs, no longer 8." },
     { version = "5.1.35", date = "2026-09-03", notes = "Fifth kick with hops 3 s apart and two per ten seconds. The blink is now 8 s apart and at most three a minute; everything else about it is unchanged." },

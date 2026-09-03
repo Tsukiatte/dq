@@ -372,7 +372,11 @@ local function readerTick(now)
                 r.x, r.z, r.at = p.X, p.Z, now
             end
             local speed = math.sqrt(r.vx * r.vx + r.vz * r.vz)
-            if part.Transparency >= CFG.spentTransparency and speed < 1 and now - r.spawn > 0.5 then
+            if speed < 1 then r.stillSince = r.stillSince or now else r.stillSince = nil end
+            -- Spent when faded and still, or simply still for a while: a thrown
+            -- spear lying in the ground blocked the field for five seconds.
+            if (part.Transparency >= CFG.spentTransparency and speed < 1 and now - r.spawn > 0.5)
+                or (r.stillSince and now - r.stillSince > 0.6 and now - r.spawn > 0.8) then
                 RD.parts[part] = nil
             end
         end

@@ -285,7 +285,10 @@ local function decide(root, hum)
     -- to the nearest clear floor, no more often than CFG.blinkCooldown.
     -- Rotation, velocity and WalkSpeed are untouched; the height comes from
     -- the floor at the destination.
-    if CFG.blink and here0 >= 0.999 and grace <= CFG.blinkWindow and now - (RT.lastBlinkAt or -math.huge) >= CFG.blinkCooldown then
+    -- Only inside a fight: a target within 70 studs. Hops while pathing
+    -- between rooms were what the sixth kick was made of.
+    local inFight = ap ~= nil and adist <= 70
+    if CFG.blink and inFight and here0 >= 0.999 and grace <= CFG.blinkWindow and now - (RT.lastBlinkAt or -math.huge) >= CFG.blinkCooldown then
         -- Walk first: if the spot the field already holds is reachable before
         -- the box fires, the legs do it. Only a box that fires sooner than the
         -- walk can clear earns a hop, and no more than blinkPer10s of them.
