@@ -11,6 +11,12 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.11.3 - 2026-09-02
+
+- Harness only: the simulator logged a dead boss with a variable that did
+  not exist yet; the error skipped the rebuild, so every run after a kill had
+  no target (the "IDLE - no target" seen after the first kill).
+
 ## 4.11.2 - 2026-09-02
 
 - A Model tracked before its hitBox replicated was keyed by its bare name
