@@ -102,6 +102,7 @@ local function addPath(name, cframe, distance, duration, t0, t1, halfWidth, half
         dx = flat.X, dz = flat.Z,
         dist = distance, dur = max(duration, 0.01),
         t0 = serverAt(t0), t1 = serverAt(t1),
+        spawn = Workspace:GetServerTimeNow(),
         -- A rolling body's centre rides its radius above the floor; the
         -- vertical test must reach down to the feet from there.
         halfWidth = halfWidth, halfLength = halfLength, halfHeight = max(halfHeight, halfWidth, halfLength),

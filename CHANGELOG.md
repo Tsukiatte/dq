@@ -11,6 +11,26 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.10.10 - 2026-09-02 - "From the moment it exists"
+
+Chris's real capture of the Midgardian Champion (2026-09-02), seven deaths:
+
+- **Five were `firstBossCrissCross` at 0% along its path with `danger=0.00`.**
+  The game's client code places the body at its origin on the event (on the
+  player) and it sits there until its start time; the server hurts while it
+  sits. `PC.paths` entries carry `spawn` and are live from it, in `dangerAt`
+  and in hit attribution.
+- **One was `firstBossJumpSlam`** (67-stud cube round the landing, precast
+  shown) at 1.8 s, certain. Seeded (`DEFAULT_ARM_DELAYS` / `DEFAULT_ARM_SPANS`).
+- **Every beam and mage shot in that run was "armed +7.0s (learned time)"**:
+  timing learned before 4.10.2 by nearest-part blame, persisted in the config.
+  Floor for its whole life, so never dodged, and drawn as a box the whole time
+  (the "ton of boxes"). Saves older than 4.10.2 no longer carry learned
+  timing or learned names into a new session (`trustLearned`).
+- **Floor is not drawn** (`drawPendingHazards` false): a box now means it can
+  hurt. It appears the moment the attack is about to arm.
+- Simulator: the criss cross spawns at the player and hurts from spawn.
+
 ## 4.10.9 - 2026-09-02
 
 - The stronger (`dodgeHubRingWeight`) pull applies whenever the dodge box is

@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 4.10.9
+    VERSION : 4.10.10
     BUILD   : 2026-09-02
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "4.10.9"
+local SCRIPT_VERSION = "4.10.10"
 local SCRIPT_BUILD_DATE = "2026-09-02"
-local SCRIPT_CODENAME = "Fight from range"
+local SCRIPT_CODENAME = "From the moment it exists"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "4.10.10", date = "2026-09-02", notes = "From the moment it exists. Chris's real capture of the Midgardian Champion, 2026-09-02: seven deaths. Five were the criss cross projectile at zero percent along its path with the dodge reading zero danger - the game places the body at its origin on the event, on the player, and it sits there hurting until its start time; the dodge had counted it only from the start. A scripted projectile now hurts from the moment it exists. One was the jump slam, a sixty-seven stud cube round the landing, at 1.8 seconds - seeded. And every beam and mage shot in that run was armed at 7.0 seconds, the moment it was removed: timing taught before 4.10.2 by whatever part was nearest, which made them floor for their whole life and drew the arena full of boxes. Learning from before 4.10.2 is dropped, and floor is no longer drawn - a box means it can hurt." },
     { version = "4.10.9", date = "2026-09-02", notes = "The stronger pull applies whenever the box is the approach - pursuit stopped at the edge of something - not only on the ring. Otherwise the quiet gap went by safe here at fifty studs, out of ability range, and the fight took four minutes that could take two." },
     { version = "4.10.8", date = "2026-09-02", notes = "The ring pull is three times the ordinary approach weight: at the ordinary weight the distance cost of an eighteen-stud move beat it and the character sat at thirty studs, safe here, while the sweep came round. And a target within eight studs with no path is walked to directly: the path to the standoff point a stud or two away was failing, which read as stuck, which blacklisted the spot and fled from it." },
     { version = "4.10.7", date = "2026-09-02", notes = "The ring is the box's to hold from wherever the last dodge left the character, not only from within a box-length of the boss: a dodge that ended eighty studs out during a burst left it standing there." },
@@ -627,6 +628,7 @@ CFG.accountRank = "DEVELOPER"
 -- colour from here, so the Overlays section can recolour any of it. accentColor
 -- drives the whole GUI: the three gradient stops are derived from it.
 CFG.colorTelegraph = Color3.fromRGB(255, 30, 30)
+CFG.drawPendingHazards = false  -- draw attacks still on their timer (floor)? Off: only what can hurt is boxed
 CFG.colorTelegraphPending = Color3.fromRGB(255, 176, 40)   -- announced, not yet live
 CFG.colorWall = Color3.fromRGB(40, 220, 90)
 CFG.colorHitbox = Color3.fromRGB(0, 220, 255)
