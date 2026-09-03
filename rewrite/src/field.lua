@@ -292,8 +292,8 @@ local function decide(root, hum)
         end
         RT.blinkTimes = RT.blinkTimes or {}
         local recent = 0
-        for i = #RT.blinkTimes, 1, -1 do if now - RT.blinkTimes[i] <= 10 then recent = recent + 1 else break end end
-        local dest = (not walkOk and recent < CFG.blinkPer10s) and blinkTarget(root, hum, rx, ry, rz) or nil
+        for i = #RT.blinkTimes, 1, -1 do if now - RT.blinkTimes[i] <= 60 then recent = recent + 1 else break end end
+        local dest = (not walkOk and recent < CFG.blinkPerMinute) and blinkTarget(root, hum, rx, ry, rz) or nil
         if dest then
             RT.blinkTimes[#RT.blinkTimes + 1] = now
             if #RT.blinkTimes > 20 then table.remove(RT.blinkTimes, 1) end
