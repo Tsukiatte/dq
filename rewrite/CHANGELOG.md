@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.7 - 2026-09-03 - "Not a wall"
+
+- The target's model is excluded from the spot walkability sweep; the boss's body was blocking every far escape from the slam.
+
 ## 5.1.6 - 2026-09-03 - "Walk"
 
 - The field's spot outranks travel only while danger here is present now or the brain's next step is unsafe when crossed (`stepSafe`); future danger alone no longer stops a clean walk.
