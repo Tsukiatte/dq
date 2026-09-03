@@ -11,6 +11,13 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.12.4 - 2026-09-02 - "Traffic light"
+
+- **Attacks painted by stage.** The game's own precast and hitBox parts are recoloured: green while the dodge treats the spot as floor (known timing, more than `dodgeLead` away), yellow inside the lead, red while live or when nothing is known about the timing. Put back the moment the attack is over, the toggle goes off, or the script leaves.
+- The hitBox is invisible by construction; it is shown while painted so the volume that actually hurts can be seen. `hitBoxSignature` reads the original transparency of a painted hitBox so the reader is not fooled by our own paint.
+- The announced zones we draw ourselves use the same three colours.
+- Toggle "Paint attacks by stage" under Telegraphs; the three colours under Overlays.
+
 ## 4.12.3 - 2026-09-02 - "Champion"
 
 Live capture through the Potassium bridge (`game/captures/nl_midgardian_2026-09-02_a.json`): 14 deaths in 220 s against the Midgardian Champion.

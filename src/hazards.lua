@@ -1207,6 +1207,106 @@ local function updateHazardHighlights()
     end
 end
 
+-- =========================================================================
+-- TRAFFIC LIGHT (4.12.4): the game's own attack parts, painted by stage.
+-- Green while the dodge treats the spot as floor (known timing, more than the
+-- lead away), yellow inside the lead, red while live or when nothing is known
+-- about the timing - the dodge treats unknown as live, so red is the honest
+-- colour. The hitBox is invisible by construction; it is shown while painted
+-- so the volume that actually hurts can be seen, and hitBoxSignature reads
+-- its original transparency so the reader is not fooled by our own paint.
+-- Everything is put back when the attack is over, the toggle goes off, or
+-- the script leaves.
+-- =========================================================================
+local function stageOf(st, now)
+    if st.doneAt then return nil end
+    if st.armedAt then return "live" end
+    if st.impactAt then
+        if st.impactAt - now > CFG.dodgeLead then return "floor" end
+        return "soon"
+    end
+    return "live"
+end
+
+local function stageColor(stage)
+    if stage == "floor" then return CFG.colorStageFloor end
+    if stage == "soon" then return CFG.colorStageSoon end
+    return CFG.colorStageLive
+end
+
+local function paintPart(part, stage, isHitBox)
+    local orig = HZ.recolored[part]
+    if not orig then
+        orig = { color = part.Color, transparency = part.Transparency, material = part.Material }
+        HZ.recolored[part] = orig
+    end
+    local color = stageColor(stage)
+    if part.Color ~= color then part.Color = color end
+    if isHitBox then
+        local t = CFG.recolorHitboxTransparency
+        if part.Transparency ~= t then part.Transparency = t end
+        if part.Material ~= Enum.Material.Neon then part.Material = Enum.Material.Neon end
+    end
+end
+
+local function unpaintPart(part)
+    local orig = HZ.recolored[part]
+    if not orig then return end
+    HZ.recolored[part] = nil
+    if not part.Parent then return end
+    pcall(function()
+        part.Color = orig.color
+        part.Transparency = orig.transparency
+        part.Material = orig.material
+    end)
+end
+
+local function restoreAttackColors()
+    for part in pairs(HZ.recolored) do unpaintPart(part) end
+end
+
+local function recolorAttackParts(now)
+    if not CFG.recolorAttacks then
+        if next(HZ.recolored) then restoreAttackColors() end
+        return
+    end
+    local touched = {}
+    for model, st in pairs(HZ.arming) do
+        if model.Parent then
+            local stage = stageOf(st, now)
+            if stage then
+                if st.precast and st.precast.Parent then
+                    paintPart(st.precast, stage, false)
+                    touched[st.precast] = true
+                end
+                if st.hitBox and st.hitBox.Parent then
+                    paintPart(st.hitBox, stage, true)
+                    touched[st.hitBox] = true
+                end
+                -- The rest of the telegraph: a second precast, a ring, an inner
+                -- and outer hitBox. Named parts only; the model's decoration is
+                -- left alone.
+                local ch = st.channels
+                for i = 1, #ch do
+                    local d = ch[i]
+                    if d.Parent and d ~= st.precast and d ~= st.hitBox and d:IsA("BasePart") then
+                        local n = string.lower(d.Name)
+                        local isHb = n:find("hitbox", 1, true) ~= nil
+                        if isHb or n:find("precast", 1, true) then
+                            paintPart(d, stage, isHb)
+                            touched[d] = true
+                        end
+                    end
+                end
+            end
+        end
+    end
+    -- Painted last pass and not this one: the attack is over. Put it back.
+    for part in pairs(HZ.recolored) do
+        if not touched[part] then unpaintPart(part) end
+    end
+end
+
 local function clearWallHighlights()
     if HZ.wallHighlightsFolder then
         HZ.wallHighlightsFolder:Destroy()
@@ -2683,8 +2783,11 @@ end
 local function hitBoxSignature(hb)
     if not hb or not hb.Parent then return nil end
     local size = hb.Size
+    -- A painted hitBox (traffic light) reads as its original self.
+    local painted = HZ.recolored[hb]
+    local tr = painted and painted.transparency or hb.Transparency
     return string.format("%d%d%.2f%.0f", hb.CanTouch and 1 or 0, hb.CanQuery and 1 or 0,
-        hb.Transparency, size.X + size.Y + size.Z)
+        tr, size.X + size.Y + size.Z)
 end
 
 -- The attack's own timeline, for the capture file.
@@ -3170,6 +3273,8 @@ local function scanDamageBricks(rootPosition)
     end
     HZ.detected = found
     updateArming(now)
+    local okPaint, errPaint = pcall(recolorAttackParts, now)
+    if not okPaint then heavyDebugThrottled("paint_error", 2.0, "Attacks", "Painting attack stages threw: " .. tostring(errPaint)) end
     rebuildHazardVolumes()
 
     if UI.damageBrickCountLabel then
@@ -3396,6 +3501,7 @@ local function setTelegraphPickerEnabled(enabled, mode)
 end
 
 S.clearHazardHighlights = clearHazardHighlights
+S.restoreAttackColors = restoreAttackColors
 S.clearHitboxVisualizer = clearHitboxVisualizer
 S.clearHoverHighlight = clearHoverHighlight
 S.clearWallHighlights = clearWallHighlights

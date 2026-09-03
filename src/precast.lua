@@ -167,8 +167,13 @@ local function precastStep()
             table.remove(PC.zones, i)
         elseif zone.part and zone.part.Parent then
             -- Warm as it approaches, so an imminent zone reads at a glance.
-            local t = math.clamp(1 - (eta / math.max(zone.delay, 0.01)), 0, 1)
-            zone.part.Color = CFG.colorPrecastEarly:Lerp(CFG.colorPrecastImminent, t)
+            if CFG.recolorAttacks then
+                local c = eta > CFG.dodgeLead and CFG.colorStageFloor or eta > 0 and CFG.colorStageSoon or CFG.colorStageLive
+                if zone.part.Color ~= c then zone.part.Color = c end
+            else
+                local t = math.clamp(1 - (eta / math.max(zone.delay, 0.01)), 0, 1)
+                zone.part.Color = CFG.colorPrecastEarly:Lerp(CFG.colorPrecastImminent, t)
+            end
         end
     end
 end
