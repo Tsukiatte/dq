@@ -19,6 +19,10 @@ file and that table in sync on every edit.
   the hit lands and when it fades.
 - The 4.11.3 code is frozen under `legacy/4.11.3` (tag `v4.11.3-legacy`,
   branch `legacy-4.11`) ahead of the rewrite.
+- `HANDOFF.md` rewritten as the rewrite brief (the previous v2.7 handoff is
+  kept as `legacy/4.11.3/HANDOFF_v2.7.md`). Place dumps of the NL fight save
+  and the Aquatic Temple save under `game/dumps/`, the latest NL capture under
+  `game/captures/`.
 
 ## 4.11.3 - 2026-09-02
 
