@@ -11,6 +11,15 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.12.11 - 2026-09-03 - "Blink"
+
+Run 3 (4.12.10): 7 deaths in 107 s, all the Champion's beams; two while the dodge read "safe here" beside beams 3.6-4.8 s old.
+
+- **Passive beam hurts for its whole life**: seeded `{0, 6.5}` (Model deleted at 7 s).
+- **Blink, the last resort** (`blinkEnabled`, `blinkMaxDistance` 14, `blinkCooldown` 0.8, `blinkMargin` 0.15): when standing in danger and the ground under you fires before the walk to the chosen spot would finish, and that spot (or the nearest clean candidate) is within 14 studs with a floor and a clear sweep, the root is placed there. Counted in `RT.blinks`.
+- **Paint is precast-only by default** (`recolorHitbox` off, toggle "Show damage volumes too"): painted hitBoxes made every beam a 64-stud slab and cost frames. `maxHazardOverlays` 28 -> 12.
+- HUD fps chip shows the script's own smoothed cost per tick (`RT.tickMs`).
+
 ## 4.12.10 - 2026-09-03 - "Grace"
 
 Bob the Frost Giant, seven deaths pinned in `game/captures/nl_run2_2026-09-02_b.json`.

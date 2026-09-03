@@ -252,7 +252,7 @@ local function buildHud(parent)
     local userLabel = chipText("...", "rowStat", 144, 104)
     userLabel.TextColor3 = T.TextSub
     chipText("|", "captionKey", 252, 6).TextColor3 = T.TextMuted
-    local fpsLabel = chipText("fps: --", "monoStat", 264, 54)
+    local fpsLabel = chipText("fps: --", "monoStat", 264, 110)
 
     -- Stats panel.
     local stats = Instance.new("Frame")
@@ -354,7 +354,7 @@ local function buildHud(parent)
         hud.Visible = CFG.showHud
         if not CFG.showHud then return end
 
-        fpsLabel.Text = string.format("fps: %d", math.floor(fps + 0.5))
+        fpsLabel.Text = string.format("fps: %d  %.1fms", math.floor(fps + 0.5), RT.tickMs or 0)
         -- Streamer Mode is about not showing the real name on stream, so the
         -- HUD must honour it too - it is the one panel that is always visible.
         userLabel.Text = SM.enabled and (SM.fields.username ~= "" and SM.fields.username or "Streamer")
@@ -630,7 +630,11 @@ local function createControlUI()
             CFG.recolorAttacks = v
             if not v and S.restoreAttackColors then S.restoreAttackColors() end
         end, 4.5,
-        "Paint the game's own attack parts: green while the spot is still safe to cross, yellow when it is about to fire, red while it hurts. The invisible damage volume is shown too. Colours are under Overlays."))
+        "Paint the game's own telegraph parts: green while the spot is still safe to cross, yellow when it is about to fire, red while it hurts. Colours are under Overlays."))
+    track(K.toggle(attacks.body, "Show damage volumes too",
+        function() return CFG.recolorHitbox end,
+        function(v) CFG.recolorHitbox = v if not v and S.restoreAttackColors then S.restoreAttackColors() end end, 4.6,
+        "Also show the invisible part that actually hurts, painted the same way. Heavy in a beam fan: every beam becomes a 64-stud slab."))
     track(K.toggle(attacks.body, "Stand in safe spots",
         function() return CFG.safeZoneEnabled end, function(v) CFG.safeZoneEnabled = v end, 5,
         "Some bosses mark the one circle you must stand IN. With this off the dodge treats the floor as uniformly safe and calmly walks you out of it."))

@@ -20,7 +20,7 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "4.12.10"
+local SCRIPT_VERSION = "4.12.11"
 -- Bump to throw away every learned attack timing in every save, once.
 local LEARN_EPOCH = 2
 local SCRIPT_BUILD_DATE = "2026-09-02"
@@ -28,6 +28,7 @@ local SCRIPT_CODENAME = "Aquatic Temple"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "4.12.11", date = "2026-09-03", notes = "Blink, and the beam for its whole life. Run 3: seven deaths, all the Champion's beams, two of them while the dodge read safe here beside beams four seconds old - the beam hurts for all seven seconds it exists, so it is seeded that way. Last resort, as Chris asked: when the ground under you fires before you could walk to the spot the dodge chose, and that spot is within fourteen studs with a floor and no wall in between, the character is placed there instead of walking; at most once every 0.8 s, and only while standing in danger. Painting the invisible hitBoxes is off by default - the beam fan became a field of 64-stud pink slabs and cost frames - and the highlight cap drops to twelve. The HUD shows the script's own cost per tick beside the frame rate." },
     { version = "4.12.10", date = "2026-09-03", notes = "Bob the Frost Giant, seven deaths pinned. Five were on the circle line, every one with the box sent 45 studs away and the field reading 'danger 0.00': the scorer discounted danger already on you for every sample along the way, including samples after the moment the circle under you fires, so a long walk through a band that fires in a second scored clean. The discount now stops at the fire time of whatever you are standing in. The circle fires at 1.3 s (its sound); the horizontal beam burns to 5 s, so the default live window is 1.5 s and the beam is seeded to its end. Done attacks no longer keep their red box. The quick tween is used only while escaping danger here, and the dodge estimates travel at whichever speed it will use. Melee mobs (the game's own meleeDistance at most 8) are fought from 14 studs past their body. The config autosaves whenever it changes and as a teleport begins - it was only written by a Save button, and a teleport killed the script first, so nothing survived a run. The HUD dot follows the switch." },
     { version = "4.12.9", date = "2026-09-02", notes = "Seeds from the second live run, thirteen deaths pinned. The Champion's passive beam killed from inside at 0.5 to 1.0 s after it appeared: it is the laser, live from the moment it exists until its line fades, not from 1.3 s. The jump slam killed at 1.9 s and again at 3.3 s: it lingers on the ground, so its window runs to 5 s. A mage shot killed at 0.5 s and a spearman strike at 0.9 s, earlier than their seeds, because the Model appears some time after the server's cast; the earliest seen hit is now the seed. Time spent inside the attack already on you costs more (dodgeInsideWeight 0.85), so a 35-stud line is left sideways in three studs rather than lengthwise in seventeen." },
     { version = "4.12.8", date = "2026-09-02", notes = "Quicker tween. The tween mover steps at tweenSpeed (22 studs a second, capped at 40) instead of the Humanoid's 16, and the dodge estimates its travel times at the same speed so a spot it can reach in time is judged in time. The client's own movement checker resets WalkSpeed above 45 and watches for hovering in Freefall; the tween never touches WalkSpeed and follows the floor, so both are untouched. After a death the character respawns at the arena entrance, 114 studs from the Champion, and the aimed projectile comes every eight seconds - closing that gap before it fires is what this is for." },
@@ -432,7 +433,7 @@ CFG.hazardTagEnabled = true         -- billboard name tag on every highlighted a
 -- one they cost more than the whole rest of the script put together, so a dense
 -- group is collapsed into the one box it effectively is.
 CFG.hazardClusterMin = 6            -- parts under one model before it becomes a box
-CFG.maxHazardOverlays = 28          -- highlights and name tags drawn at once
+CFG.maxHazardOverlays = 12          -- highlights and name tags drawn at once (4.12.11: 28 cost frames in a beam fan)
 
 -- long enough to point at it. While Freeze is on, every detected attack is
 -- copied into a held snapshot that stays put after the real one is gone, so it
@@ -481,6 +482,13 @@ CFG.autoDetectMap = true
 -- were caught fighting each other three times in six versions.
 CFG.dodgeInterval = 0.05         -- seconds between decisions
 CFG.dodgeReach = 18              -- studs to the outer ring of candidates
+-- Last resort (4.12.11, Chris): a short hop to a safe spot beside you when
+-- the thing under you fires before you could walk out. A few hitboxes at
+-- most; never through a wall; never twice in a row.
+CFG.blinkEnabled = true
+CFG.blinkMaxDistance = 14        -- studs
+CFG.blinkCooldown = 0.8          -- seconds between hops
+CFG.blinkMargin = 0.15           -- seconds of slack the walk must have or the hop is taken
 CFG.dodgeReachEscalate = 2.5     -- when nothing within reach is safe, look this many times further, once (4.12.6)
 CFG.dodgeRings = 4
 CFG.dodgeRays = 24
@@ -680,7 +688,8 @@ CFG.recolorAttacks = true
 CFG.colorStageFloor = Color3.fromRGB(60, 220, 120)   -- known timing, more than the lead away: walkable
 CFG.colorStageSoon = Color3.fromRGB(255, 220, 40)    -- inside the lead: about to fire
 CFG.colorStageLive = Color3.fromRGB(255, 50, 50)     -- live, or nothing known (dodged as live)
-CFG.recolorHitboxTransparency = 0.55                 -- the damage volume is invisible by construction; shown while painted
+CFG.recolorHitbox = false                             -- also show the invisible damage volume while painted (4.12.11: off; 64-stud beams became solid slabs and cost frames)
+CFG.recolorHitboxTransparency = 0.55                 -- its transparency when shown
 CFG.colorWall = Color3.fromRGB(40, 220, 90)
 CFG.colorHitbox = Color3.fromRGB(0, 220, 255)
 CFG.colorAbilityRadius = Color3.fromRGB(170, 100, 255)
