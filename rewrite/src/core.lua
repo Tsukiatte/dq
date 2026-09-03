@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.52"
+local SCRIPT_VERSION = "5.1.53"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.53", date = "2026-09-03", notes = "Mob attacks (Chris): they hit about a quarter second after they look finished, so their windows run to 1.5 s and a fading precast no longer ends them early. Champion: a passive beam is held 2.0 s instead of 3.5 and padded 1.5 studs, so the fan's gaps exist in the model; during the fan the bot backs to 95 studs at escape speed instead of walking toward 135. The big spike kills 4-6 studs outside its 40-stud body, so it is 52 wide now. Visuals: a stopped projectile is a hazard for one second, not for as long as it lies there, and only announced paths draw their sweep strip - the yellow strips that stayed on the floor were thrown spears." },
     { version = "5.1.52", date = "2026-09-03", notes = "Bob (Chris): the floating beam fans are padded by the body radius only instead of 4.5 studs a side, so the gaps between spokes exist again. The circle chain's whole line through Bob is a zone from the first circle, so the escape is sideways, never along the line toward the next circle." },
     { version = "5.1.51", date = "2026-09-03", notes = "Travel steps are refused only for danger that would land during the crossing (0.6+); the soft lane danger was blocking every other step of the approach." },
     { version = "5.1.50", date = "2026-09-03", notes = "Bob: the circle chain is predicted from its first circle (0.27 s, 22 studs and 6 studs wider per step, lethal 0.6 s after each appears) so the bot leaves the line before the chain reaches it. The sweeping wall is tracked from its real model (balls and beam, ~19 studs/s); the announced path was a hundred studs off and is no longer used." },
@@ -117,8 +118,7 @@ local CFG = {
     dodgeRays = 16,
     dodgeMargin = 2.0,            -- studs of clearance round the character; hits landed 1.5-3.3 studs outside their boxes            -- studs of clearance round the character
     dodgeShoulder = 1.5,
-    slimReach = 0.8,              -- padding for `slim` hazards (Bob's beam fans): body radius, no more
-    slimShoulder = 0.3,            -- studs of warm edge outside a hazard
+    slimShoulder = 0.3,           -- shoulder for `slim` hazards (a seed's slim value is their reach): the beam fans need their gaps            -- studs of warm edge outside a hazard
     dodgeLead = 1.2,              -- a standing telegraph counts as live this long before it fires
     dodgePathLead = 0.4,          -- a moving projectile's line: the time to sidestep
     dodgeDwell = 1.5,             -- a spot must stay clear this long after arrival (the big spike front: 100 studs/s, announced 1.4 s ahead)
@@ -143,7 +143,7 @@ local CFG = {
     -- Reader defaults for attacks with no seed.
     defaultFire = 1.5,            -- a telegraphed Model with no seed fires this long after it appears
     defaultLive = 0.6,            -- and hurts this long after firing
-    fadeLinger = 0.3,             -- after its precast fades an attack is over this much later
+    fadeLinger = 0.55,            -- after its precast fades an attack is over this much later (Chris: the hit lands ~0.25 s after the visual looks done)
     projectileLookahead = 1.0,    -- seconds of a moving part's path treated as its box
     spentTransparency = 0.97,
 
@@ -183,15 +183,15 @@ local CFG = {
 -- in seconds after the Model appears. Measured in the recorded runs of
 -- 2026-09-02/03 (game/captures). `long` = it burns until the Model goes.
 local TIMING = {
-    northernmageshot            = { first = 0.5, last = 1.2 },
-    spearmanstrikehitbox        = { first = 0.6, last = 1.2 },
-    northernwarriorlinestrike   = { first = 0.6, last = 1.2 },
-    northernwarriorcirclestrike = { first = 0.6, last = 1.2 },
-    firstbosspassivebeam        = { first = 0.3, last = 3.5, holdFull = true },   -- hurts 0.3-2.2 s after appearing, and in the burst its lane re-fires every 1.1 s: a lane never expires while the burst lasts
+    northernmageshot            = { first = 0.5, last = 1.5, holdFull = true },   -- mob attacks hit ~0.25 s after their visual looks finished; the fade must not end them
+    spearmanstrikehitbox        = { first = 0.6, last = 1.5, holdFull = true },
+    northernwarriorlinestrike   = { first = 0.6, last = 1.5, holdFull = true },
+    northernwarriorcirclestrike = { first = 0.6, last = 1.5, holdFull = true },
+    firstbosspassivebeam        = { first = 0.3, last = 2.0, holdFull = true, slim = 1.5 },   -- hurts 0.3-2.2 s after appearing, and in the burst its lane re-fires every 1.1 s: a lane never expires while the burst lasts
     firstbossjumpslam           = { first = 1.8, last = 5.0 },
     secondbosscriclehitbox      = { first = 0.6, last = 1.6, pad = 3 },   -- precast-only cylinder (22/28/34 wide, growing with distance); hits 0.7-1.0 s after it appears, a body wider than the cylinder
-    secondbosshorizontalbeam    = { first = 1.1, last = 5.0, slim = true },   -- 10x64x400 beams 23.5 studs apart marching across the arena
-    secondbossspreadbeam        = { slim = true },                            -- nine 12x64x400 spokes 20 degrees apart from Bob; gaps widen with distance
+    secondbosshorizontalbeam    = { first = 1.1, last = 5.0, slim = 0.8 },   -- 10x64x400 beams 23.5 studs apart marching across the arena
+    secondbossspreadbeam        = { first = 0.9, last = 2.5, slim = 0.8 },   -- killed 0.5 s before the 1.5 s default                            -- nine 12x64x400 spokes 20 degrees apart from Bob; gaps widen with distance
     cubepylonshot               = { first = 0.8, last = 1.1 },
 }
 

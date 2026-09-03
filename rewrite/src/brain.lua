@@ -40,7 +40,9 @@ local sqrt, abs, max, min = math.sqrt, math.abs, math.max, math.min
 local function flat(a, b) local dx, dz = a.X - b.X, a.Z - b.Z return sqrt(dx * dx + dz * dz) end
 
 local function standoffFor(e)
-    if e.isBoss then return CFG.bossStandoff end
+    -- During the Champion's beam fan nothing inside ~60 studs has a gap to
+    -- stand in; at 95 the lanes are 30 studs apart and the field can hold one.
+    if e.isBoss then return (os.clock() < (RD.fanUntil or -math.huge)) and 95 or CFG.bossStandoff end
     return e.extent + CFG.mobStandoff
 end
 
