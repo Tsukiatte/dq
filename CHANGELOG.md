@@ -11,6 +11,18 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.12.9 - 2026-09-02 - "Pinned"
+
+Live run 2 (`game/captures/nl_run2_2026-09-02_b.json`), 16 deaths, each with the parts around the character and the reader's verdict at that instant.
+
+- **Passive beam is live from spawn** (`{0, 2.0}`): killed inside beams at 0.5, 0.7, 0.8, 0.9 and 1.0 s after they appeared. The 4.12.3 seed of 1.3 s (precast fade) was the warning fading, not the laser starting.
+- **Jump slam lingers** (`{1.8, 5.0}`): killed inside it at 1.9 s and at 3.3 s.
+- **Mob seeds earlier**: mage shot 0.5 s (killed at 0.5), spearman and warrior 0.6 s (killed at 0.9). The Model is seen some time after the server's cast, so the earliest seen hit is the seed.
+- `dodgeInsideWeight` 0.5 -> 0.85: time inside the attack already on you costs more, so a line is left sideways, not lengthwise.
+- Recorder verdicts now carry the dodge's `done` and remaining live window.
+
+Also seen and not yet fixed: a spearman strike killed 7.4 studs outside its hitBox part, so its damage volume is larger than the part (the visual sweeps 65 studs); the reader's hit blame still names the nearest part (`FirstPart`, the arena cube, twice).
+
 ## 4.12.8 - 2026-09-02 - "Quicker"
 
 - **Tween speed** (`tweenSpeed` 22, capped by `tweenSpeedMax` 40): the tween mover steps at this speed instead of the Humanoid's 16. The dodge estimates travel times with the same number (`S.moverSpeed`). The client's checker resets WalkSpeed above 45 and watches Freefall; the tween never touches WalkSpeed and follows the floor. Slider under Dodge; saved with the config.

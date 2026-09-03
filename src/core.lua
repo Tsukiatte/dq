@@ -20,7 +20,7 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "4.12.8"
+local SCRIPT_VERSION = "4.12.9"
 -- Bump to throw away every learned attack timing in every save, once.
 local LEARN_EPOCH = 2
 local SCRIPT_BUILD_DATE = "2026-09-02"
@@ -28,6 +28,7 @@ local SCRIPT_CODENAME = "Aquatic Temple"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "4.12.9", date = "2026-09-02", notes = "Seeds from the second live run, thirteen deaths pinned. The Champion's passive beam killed from inside at 0.5 to 1.0 s after it appeared: it is the laser, live from the moment it exists until its line fades, not from 1.3 s. The jump slam killed at 1.9 s and again at 3.3 s: it lingers on the ground, so its window runs to 5 s. A mage shot killed at 0.5 s and a spearman strike at 0.9 s, earlier than their seeds, because the Model appears some time after the server's cast; the earliest seen hit is now the seed. Time spent inside the attack already on you costs more (dodgeInsideWeight 0.85), so a 35-stud line is left sideways in three studs rather than lengthwise in seventeen." },
     { version = "4.12.8", date = "2026-09-02", notes = "Quicker tween. The tween mover steps at tweenSpeed (22 studs a second, capped at 40) instead of the Humanoid's 16, and the dodge estimates its travel times at the same speed so a spot it can reach in time is judged in time. The client's own movement checker resets WalkSpeed above 45 and watches for hovering in Freefall; the tween never touches WalkSpeed and follows the floor, so both are untouched. After a death the character respawns at the arena entrance, 114 studs from the Champion, and the aimed projectile comes every eight seconds - closing that gap before it fires is what this is for." },
     { version = "4.12.7", date = "2026-09-02", notes = "Park in the lobby. The autofarm master switch is turned off on arriving in the lobby and back on on arriving in a dungeon, once per place change so a hand on the switch inside a place is respected. Queueing no longer needs the master switch on, since the switch is now off in the lobby by design. Toggle under Auto queue, saved with the config." },
     { version = "4.12.6", date = "2026-09-02", notes = "Timing defaults, from watching Bob the Frost Giant live. Every attack in this game hurts for a fraction of a second when its telegraph fades, yet an attack with nothing known about its timing was dodged as live from the moment it appeared, and an armed one stayed live until the game deleted its Model five seconds later - a marching line of growing circles read as a solid wall, and the character froze in it and died. Now a telegraphed attack with unknown timing is assumed to fire 1.5 s after it appears (its fade or sound still arms it earlier, and the assumption is never learned as fact), and an armed attack with no measured window is over 0.6 s after arming unless it is a projectile in flight, hit us, or is known to burn on. When nothing within eighteen studs is safe the dodge looks two and a half times further, once, with every sample still taken at the moment it would happen. Fade-learned fire times are loaded again across sessions; only hit-learned windows stay out. Auto queue is its own window, switchable under Modules. Seeds for the Frost Giant's beam fan and circle line." },
@@ -504,7 +505,7 @@ CFG.dodgeHeadingMemory = 1.5
 CFG.dodgeEnemyLookahead = 0.4
 -- What a path sample inside the thing already hitting you still costs, as a
 -- share of full: time spent in it matters, which way out does not.
-CFG.dodgeInsideWeight = 0.5
+CFG.dodgeInsideWeight = 0.85     -- time spent inside the attack already on you still costs: 0.5 let a 35-stud line be left lengthwise (4.12.9)
 -- Studs between samples along a candidate line (2 to 8 samples per line).
 CFG.dodgeSampleSpacing = 2.5
 -- Hubs (4.10.0): enemies that long line attacks pass through.

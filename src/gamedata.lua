@@ -349,10 +349,13 @@ local DEFAULT_ARM_DELAYS = {
     -- Northern Lands, from the captures of 2026-09-02: the mage shot's
     -- precast appears and the hit lands 0.9s after the Model does; the
     -- spearman and warrior strikes land at 0.88s.
-    northernmageshot = 0.9,
-    spearmanstrikehitbox = 0.85,
-    northernwarriorlinestrike = 0.85,
-    northernwarriorcirclestrike = 0.85,
+    -- Live run 2 (2026-09-02): a mage shot killed at 0.5 s and a spearman
+    -- strike at 0.9 s after the Model was seen; the Model appears some
+    -- time after the server cast, so the earliest seen hit is the seed.
+    northernmageshot = 0.5,
+    spearmanstrikehitbox = 0.6,
+    northernwarriorlinestrike = 0.6,
+    northernwarriorcirclestrike = 0.6,
     -- The Midgardian Champion's jump slam (67-stud cube round its landing,
     -- precast shown): a certain hit at 1.8 s in Chris's capture of 2026-09-02.
     firstbossjumpslam = 1.8,
@@ -381,12 +384,18 @@ local DEFAULT_ARM_SPANS = {
     -- 0.6 s, gone by 2.0 s; the Model is deleted at 7.0 s. The old 0.3 s
     -- came from a criss cross hit blamed on the nearest beam, and made
     -- every beam a wall from birth.
-    firstbosspassivebeam = { first = 1.3, last = 1.9 },
-    northernmageshot = { first = 0.9, last = 1.2 },
-    spearmanstrikehitbox = { first = 0.85, last = 1.2 },
-    northernwarriorlinestrike = { first = 0.85, last = 1.2 },
-    northernwarriorcirclestrike = { first = 0.85, last = 1.2 },
-    firstbossjumpslam = { first = 1.8, last = 2.3 },
+    -- Live run 2 (2026-09-02): killed INSIDE beams 0.5, 0.7, 0.8, 0.9 and
+    -- 1.0 s after they appeared. The beam is the laser; it hurts from the
+    -- moment it exists, and the visible line is the warning to be out of
+    -- it already. Live from spawn until its line fades.
+    firstbosspassivebeam = { first = 0, last = 2.0 },
+    northernmageshot = { first = 0.5, last = 1.2 },
+    spearmanstrikehitbox = { first = 0.6, last = 1.2 },
+    northernwarriorlinestrike = { first = 0.6, last = 1.2 },
+    northernwarriorcirclestrike = { first = 0.6, last = 1.2 },
+    -- Live run 2: killed inside the slam at 1.9 s AND at 3.3 s. It lingers
+    -- on the ground after landing; stay out until the Model goes (5 s).
+    firstbossjumpslam = { first = 1.8, last = 5.0 },
     cubepylonshot = { first = 0.8, last = 1.1 },
     ["model:4x8x35"] = { first = 0.9, last = 3.6 },
 }
