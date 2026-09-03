@@ -440,11 +440,16 @@ local function rollingProjectile(eventName, templateName, radius, damage, distan
     local dir = flat.Unit
     local startCF
     if atPlayer then
-        -- The real criss cross: placed ON the player, then rolls off in some
-        -- direction. It hurts while it sits there.
+        -- The real criss cross: placed ON or round the player, then rolls
+        -- off in some direction. It hurts while it sits there. Chris counts
+        -- about fifteen crossing the map at once; a volley scatters them
+        -- within DQSimCrissSpread of the player, the first one dead on.
         local a = math.random() * math.pi * 2
         local d2 = Vector3.new(math.cos(a), 0, math.sin(a))
-        local origin = Vector3.new(target.X, CENTRE.Y + radius, target.Z)
+        local spread = (atPlayer == "first") and 0 or attr("DQSimCrissSpread", 20)
+        local sa = math.random() * math.pi * 2
+        local off = Vector3.new(math.cos(sa), 0, math.sin(sa)) * (math.random() * spread)
+        local origin = Vector3.new(target.X + off.X, CENTRE.Y + radius, target.Z + off.Z)
         startCF = CFrame.lookAt(origin, origin + d2 * 40)
     else
         startCF = CFrame.lookAt(CENTRE + Vector3.new(0, radius, 0) + dir * 8, CENTRE + Vector3.new(0, radius, 0) + dir * 40)
@@ -519,7 +524,9 @@ task.spawn(function()
         if attr("DQSimEnabled", true) and attr("DQSimProjectiles", true) then
             i = i + 1
             if i % 3 == 1 then
-                rollingProjectile("First Boss Criss Cross Projectile", "firstBossCrissCross", 7.5, 120, 90, 3.0, true)
+                for i = 1, attr("DQSimCrissCount", 5) do
+                    rollingProjectile("First Boss Criss Cross Projectile", "firstBossCrissCross", 7.5, 120, 90, 3.0, i == 1 and "first" or true)
+                end
             elseif i % 3 == 2 then
                 rollingProjectile("First Boss Seeking Spike", "firstBossSeekingSpikes", 10, 120, 90, 2.5)
             else

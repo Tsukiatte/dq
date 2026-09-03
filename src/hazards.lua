@@ -2738,6 +2738,10 @@ local function applyStamp(st, model, stamp, now)
     note(st, now - st.spawn, string.format("window:event %.1f-%.1f", stamp.first - st.spawn, stamp.last - st.spawn))
 end
 
+local function stampMatches(stamp, st)
+    return stamp.prefix == nil or string.sub(st.name, 1, #stamp.prefix) == stamp.prefix
+end
+
 local function applyWindowStamps(st, model, now)
     local stamps = HZ.windowStamps
     if #stamps == 0 then return end
@@ -2747,7 +2751,7 @@ local function applyWindowStamps(st, model, now)
         local stamp = stamps[i]
         if now > stamp.expires then
             table.remove(stamps, i)
-        elseif (pos - stamp.pos).Magnitude <= stamp.radius then
+        elseif stampMatches(stamp, st) and (pos - stamp.pos).Magnitude <= stamp.radius then
             applyStamp(st, model, stamp, now)
             table.remove(stamps, i)
             return
@@ -2755,18 +2759,25 @@ local function applyWindowStamps(st, model, now)
     end
 end
 
-local function stampAttackWindow(position, radius, firstOs, lastOs)
+-- `prefix` narrows the stamp to attacks whose key starts with it: the
+-- Aquatic laser's Model is "model:..."; without it a mage shot lying within
+-- the radius took the window instead (seen in the harness).
+local function stampAttackWindow(position, radius, firstOs, lastOs, prefix)
     local now = os.clock()
+    local stamp = { pos = position, radius = radius, first = firstOs, last = lastOs, prefix = prefix, expires = now + 6 }
+    local best, bestD = nil, math.huge
     for model, st in pairs(HZ.arming) do
-        if model.Parent and not st.doneAt then
+        if model.Parent and not st.doneAt and stampMatches(stamp, st) then
             local pos = modelPivot(model, st)
-            if pos and (pos - position).Magnitude <= radius then
-                applyStamp(st, model, { first = firstOs, last = lastOs }, now)
-                return true
-            end
+            local d = pos and (pos - position).Magnitude or math.huge
+            if d <= radius and d < bestD then best, bestD = st, d end
         end
     end
-    HZ.windowStamps[#HZ.windowStamps + 1] = { pos = position, radius = radius, first = firstOs, last = lastOs, expires = now + 6 }
+    if best then
+        applyStamp(best, nil, stamp, now)
+        return true
+    end
+    HZ.windowStamps[#HZ.windowStamps + 1] = stamp
     return false
 end
 
