@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.6 - 2026-09-03 - "Walk"
+
+- The field's spot outranks travel only while danger here is present now or the brain's next step is unsafe when crossed (`stepSafe`); future danger alone no longer stops a clean walk.
+
 ## 5.1.5 - 2026-09-03 - "Pull"
 
 - The field's pull toward the target band applies at every distance (0.6x beyond the last 30 studs); the strafe bias only inside. Restores the 5.1.0 approach.
