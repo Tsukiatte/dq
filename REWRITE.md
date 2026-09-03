@@ -113,3 +113,13 @@ each change is judged on deaths per boss and boss damage per minute alive.
   keys off dwell-aware danger, not danger at this instant.
 - **Jump slam**: `First Boss Jump Down` (Vector3) is the landing point; the
   67-stud slam Model appears at landing and hits 1.8 s later.
+
+### Mobs at high level (Chris, 2026-09-03)
+
+The bot must never be within weapon reach of any mob: abilities only and
+dodging. 5.1.26 fights every mob from `mobStandoff` (34) past its body with
+auto attack off, counts warriors as melee (`meleeMobMaxReach` 16; their melee
+distance is above 8, which is why they were approached to 22 studs and one
+circle strike killed), backs straight off any target inside standoff minus six,
+and makes a melee mob's swing reach a hard zone. `abilityRadius` (42) must stay
+above `mobStandoff` or nothing is ever cast at a mob.
