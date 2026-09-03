@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 4.11.0
+    VERSION : 4.11.1
     BUILD   : 2026-09-02
 
     VERSIONING RULES (semantic):
@@ -20,7 +20,7 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "4.11.0"
+local SCRIPT_VERSION = "4.11.1"
 -- Bump to throw away every learned attack timing in every save, once.
 local LEARN_EPOCH = 2
 local SCRIPT_BUILD_DATE = "2026-09-02"
@@ -28,6 +28,7 @@ local SCRIPT_CODENAME = "Aquatic Temple"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "4.11.1", date = "2026-09-02", notes = "The laser's window stamp goes to the nearest Model whose key starts with model, not to whatever attack sits within the radius: in the harness a mage shot took it. And the simulator fires the criss cross in volleys round the player - Chris counts fifteen crossing the map at once in the real fight." },
     { version = "4.11.0", date = "2026-09-02", notes = "Aquatic Temple, from the capture and the place file. The boss's attack Models are renamed Model on the client - the laser precast, the orbs - so learning by name pooled them all into one window; a generic name is keyed with the hitBox's rounded size instead. The laser shot event says exactly when its line hurts, and that window is stamped onto the Model, held for it if it has not arrived yet, and kept as a zone besides. The first and last bosses' orbs are Parts with no hitBox, invisible to the index; their path from the event is the whole of the hazard. The third boss's smite and the second boss's damage parts become zones. The cube pylon shot is seeded from a certain hit at 0.8 seconds. And a learning epoch: one clean slate for every save, whatever build wrote it." },
     { version = "4.10.10", date = "2026-09-02", notes = "From the moment it exists. Chris's real capture of the Midgardian Champion, 2026-09-02: seven deaths. Five were the criss cross projectile at zero percent along its path with the dodge reading zero danger - the game places the body at its origin on the event, on the player, and it sits there hurting until its start time; the dodge had counted it only from the start. A scripted projectile now hurts from the moment it exists. One was the jump slam, a sixty-seven stud cube round the landing, at 1.8 seconds - seeded. And every beam and mage shot in that run was armed at 7.0 seconds, the moment it was removed: timing taught before 4.10.2 by whatever part was nearest, which made them floor for their whole life and drew the arena full of boxes. Learning from before 4.10.2 is dropped, and floor is no longer drawn - a box means it can hurt." },
     { version = "4.10.9", date = "2026-09-02", notes = "The stronger pull applies whenever the box is the approach - pursuit stopped at the edge of something - not only on the ring. Otherwise the quiet gap went by safe here at fifty studs, out of ability range, and the fight took four minutes that could take two." },

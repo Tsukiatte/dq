@@ -11,6 +11,16 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.11.1 - 2026-09-02
+
+- `stampAttackWindow(position, radius, first, last, prefix)`: the stamp goes
+  to the nearest tracked Model whose key starts with `prefix` ("model" for the
+  Aquatic laser). Verified live: without the filter a mage shot within the
+  radius took the window.
+- Simulator: the criss cross fires in volleys (`DQSimCrissCount` 5, spread
+  `DQSimCrissSpread` 20 studs round the player) - Chris counts ~15 crossing
+  the map at once in the real fight.
+
 ## 4.11.0 - 2026-09-02 - "Aquatic Temple"
 
 From Chris's Aquatic Temple capture (8 hits) and the place file's client

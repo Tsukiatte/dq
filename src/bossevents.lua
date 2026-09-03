@@ -307,7 +307,7 @@ end
 AQ["first boss laser shot"] = function(a)
     if not isArgs(a, 4) or typeof(a[3]) ~= "CFrame" then return end
     local startT, endT, cf, distance = a[1], a[2], a[3], a[4]
-    local stamped = S.stampAttackWindow and S.stampAttackWindow(cf.Position, 24, osAt(startT), osAt(endT))
+    local stamped = S.stampAttackWindow and S.stampAttackWindow(cf.Position, 24, osAt(startT), osAt(endT), "model")
     -- The line itself, as the event describes it: from the cframe, along
     -- its look, for the distance, for the whole of the sweep.
     local centre = cf + cf.LookVector * (distance * 0.5)
