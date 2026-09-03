@@ -1301,6 +1301,9 @@ local function createControlUI()
             if S.LB then S.LB.arrivedAt = nil S.LB.lastAttempt = -math.huge end
         end, 2,
         "Queue and replay on their own."))
+    track(K.toggle(queueSection.content, "Press START in the dungeon",
+        function() return CFG.autoStartDungeon end, function(v) CFG.autoStartDungeon = v end, 2.4,
+        "A queued run waits at the spawn until somebody presses START. After six seconds the script presses it for the party."))
     track(K.toggle(queueSection.content, "Autofarm off in lobby, on in dungeon",
         function() return CFG.autoFarmByPlace end,
         function(v) CFG.autoFarmByPlace = v if S.LB then S.LB.farmAppliedFor = nil end end, 2.5,

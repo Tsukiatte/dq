@@ -48,6 +48,8 @@ local LB = {
     replayFired = false,
     placeManager = nil,
     farmAppliedFor = nil,
+    levelArrivedAt = nil,
+    lastStartPress = -math.huge,
 }
 
 local function placeManager()
@@ -203,6 +205,19 @@ local function lobbyTick(now)
     if CFG.autoFarmByPlace and LB.place ~= LB.farmAppliedFor and (LB.place == "Lobby" or LB.place == "Level") then
         LB.farmAppliedFor = LB.place
         setFarm(LB.place == "Level", LB.place == "Level" and "in a dungeon" or "in the lobby")
+    end
+    if LB.place == "Level" and CFG.autoStartDungeon then
+        LB.levelArrivedAt = LB.levelArrivedAt or now
+        local startedValue = Workspace:FindFirstChild("dungeonStarted")
+        if startedValue and startedValue:IsA("BoolValue") and not startedValue.Value
+            and now - LB.levelArrivedAt >= CFG.autoStartDelay and now - LB.lastStartPress >= 10 then
+            LB.lastStartPress = now
+            local startRemote = remote("changeStartValue")
+            if startRemote then
+                pcall(function() startRemote:FireServer() end)
+                heavyDebug("Queue", "Dungeon not started; START pressed.")
+            end
+        end
     end
     if not CFG.autoQueue then
         setStatus("off")

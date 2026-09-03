@@ -275,6 +275,7 @@ local function buildConfigTable()
             replay = CFG.autoQueueReplay,
             replayDelay = CFG.autoQueueReplayDelay,
             farmByPlace = CFG.autoFarmByPlace,
+            autoStart = CFG.autoStartDungeon,
         },
         learnedTelegraphNames = learned,
         ownAttackNames = ownNames,
@@ -330,6 +331,7 @@ local function applyConfigData(data)
         if lobby.replay ~= nil then CFG.autoQueueReplay = lobby.replay == true end
         CFG.autoQueueReplayDelay = tonumber(lobby.replayDelay) or CFG.autoQueueReplayDelay
         if lobby.farmByPlace ~= nil then CFG.autoFarmByPlace = lobby.farmByPlace == true end
+        if lobby.autoStart ~= nil then CFG.autoStartDungeon = lobby.autoStart == true end
     end
     local combat = data.combat
     if type(combat) == "table" then
