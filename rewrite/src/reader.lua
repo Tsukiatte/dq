@@ -510,7 +510,10 @@ local function readerTick(now)
     end
     -- Model attacks: fade means fired; fade + linger means over.
     for model, r in pairs(RD.models) do
-        if not model.Parent or (r.hb and not r.hb.Parent and r.pc and not r.pc.Parent) then
+        -- A Model that is destroyed when it fires (Bob's circles) keeps its
+        -- record, on cached geometry, until its window closes: two deaths
+        -- landed seven studs outside a circle the reader had just forgotten.
+        if (not model.Parent or (r.hb and not r.hb.Parent and r.pc and not r.pc.Parent)) and (now > r.untilAt or not r.lastCFrame) then
             RD.models[model] = nil
         else
             local pc = r.pc

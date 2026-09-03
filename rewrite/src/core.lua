@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.69"
+local SCRIPT_VERSION = "5.1.70"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.70", date = "2026-09-03", notes = "Bob: the circle Model itself is destroyed when it fires, not only its precast, and the reader dropped the record with it - two more deaths seven studs outside a circle it had just forgotten. A record whose Model is gone now lives on its remembered geometry until its window closes." },
     { version = "5.1.69", date = "2026-09-03", notes = "Per-boss profiles (Chris: keep the Champion and Bob apart). The arena pull, the fan reflex and the slam reflex are the Champion only; Bob keeps the chain line, the wall and the orb bubble. Attack windows stay keyed by attack name; the blink, the measured range and the mob rules are shared." },
     { version = "5.1.68", date = "2026-09-03", notes = "From the death verdicts at Bob: the horizontal beam fires 0.6 s after it appears, not 1.1 (a death 0.4 s before the model said so); the spread beam hits four studs outside its box; the following orbs get a 14-stud bubble (one killed at 1.2 studs with no box round it). No ability is cast while the ground here goes hot within 1.2 s: the cast animation roots the character, and the trace showed it commanded to run and not moving in the second before a death." },
     { version = "5.1.67", date = "2026-09-03", notes = "Into the arena, every time (Chris): boss-fight spots beyond the arena edge cost during the fan as well (the edge is the fan radius then), and the approach to a boss runs at escape speed while it is more than twenty-five studs outside the band, so the bot does not linger at the mouth where the aimed attacks spawn on it." },
