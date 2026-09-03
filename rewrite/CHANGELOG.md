@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.62 - 2026-09-03 - "See it"
+
+- Field: `DG.evalStats` and `DG.chosen`. Tools: `recorder6.lua` (10 Hz trace, death verdicts, movement effectiveness, blink/reflex logs) and `poll6.lua`.
+
 ## 5.1.61 - 2026-09-03 - "Slam reflex"
 
 - Reader: `First Boss Jump Down` sets `RT.reflex` (centre, radius 44, 3.2 s). Brain: step 0 flees the reflex centre at `tweenEscape`, trying 0/35/70 degrees either side through `stepSafe`.
