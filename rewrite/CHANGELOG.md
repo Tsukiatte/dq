@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.35 - 2026-09-03 - "Rarer"
+
+- `blinkCooldown` 8.0; `blinkPerMinute` 3 replaces the per-10-s cap.
+
 ## 5.1.34 - 2026-09-03 - "Lanes are traps, gaps are safe"
 
 - Passive beam `last` 3.5 s; `dodgeShoulder` 1.5.
