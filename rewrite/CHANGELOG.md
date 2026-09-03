@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.10 - 2026-09-03 - "Forward only"
+
+- `nextRoom` tracks the furthest room order reached; rooms passed at range count as behind.
+
 ## 5.1.9 - 2026-09-03 - "From the announcement"
 
 - Moving bodies (criss cross, big spike, seeking spike, projectiles) are danger from the moment they are known, at their origin until their start time; no 0.4 s lead gate.

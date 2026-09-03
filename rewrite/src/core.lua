@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.9"
+local SCRIPT_VERSION = "5.1.10"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.10", date = "2026-09-03", notes = "The next room is the first past the furthest room stood in; rooms passed at range no longer pull the character back (it walked toward room 2 after the Champion died)." },
     { version = "5.1.9", date = "2026-09-03", notes = "Sixteen deaths in one Champion fight, read from the recorder. A moving body is danger from the moment it is announced (the aimed criss cross sits on the player until its start time; the field used to notice it 0.4 s before). Remote-announced paths are ground attacks whatever height their CFrame carries (the big spike was filtered out vertically). A far spot up a ramp is allowed. Walks are planned at the Humanoid's real WalkSpeed, so the escape burst is no longer permanent when the saved walk speed is above 16." },
     { version = "5.1.8", date = "2026-09-03", notes = "Third anti-cheat kick, from the server, during ordinary driving. The mover no longer writes positions at all: every move is a Humanoid walk, and leaving danger raises WalkSpeed to the escape value for the burst and restores it after. Real collisions, real falls, legal speed. Half a second against a wall is a hop." },
     { version = "5.1.7", date = "2026-09-03", notes = "The target is not a wall. The swept walkability check that validates a spot treated the boss's own sixty-stud body as solid, so with the jump slam centred on the character every spot outside the ball lay behind him and failed, and the field kept a six-stud spot at danger 1.0. The target's model is excluded from that check." },
