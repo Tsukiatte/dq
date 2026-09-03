@@ -13,14 +13,15 @@ local function hasFiles()
     return type(writefile) == "function" and type(readfile) == "function" and type(isfile) == "function"
 end
 
--- Only what the UI exposes is saved. Tuning constants follow the code: a
--- snapshot of all of CFG kept every old default alive across releases.
+-- Only settings are saved: toggles, standoffs, speeds, queue choices, colours.
+-- Dodge tuning (dwell, leads, reach, timings) follows the code even though
+-- the UI shows sliders for it; a saved 0.6 s dwell silently undid 5.1.14.
 local PERSIST = {
     "abilityRadius", "attackRange", "autoAttack", "autoE", "autoQ", "autoFarmByPlace",
     "autoQueue", "autoQueueDelay", "autoQueueDifficulty", "autoQueueHardcore", "autoQueueMap", "autoQueuePrivate", "autoQueueReplay", "autoStartDungeon",
     "bossStandoff", "meleeStandoff", "rangedStandoff", "strafe", "strafeSpeedFraction", "tweenEscape", "tweenWalk",
     "colorFloor", "colorLive", "colorSoon", "drawHazards", "drawTarget", "hazardTransparency",
-    "debugPrints", "defaultFire", "defaultLive", "dodgeDwell", "dodgeFarScale", "dodgeLead", "dodgeMoveAt", "dodgePathLead", "dodgeReach", "dodgeStrafeWeight",
+    "debugPrints",
     "menuKey",
 }
 local PERSIST_SET = {}

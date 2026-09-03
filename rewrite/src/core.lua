@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.14"
+local SCRIPT_VERSION = "5.1.15"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.15", date = "2026-09-03", notes = "Dodge tuning keys are no longer persisted; the saved 0.6 s dwell was overriding 5.1.14 on load." },
     { version = "5.1.14", date = "2026-09-03", notes = "Dwell 1.5 s: a spot must stay clear for 1.5 s after arrival and here counts as dangerous when something arrives within 1.5 s. The big spike's front leaves the boss 1.4 s after its announcement at 100 studs/s; with a 0.6 s window the field noticed it 0.9 s out and could not clear 23 studs." },
     { version = "5.1.13", date = "2026-09-03", notes = "Body margin 2.0: a mage shot killed 3.3 studs outside its box and a circle 1.5 outside; the game reaches past the visible hitBox." },
     { version = "5.1.12", date = "2026-09-03", notes = "The config file keeps only the settings the UI exposes. It used to snapshot every tuning constant, so each new default (margin, melee buffer, walk speed) was overridden by the old saved value on load." },
@@ -79,7 +80,7 @@ local CFG = {
     dodgeShoulder = 3,            -- studs of warm edge outside a hazard
     dodgeLead = 1.2,              -- a standing telegraph counts as live this long before it fires
     dodgePathLead = 0.4,          -- a moving projectile's line: the time to sidestep
-    dodgeDwell = 1.5,             -- a spot must stay clear this long after arrival: the big spike front travels 100 studs/s and is announced 1.4 s ahead             -- a spot must stay clear this long after arrival
+    dodgeDwell = 1.5,             -- a spot must stay clear this long after arrival (the big spike front: 100 studs/s, announced 1.4 s ahead)
     dodgeMoveAt = 0.15,           -- danger here at or above this: relocate
     dodgeHysteresis = 0.1,
     dodgeDistanceCost = 0.008,
