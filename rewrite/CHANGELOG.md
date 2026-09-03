@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.43 - 2026-09-03 - "Which way is up"
+
+- Field: `boxDepth` picks the vertical axis from the CFrame.
+
 ## 5.1.42 - 2026-09-03 - "The volley line"
 
 - Reader: `noteVolley` adds a `volley next` zone along the march of a mage volley.
