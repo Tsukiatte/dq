@@ -11,6 +11,13 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.11.2 - 2026-09-02
+
+- A Model tracked before its hitBox replicated was keyed by its bare name
+  ("model") and armed "known live", and stayed that way. When the hitBox
+  turns up it is re-keyed (`model:4x8x35`) and given that key's seeded or
+  learned timing; a window an event stamped on it (`st.stamped`) is kept.
+
 ## 4.11.1 - 2026-09-02
 
 - `stampAttackWindow(position, radius, first, last, prefix)`: the stamp goes
