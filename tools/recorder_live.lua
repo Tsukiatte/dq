@@ -184,7 +184,19 @@ local function hookHumanoid(c)
                 pos = rt and v3(rt.Position) or nil, near = near,
                 dodge = S and S.DG and { target = S.DG.target and v3(S.DG.target) or nil, reason = S.DG.targetReason,
                     dangerHere = S.DG.dangerHere and r1(S.DG.dangerHere) or nil } or nil,
-                readerLastHit = S and S.HZ and S.HZ.lastHitName or nil }
+                readerLastHit = S and S.HZ and S.HZ.lastHitName or nil,
+                -- The dodge's view at the instant: the cheapest candidates it had.
+                cands = (function()
+                    if not (S and S.DG and S.DG.cands and S.DG.order) then return nil end
+                    local list = {}
+                    for i = 1, math.min(#S.DG.order, 8) do
+                        local c = S.DG.cands[S.DG.order[i]]
+                        if c then list[#list + 1] = { dist = r1(c.dist or 0), danger = r1(c.danger or 0), cost = r1(c.cost or 0), valid = c.valid == true,
+                            dx = rt and r1(c.x - rt.Position.X) or nil, dz = rt and r1(c.z - rt.Position.Z) or nil } end
+                    end
+                    return list
+                end)(),
+                dangerHere = S and S.DG and S.DG.dangerHere and r1(S.DG.dangerHere) or nil }
         end
         last = h
     end)
