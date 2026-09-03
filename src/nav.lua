@@ -1290,6 +1290,18 @@ local function updatePursuitMovement(enemy, humanoid, root, enemyRoot)
         if horizontalDistance > CFG.waypointAdvanceDistance or math.abs(waypointDelta.Y) > 4.5 then
             break
         end
+        -- Near enough to pass it - but on a turn, passing it early aims the
+        -- next MoveTo through the inside wall of the corner. With waypoints
+        -- four studs apart and a four-stud advance radius that was every
+        -- corner, and a staircase that turns ninety degrees is a corner with
+        -- a wall on the inside and a drop on the outside. A waypoint is only
+        -- passed once the one after it is in clear sight, or once we are
+        -- practically on it.
+        local following = NAV.waypoints[NAV.index + 1]
+        if following and horizontalDistance > 1.5
+            and not isPathSegmentClear(root.Position, following.Position, enemy) then
+            break
+        end
         NAV.index = NAV.index + 1
     end
 
@@ -1408,12 +1420,31 @@ local function updatePursuitMovement(enemy, humanoid, root, enemyRoot)
             if dir.Magnitude > 0.1 then
                 dir = dir.Unit
                 local side = Vector3.new(-dir.Z, 0, dir.X)
-                NAV.wpStallSide = -(NAV.wpStallSide or -1)
-                moveGoal = root.Position + side * (4 * NAV.wpStallSide) + dir * 1.5
+                -- Which way round the wall? It used to ALTERNATE sides every
+                -- stall, which against a long wall is a left-right shuffle on
+                -- the spot. Measure the room to each side and take the roomier
+                -- one; keep taking it for a few seconds so successive stalls
+                -- walk along the wall instead of undoing each other.
+                local _, playerRadius = getPlayerHitboxMetrics()
+                local roomRight = headingClearDistance(root, side, 8, enemy, playerRadius)
+                local roomLeft = headingClearDistance(root, -side, 8, enemy, playerRadius)
+                local s = NAV.wpStallSide
+                if not s or not NAV.wpStallSideAt or now - NAV.wpStallSideAt > 4.0 then
+                    s = roomRight >= roomLeft and 1 or -1
+                end
+                if (s == 1 and roomRight < 2.0 and roomLeft > roomRight)
+                    or (s == -1 and roomLeft < 2.0 and roomRight > roomLeft) then
+                    s = -s
+                end
+                NAV.wpStallSide, NAV.wpStallSideAt = s, now
+                local along = math.min(6, math.max(2, (s == 1 and roomRight or roomLeft) - 1))
+                moveGoal = root.Position + side * (along * s) + dir * 1.0
                 humanoid.Jump = true
                 NAV.lastIssuedMove = nil
                 NAV.needsRecompute = true
-                heavyDebugThrottled("wp_stall", 1.0, "Pathfinding", "Stopped against something; sidestepping.")
+                heavyDebugThrottled("wp_stall", 1.0, "Pathfinding", string.format(
+                    "Stopped against something; going round to the %s (%.0f studs of room).",
+                    s == 1 and "right" or "left", along))
             end
             NAV.wpStallAnchor = root.Position
             NAV.wpStallTime = now
@@ -1572,8 +1603,15 @@ local function walkTowardPoint(humanoid, root, point)
         local waypoints = route.waypoints
         while route.index <= #waypoints do
             local delta = rootPos - waypoints[route.index].Position
-            if Vector3.new(delta.X, 0, delta.Z).Magnitude > CFG.waypointAdvanceDistance
-                or math.abs(delta.Y) > 4.5 then
+            local hd = Vector3.new(delta.X, 0, delta.Z).Magnitude
+            if hd > CFG.waypointAdvanceDistance or math.abs(delta.Y) > 4.5 then
+                break
+            end
+            -- Pass a waypoint only when the next is in clear sight (see the
+            -- pursuit follower): passing it early cuts the corner.
+            local following = waypoints[route.index + 1]
+            if following and hd > 1.5
+                and not isPathSegmentClear(rootPos, following.Position, nil) then
                 break
             end
             route.index = route.index + 1
@@ -1687,4 +1725,7 @@ S.getRaycastExclusions = getRaycastExclusions
 S.steerTowards = steerTowards
 S.projectToGround = projectToGround
 S.isPathSegmentClear = isPathSegmentClear
+S.hitBlocksWalking = hitBlocksWalking
+S.headingClearDistance = headingClearDistance
+S.getFeetY = getFeetY
 end

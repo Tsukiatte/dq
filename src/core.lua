@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 4.12.0
+    VERSION : 4.12.1
     BUILD   : 2026-09-02
 
     VERSIONING RULES (semantic):
@@ -20,7 +20,7 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "4.12.0"
+local SCRIPT_VERSION = "4.12.1"
 -- Bump to throw away every learned attack timing in every save, once.
 local LEARN_EPOCH = 2
 local SCRIPT_BUILD_DATE = "2026-09-02"
@@ -28,6 +28,7 @@ local SCRIPT_CODENAME = "Aquatic Temple"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "4.12.1", date = "2026-09-02", notes = "Stairs and walls. The tween mover stepped horizontally and never re-sampled the floor, and its single wall ray left the root centre three studs up and missed every riser beneath it - up a staircase it drove the legs into each step and physics fought back, and a flight that turns ninety degrees was hopeless. It follows the floor now: the floor under the next point is raycast each frame, the root is placed at its own measured height above it, a rise within the step height is climbed, and walls are read at knee and chest with the steerer's own step-versus-wall classifier. The dodge judged candidate heights against the root with abs(), which rejected any spot even a fraction of a stud downhill while allowing six studs up; heights are judged from the feet, asymmetric, and the walk sweep keeps the root's height above the destination floor so it clears stair risers. Pursuit no longer passes a waypoint until the one after it is in clear sight - with four-stud spacing and a four-stud advance radius it was passing every corner early and aiming through the inside wall - and a wall stall now goes round to the roomier side and keeps going that way, where it used to alternate sides and shuffle on the spot against a wall it could simply have walked along." },
     { version = "4.12.0", date = "2026-09-02", notes = "Restored from 4.11.3 as the base going forward. The 5.0.x rewrite is shelved under legacy/5.0.1 - it never ran in the real game and Chris judged 4.11.3 the one that was working decently. Nothing else changed in this version; the strip and the pathfinding fixes follow on top of it." },
     { version = "4.11.3", date = "2026-09-02", notes = "Harness only: the simulator logged a dead boss with a variable that did not exist yet, the error skipped the rebuild, and every run after a kill had no target. Fixed." },
     { version = "4.11.2", date = "2026-09-02", notes = "A Model tracked before its hitBox replicated was keyed by its bare name and armed as known live, and stayed that way. When the hitBox turns up it is keyed properly and given the timing that key knows; a window an event stamped on it is kept." },

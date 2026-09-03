@@ -11,6 +11,46 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.12.1 - 2026-09-02 - "Stairs"
+
+Three defects behind "stuck on walls it could go around" and "cannot take a
+staircase that turns ninety degrees", all in the drive path.
+
+### The tween never followed the floor
+`driveTo`'s tween stepped `root.Position + direction * step` - flat. Y was never
+re-sampled, and its single wall ray left the root centre (about three studs up),
+so it missed every riser beneath that. Up a staircase it drove the legs into
+each step and physics fought back; a flight that turns ninety degrees was
+hopeless, and the watchdog borrowing `walk` for three seconds is why it
+sometimes half-worked.
+
+It **follows the floor** now. Each frame the floor under the next point is
+raycast and the root is placed at its own *measured* height above it (measured,
+because `HipHeight + half the root` is right for R15 and wrong for R6, and a
+slope puts the answer between). A rise within `maxStepHeight` is climbed; taller
+is a jump, and the Humanoid does jumps. Walls are read at **knee and chest**
+with the steerer's own `hitBlocksWalking`, so a riser reads as a step and a
+plinth as a wall. Never further than a frame's walk, never through anything.
+
+### The dodge could not step downhill
+Candidate floors were tested as `abs(y - rootY) <= maxClimb + 0.1`. The root
+rides ~3 studs up, so that accepted floor from **0.1 studs down to 6.1 studs
+up** - the dodge would pick a ledge it had to jump onto and reject a kerb. And
+the walkability sweep ran from the root to two studs above the destination
+floor, clipping the first riser of any upward run. Heights are judged **from the
+feet, asymmetrically**, and the sweep keeps the root's height above the
+destination floor so it climbs with the steps.
+
+### Pursuit cut every corner and shuffled on walls
+- Waypoints are four studs apart and were passed when within four studs - i.e.
+  immediately - so on a turn the next `MoveTo` aimed through the inside wall.
+  **A waypoint is passed only once the one after it is in clear sight**, or once
+  the character is practically on it. Same rule in the manual waypath follower.
+- The wall-stall sidestep **alternated sides** every stall: against a long wall
+  that is a left-right shuffle on the spot. It now measures the room to each
+  side, takes the roomier one, and keeps taking it for a few seconds so
+  successive stalls walk *along* the wall instead of undoing each other.
+
 ## 4.12.0 - 2026-09-02 - "Back to the one that worked"
 
 **Restored from 4.11.3.** The 5.0.x rewrite (`reader`, `field`, `bosses`, the

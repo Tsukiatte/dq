@@ -8,6 +8,12 @@ local Workspace = S.Workspace
 local CFG = S.CFG
 local NAV = S.NAV
 local heavyDebug = S.heavyDebug
+local getRaycastExclusions = S.getRaycastExclusions
+local hitBlocksWalking = S.hitBlocksWalking
+
+-- Knee and chest, above the feet. A riser sits under the knee ray and reads
+-- as a step; a plinth or a wall reaches the chest ray and reads as a wall.
+local TWEEN_PROBE_HEIGHTS = { 1.2, 2.6 }
 
 -- =========================================================================
 -- THE ACTUATOR (3.6.0)
@@ -150,52 +156,82 @@ local function driveTo(humanoid, root, target, arrive)
 
     if mode == "tween" then
         -- Writes the root's position directly, which is the ONLY one of these
-        -- that the default control module cannot argue with. Move() and a
+        -- that the default control module cannot argue with (Move() and a
         -- velocity write both go through the Humanoid, and Roblox's own control
-        -- script calls Move() every frame from input - with no keys held that is
-        -- Move(zero), issued on RenderStepped, before physics. Ours lands on
-        -- Heartbeat, after. So its "stop" is what physics actually sees and the
-        -- character stands still. MoveTo survives only because it is a separate
-        -- persistent mechanism.
+        -- script calls Move(zero) every frame on RenderStepped, before physics).
         --
-        -- Stepping the CFrame skips all of that, which is why a script that
-        -- tweens to a marker has precision the Humanoid API cannot give it.
-        -- Never further than the character could have WALKED in this frame, so
-        -- the speed a server sees is ordinary walking speed and there is no
-        -- teleport-sized jump to notice.
+        -- It FOLLOWS THE FLOOR. The 3.6.2 tween stepped horizontally and never
+        -- re-sampled the floor, and its one wall ray left the root centre -
+        -- about three studs up - so it missed every riser under that. Up a
+        -- staircase it drove the legs into each step and physics fought back:
+        -- that was "cannot go up stairs", and a staircase that turns ninety
+        -- degrees was hopeless. Each frame the floor under the NEXT point is
+        -- raycast and the root placed at its own height above it; a rise
+        -- within the step height is simply climbed. Walls are read at knee
+        -- and chest height with the same step-versus-wall classifier the
+        -- steerer uses, so a riser reads as a step and a plinth as a wall.
+        --
+        -- Never further than the character could have walked this frame, so
+        -- what a server sees is walking pace, and never through anything.
         local step = math.min(speed * RT.frameDelta, distance)
-        local goal = root.Position + direction * step
-
-        -- And it does not pass through anything. Writing a CFrame skips
-        -- collision, which is the one genuinely conspicuous thing about this
-        -- mode: clipping through a wall is trivial to detect server-side and
-        -- easy to do by accident. So the step is raycast first and stopped
-        -- short of whatever it hits. What is left is precise movement at
-        -- walking pace that still respects the map.
+        local exclusions = getRaycastExclusions(nil)
         local params = RaycastParams.new()
         params.FilterType = Enum.RaycastFilterType.Exclude
-        local exclude = { RT.visualRoot }
-        local character = S.LocalPlayer.Character
-        if character then exclude[#exclude + 1] = character end
-        params.FilterDescendantsInstances = exclude
+        params.FilterDescendantsInstances = exclusions
+        params.IgnoreWater = true
         pcall(function() params.RespectCanCollide = true end)
 
-        local blocked = Workspace:Raycast(root.Position, direction * (step + 0.6), params)
-        if blocked then
-            local room = (blocked.Position - root.Position).Magnitude - 0.6
-            if room <= 0.05 then
-                -- Flat against something: let the Humanoid handle it, since it
-                -- knows how to slide along a wall and step over a lip.
-                humanoid:MoveTo(target)
-                return false
+        local pos = root.Position
+        -- How far the root rides above the floor, measured rather than assumed:
+        -- HipHeight + half the root is right for R15 and wrong for R6, and a
+        -- slope puts the answer somewhere between anyway.
+        local above = humanoid.HipHeight + root.Size.Y * 0.5
+        local under = Workspace:Raycast(pos, Vector3.new(0, -(above + 4), 0), params)
+        if under then above = pos.Y - under.Position.Y end
+        local feetY = pos.Y - above
+
+        -- Anything wall-like across the step, at knee and at chest.
+        for _, h in ipairs(TWEEN_PROBE_HEIGHTS) do
+            local origin = Vector3.new(pos.X, feetY + h, pos.Z)
+            local hit = Workspace:Raycast(origin, direction * (step + 0.6), params)
+            if hit and hitBlocksWalking(hit, direction, feetY, exclusions) then
+                local room = Vector3.new(hit.Position.X - pos.X, 0, hit.Position.Z - pos.Z).Magnitude - 0.6
+                if room <= 0.05 then
+                    -- Flat against something: the Humanoid knows how to slide
+                    -- along a wall and hop a lip; let it, for this frame.
+                    humanoid:MoveTo(target)
+                    return false
+                end
+                step = math.min(step, room)
             end
-            goal = root.Position + direction * room
         end
 
-        -- Position only: the rotation is left exactly as it was so AutoRotate
-        -- keeps turning the character normally instead of fighting a forced
-        -- orientation every frame.
+        local nx, nz = pos.X + direction.X * step, pos.Z + direction.Z * step
+        -- The floor under the next point: from a step above the feet down
+        -- through the drop limit, so a kerb up is seen and a ledge down is too.
+        local floorHit = Workspace:Raycast(
+            Vector3.new(nx, feetY + CFG.maxStepHeight + 0.5, nz),
+            Vector3.new(0, -(CFG.maxStepHeight + 0.5 + CFG.maxDropHeight), 0), params)
+        if not floorHit then
+            -- Nothing to stand on there: the Humanoid, not a CFrame write,
+            -- decides what happens at an edge.
+            humanoid:MoveTo(target)
+            return false
+        end
+        local rise = floorHit.Position.Y - feetY
+        if rise > CFG.maxStepHeight then
+            -- Taller than a step: that is a jump, and the Humanoid does jumps.
+            humanoid.Jump = true
+            humanoid:MoveTo(target)
+            return false
+        end
+
+        local goal = Vector3.new(nx, floorHit.Position.Y + above, nz)
+        -- Position only: the rotation is left as it was so AutoRotate keeps
+        -- turning the character normally.
         root.CFrame = CFrame.new(goal) * (root.CFrame - root.CFrame.Position)
+        -- On the floor every frame, so the Humanoid never reads as hovering.
+        root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
         return false
     end
 
