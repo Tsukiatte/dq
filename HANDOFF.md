@@ -270,6 +270,19 @@ near 60 s: keep in-code waits under 50 s.
    that capture, and the 750-line bot video.
 3. Write the new internals (`core`, `reader`, `field`, `dodge`, `mover`,
    `pursuit`, `bosses`, `main`); reuse `uikit.lua` and adapt `ui.lua`.
+   **Done 2026-09-02 (5.0.0):** `src/` is `core, gamedata, uikit, reader,
+   field, bosses, mover, dodge, pursuit, draw, tools, path, streamer,
+   config, ui, main`. `ui.lua`, `uikit.lua`, `path.lua`, `streamer.lua`,
+   `gamedata.lua` are the 4.11 files unchanged; everything else is new.
+   What the first real capture (`DQProbe_NorthernLands_0902_212439.txt`,
+   6 deaths) settled, and what 5.0.0 is built on: the precast is visible
+   from spawn (0.35-0.55), flashes to 0.17 at the hit and fades by ~1.1 s;
+   flash ages: beam 0.92, mage 0.98, spearman 0.86, warrior line 0.66,
+   warrior circle 0.65/0.37; the lingering invisible hitBox is floor; the
+   criss cross is a wall-to-wall projectile at 30 studs/s from the event
+   (spawned ON a player standing outside FirstPart); parked beam yaws are
+   20 degrees apart with a random per-burst offset. Not yet run in the
+   real game; the Studio harness is for mechanics only (Chris).
    Budget: under 5,000 lines total including the UI; the internals under
    2,500. Keep `tools/check.py` / `build.py` (update `tools/modules.py`'s
    ORDER) so the bundle and the harness keep working.

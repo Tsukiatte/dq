@@ -299,6 +299,10 @@ local function samplePart(rec, now, step, rx, rz)
     if rec.ev then
         rec.open = rec.spawn
         rec.close = rec.ev.stop - gameOffset
+    elseif rec.vel and rec.vel.Magnitude > CFG.projectileMaxSpeed then
+        -- Faster than any projectile here: a tweened visual (the spearman's
+        -- strike part crosses 65 studs in a quarter second). Floor.
+        rec.open = nil
     else
         rec.open = rec.visAt
         rec.close = rec.fadeAt and (rec.fadeAt + 0.1) or INF

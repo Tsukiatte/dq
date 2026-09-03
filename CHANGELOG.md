@@ -11,6 +11,15 @@ file and that table in sync on every edit.
 
 ---
 
+## 5.0.1 - 2026-09-02
+
+- A part parented to workspace with no boss event behind it and moving
+  faster than 60 studs/s is a visual, not a projectile (`projectileMaxSpeed`).
+  The spearman's `spearmanStrike` part is tweened 65 studs in 0.25 s; read as
+  a projectile it became a 300-stud strip of danger, forty times a run. The
+  hit is the `spearmanStrikeHitbox` Model, read as before.
+- HANDOFF section 9 records the 5.0.0 state.
+
 ## 5.0.0 - 2026-09-02 - "Northern Lands" - the rewrite
 
 The internals are new: `core`, `reader`, `field`, `bosses`, `mover`, `dodge`,

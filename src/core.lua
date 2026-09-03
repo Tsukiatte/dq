@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 5.0.0
+    VERSION : 5.0.1
     BUILD   : 2026-09-02
 
     5.0.0 is the rewrite. The internals (reader, field, bosses, mover, dodge,
@@ -25,12 +25,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "5.0.0"
+local SCRIPT_VERSION = "5.0.1"
 local SCRIPT_BUILD_DATE = "2026-09-02"
 local SCRIPT_CODENAME = "Northern Lands"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "5.0.1", date = "2026-09-02", notes = "A part parented to workspace without a boss event behind it and moving faster than sixty studs a second is a visual, not a projectile: the spearman's strike part crosses sixty-five studs in a quarter of a second and would have been read as a three-hundred-stud strip of danger forty times a run. The hit is the strike hitBox Model, which is read as before." },
     { version = "5.0.0", date = "2026-09-02", notes = "The rewrite. Reading attacks comes first and comes from the game, not from being hit: every attack Model is tracked from the moment it appears and its precast is read every frame. Chris's real Northern Lands capture (six deaths, 136 seconds, 422 attacks) fixed the rule - the precast is visible from spawn, flashes to 0.17 at the instant the hit lands and fades out a fifth of a second later; the invisible hitBox that lingers for seven seconds afterwards is floor. Beams, mage shots and strikes all hurt once, at that flash, so the reader carries the measured flash time per attack and the dodge treats a telegraph as floor until shortly before it and floor again shortly after. Boss projectiles come from the boss remote with their exact path. The beam sweep is predicted from its last two beams. Movement is a tween along the floor at walking speed, or MoveTo, never faster and never airborne. The dodge scores a ring of candidates at the moments it would reach them and holds still when here is fine. Bosses are fought from ability range and never in melee. The UI, the waypoint editor, streamer mode and the config files are unchanged." },
 }
 
@@ -126,6 +127,7 @@ CFG.maximumDamageBrickRange = 150
 CFG.damageBrickClearance = 2.5   -- studs kept from the edge of every attack shape
 CFG.preemptiveClearance = 6.5    -- soft ring beyond that, for ranking where to stand
 CFG.projectileLookahead = 1.2    -- seconds of a moving part's travel treated as its strip
+CFG.projectileMaxSpeed = 60      -- studs/s: a part without an event moving faster is a visual, not a projectile
 CFG.hitAfter = 0.25              -- an attack hurts until this long after its flash
 CFG.fadeLinger = 0.25            -- an attack of unknown timing hurts until this long after its fade
 CFG.hookRemotes = false
