@@ -314,9 +314,21 @@ local function scanEnemies(now)
     RD.enemies = list
     -- The Champion's arena kills past about 128 studs from him: every death
     -- out there had nothing near it, and the respawn point is 131-137 out.
+    -- The leash arms once the character has been inside the arena (within
+    -- 110 studs) and stays armed for that boss; the walk in from room 2 must
+    -- not see the band as a wall. Hopping at its outer edge cost a whole run.
     RD.leash = nil
+    local rt = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
     for _, e in ipairs(list) do
-        if e.isBoss and e.model.Name == "Midgardian Champion" then RD.leash = { enemy = e, radius = CFG.leashRadius } break end
+        if e.isBoss and e.model.Name == "Midgardian Champion" then
+            if RD.leashBoss ~= e.model then RD.leashBoss = e.model RD.leashArmed = false end
+            if rt and not RD.leashArmed then
+                local dx, dz = rt.Position.X - e.x, rt.Position.Z - e.z
+                if dx * dx + dz * dz < 110 * 110 then RD.leashArmed = true end
+            end
+            if RD.leashArmed then RD.leash = { enemy = e, radius = CFG.leashRadius } end
+            break
+        end
     end
 end
 

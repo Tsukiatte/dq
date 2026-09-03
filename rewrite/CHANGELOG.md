@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.25 - 2026-09-03 - "Armed"
+
+- Reader arms `RD.leash` once inside 110 studs of the Champion (sticky per boss); the field applies it to everything outside `leashRadius`.
+
 ## 5.1.24 - 2026-09-03 - "Trace"
 
 - `bossStandoff` 38; `RT.configTrace` records load/save history.
