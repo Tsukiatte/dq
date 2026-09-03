@@ -11,6 +11,13 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.12.20 - 2026-09-03 - "Release"
+
+Run 7 navigation samples: the character lived at the spawn in "holding for a gap" while the dodge read "safe here".
+
+- **Step clear for a passing step** (`dodgeStepDwell` 0.3): the pursuit step-clear check sampled the next 5 studs up to 1.9 s ahead (with the 1.2 s standing dwell); in a field of fast projectiles that point was briefly warm most of the time, so pursuit held. Now the moment of crossing plus 0.3 s.
+- **Hold released** (`pursuitHoldMax` 1.5 s): a hold for a gap that has lasted 1.5 s while danger here is below `dodgeMoveAt` lets pursuit take its step.
+
 ## 4.12.19 - 2026-09-03 - "No slabs"
 
 - The telegraph highlight skips parts that carry an arming record while stage painting is on: the selection boxes round the beams' invisible 64-stud hitBoxes were the red slabs filling the screen. Bare projectiles are still boxed.

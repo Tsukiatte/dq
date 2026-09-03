@@ -1159,11 +1159,14 @@ local function stepClear(root, humanoid, to)
     local step = min(len, CFG.dodgeStepProbe)
     local ux, uz = dx / len * step, dz / len * step
     local T = step / max(humanoid.WalkSpeed, 4)
+    -- A step is crossed, not stood on: clear when we are on it and for a
+    -- moment after. The full standing dwell here froze pursuit in any busy
+    -- field (4.12.20).
+    local dwell = CFG.dodgeStepDwell or 0.3
     local d = max(
         dangerAt(rp.X + ux * 0.5, rp.Y, rp.Z + uz * 0.5, T * 0.5),
         dangerAt(rp.X + ux, rp.Y, rp.Z + uz, T),
-        dangerAt(rp.X + ux, rp.Y, rp.Z + uz, T + CFG.dodgeDwell * 0.5),
-        dangerAt(rp.X + ux, rp.Y, rp.Z + uz, T + CFG.dodgeDwell))
+        dangerAt(rp.X + ux, rp.Y, rp.Z + uz, T + dwell))
     return d < CFG.dodgeMoveAt
 end
 

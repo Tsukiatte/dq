@@ -20,7 +20,7 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "4.12.19"
+local SCRIPT_VERSION = "4.12.20"
 -- Bump to throw away every learned attack timing in every save, once.
 local LEARN_EPOCH = 2
 local SCRIPT_BUILD_DATE = "2026-09-02"
@@ -28,6 +28,7 @@ local SCRIPT_CODENAME = "Aquatic Temple"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "4.12.20", date = "2026-09-03", notes = "Holding for a gap was the standing still. Run 7's navigation samples: the character spent its life at the spawn in 'holding for a gap' while the dodge read 'safe here'. Pursuit refused its next five-stud step whenever the step-clear check, which looked 1.9 s ahead including the 1.2 s dwell meant for standing on a spot, found the point briefly warm - in a field of fast projectiles that is most of the time. A passing step now needs to be clear for the moment it is crossed and 0.3 s after, and a hold that has lasted 1.5 s while standing safe is released: a person does not freeze at a doorway because something might cross it in two seconds." },
     { version = "4.12.19", date = "2026-09-03", notes = "No box round a painted attack. The telegraph highlight drew a selection box round every detected part, including the invisible 64-stud hitBoxes of the beams, and those boxes were the red slabs across the screen. An attack that is painted by stage is no longer boxed; bare projectiles still are." },
     { version = "4.12.18", date = "2026-09-03", notes = "Spent projectiles are over. A known attack part that is not a hitBox or precast, has faded out and is not moving is no longer danger: the criss cross fades at the end of its eight-second flight and is deleted two seconds later, and the known-name rule kept it dangerous, boxed and painted for those two seconds." },
     { version = "4.12.17", date = "2026-09-03", notes = "The movement state is kept in RT.movementState as well as on the HUD, so a tool reading the script can see whether pursuit is walking, holding for a gap, or has no path. Run 6 never came within sixty studs of the Champion and the one field that would have said why was only ever a label." },
@@ -617,6 +618,8 @@ CFG.dodgeEnemySoftWeight = 0.12
 -- Pursuit walks the map underneath the dodge (4.3.0) and asks before every
 -- step whether the next few studs of its route are clear. This is how many.
 CFG.dodgeStepProbe = 5
+CFG.dodgeStepDwell = 0.3         -- seconds a PASSING step must stay clear after arrival (the 1.2 s dwell is for standing; 4.12.20)
+CFG.pursuitHoldMax = 1.5         -- seconds pursuit may be held for a gap while standing safe before it takes the step anyway (4.12.20)
 -- A spot with a wall right behind it is a pocket. Continuing to flee from
 -- there is impossible, so it costs extra in proportion to how little room
 -- there is beyond it.
