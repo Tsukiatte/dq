@@ -56,7 +56,7 @@ local function standoffFor(e)
     if e.isBoss then
         -- During the beam fan the fight is from the edge: the lanes are far
         -- enough apart there to stand between and hop across.
-        if os.clock() < (RD.fanUntil or -math.huge) + 1.0 then return CFG.fanRadius end
+        if S.bossProfile(e.model.Name).fan and os.clock() < (RD.fanUntil or -math.huge) + 1.0 then return CFG.fanRadius end
         if CFG.autoStandoff and RD.abilitySlots then
             -- The least ranged slot: two studs inside a known cap, one past a
             -- reach that is only a lower bound. Never closer than the slider.

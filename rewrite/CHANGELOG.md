@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.69 - 2026-09-03 - "Two bosses, two profiles"
+
+- Core: `BOSS_PROFILES` / `S.bossProfile`. Field: arena pull gated on the profile. Brain: fan standoff gated on the profile.
+
 ## 5.1.68 - 2026-09-03 - "Verdicts"
 
 - Core: horizontal beam first 0.6; spread slim 4.0; `castSafeGrace` 1.2; `orbBubble` 14. Reader: orb bubble on bare parts; chain line width capped at three steps of growth. Brain: casts gated on safety. Recorder: `busyCasting` in the trace.
