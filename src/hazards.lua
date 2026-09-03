@@ -628,6 +628,13 @@ local function isDamageBrick(part)
         return false
     end
     local structural = ATTACK_PARTS[lname] ~= nil and part:FindFirstAncestorOfClass("Model") ~= nil
+    -- A spent projectile (4.12.18): a known attack part that is NOT a hitBox
+    -- or precast, has faded out and is not moving, is over. The criss cross
+    -- fades at the end of its flight and is deleted two seconds later; the
+    -- known-name rule kept it dangerous, boxed and painted for those seconds.
+    if not structural and not ATTACK_PARTS[lname] and part.Transparency >= 0.97 and not getHazardMotion(part) then
+        return false
+    end
     if structural or isKnownEnemyAttack(part) then
         -- Still ours if we own it: our own abilities are built the same way.
         if HZ.ownParts[part] then return false end
