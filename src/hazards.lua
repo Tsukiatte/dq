@@ -2914,6 +2914,13 @@ local function updateArming(now)
                     st.liveUntil = spawn + span.last + CFG.armAssumedLinger
                 elseif delay and delay > 0 then
                     st.impactAt = spawn + delay
+                elseif pc and CFG.armDefaultDelay > 0 then
+                    -- Nothing known, but it is telegraphed: in this game a
+                    -- telegraph fires when it fades, about a second and a
+                    -- half in. Assumed, not learned; the fade or a sound
+                    -- still arms it the moment either happens.
+                    st.impactAt = spawn + CFG.armDefaultDelay
+                    st.guessed = true
                 end
                 -- An event that announced this attack's window beats both.
                 applyWindowStamps(st, model, now)
@@ -3061,11 +3068,12 @@ local function updateArming(now)
                     if not st.armedAt and getHazardMotion(part) then st.armedAt = now st.armedBy = "moving" end
                     if not st.armedAt and st.impactAt and now >= st.impactAt then
                         st.armedAt = now
-                        st.armedBy = "learned time"
+                        st.armedBy = st.guessed and "assumed time" or "learned time"
                     end
                     if st.armedAt then
                         note(st, age, "armed:" .. tostring(st.armedBy))
-                        if not st.byInvisible and st.armedBy ~= "learned time" then
+                        -- An assumption is never written down as a measurement.
+                        if not st.byInvisible and st.armedBy ~= "learned time" and st.armedBy ~= "assumed time" then
                             local known = RT.armDelays[st.name]
                             if known ~= 0 then
                                 if age >= CFG.armMinDelay then
@@ -3086,7 +3094,12 @@ local function updateArming(now)
                         st.armedBy = nil
                         if tr then st.minT = tr end
                         local delay = RT.armDelays[st.name]
-                        if delay and delay > 0 then st.impactAt = st.spawn + delay end
+                        if delay and delay > 0 then
+                            st.impactAt = st.spawn + delay
+                        elseif CFG.armDefaultDelay > 0 then
+                            st.impactAt = now + CFG.armDefaultDelay
+                            st.guessed = true
+                        end
                     end
                 end
                 st.lastOn = on
@@ -3115,6 +3128,18 @@ local function updateArming(now)
                     -- a dead attack on the field.
                     if not doneBy and st.liveUntil and now >= st.liveUntil then
                         doneBy = "window over"
+                    end
+                    -- No measured window: this game's attacks hurt for a
+                    -- fraction of a second at their fade, so an armed attack
+                    -- with nothing known about its window is over shortly
+                    -- after arming - unless it is a projectile in flight, it
+                    -- was armed by hitting us, or it is known to burn on. The
+                    -- horizontal beams were staying live for the five seconds
+                    -- until the game deleted them.
+                    if not doneBy and not st.liveUntil and st.armedAt and CFG.armDefaultLive > 0
+                        and not RT.armLongLived[st.name] and st.armedBy ~= "moving" and st.armedBy ~= "hit"
+                        and not getHazardMotion(part) and now - st.armedAt >= CFG.armDefaultLive then
+                        doneBy = "assumed over"
                     end
                     if doneBy then
                         st.doneAt = now

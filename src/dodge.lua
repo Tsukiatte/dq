@@ -839,6 +839,43 @@ local function decide(root, humanoid)
         if checked >= CFG.dodgeRayBudget and (best and best.danger < moveAt or checked >= 40) then break end
     end
 
+    -- Nothing within reach is safe: look further, once. A wall of circles
+    -- forty studs across cannot be left in eighteen, and the samples along a
+    -- longer line are still taken at the moments they would happen, so
+    -- crossing a fresh telegraph to reach open ground beyond it scores as
+    -- exactly that. Only a far spot whose whole line reads clean is taken.
+    if (not best or best.danger >= moveAt) and CFG.dodgeReachEscalate > 1 then
+        local scale = CFG.dodgeReachEscalate
+        local far = {}
+        for _, off in ipairs(DG.offsets) do
+            local sx, sz, sd = off.x * scale, off.z * scale, off.dist * scale
+            if sd > CFG.dodgeReach then
+                local worst, graded = score(sx, sz, sd)
+                if worst < moveAt then
+                    local cx, cz = rx + sx, rz + sz
+                    local cost = graded + sd * distCost + hubCost(cx, cz)
+                    if approach then cost = cost + approachCost(cx, cz) end
+                    far[#far + 1] = { x = cx, z = cz, dist = sd, danger = worst, cost = cost }
+                end
+            end
+        end
+        table.sort(far, function(a, b) return a.cost < b.cost end)
+        for i = 1, math.min(#far, CFG.dodgeRayBudget) do
+            local c = far[i]
+            local y = floorAt(c.x, c.z, ry, params)
+            if y and (y - feetY) <= CFG.dodgeMaxClimb and (y - feetY) >= -CFG.dodgeMaxDrop
+                and walkable(rootPos, c.x, y, c.z, params, aboveFloor) then
+                c.y = y
+                c.valid = true
+                c.adjusted = c.cost
+                best, bestCost = c, c.cost
+                heavyDebugThrottled("dodge_far", 1.0, "Dodge",
+                    string.format("Nothing safe within %.0f studs; going %.0f studs out.", CFG.dodgeReach, c.dist))
+                break
+            end
+        end
+    end
+
     -- Hysteresis, for a box whose LINE is still clear and only then. The old
     -- check re-read danger at the box and nowhere else, so an attack placed
     -- between the character and the box did not exist as far as the held box

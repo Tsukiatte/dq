@@ -243,6 +243,7 @@ local function buildConfigTable()
             panelAccount = CFG.panelAccount,
             panelConfigs = CFG.panelConfigs,
             panelAttacks = CFG.panelAttacks,
+            panelQueue = CFG.panelQueue,
             pinnedWindows = (function()
                 local names = {}
                 for name in pairs(RT.pinnedWindows) do table.insert(names, name) end
@@ -400,6 +401,7 @@ local function applyConfigData(data)
         if visuals.panelAccount ~= nil then CFG.panelAccount = visuals.panelAccount == true end
         if visuals.panelConfigs ~= nil then CFG.panelConfigs = visuals.panelConfigs == true end
         if visuals.panelAttacks ~= nil then CFG.panelAttacks = visuals.panelAttacks == true end
+        if visuals.panelQueue ~= nil then CFG.panelQueue = visuals.panelQueue == true end
         if type(visuals.pinnedWindows) == "table" then
             table.clear(RT.pinnedWindows)
             for _, name in ipairs(visuals.pinnedWindows) do
@@ -491,7 +493,7 @@ local function applyConfigData(data)
         heavyDebug("Config", string.format(
             "Save is from %s: learned attack timing and auto-learned names are discarded (they were wrong); hand picks and the attack book are kept.",
             savedVersion))
-        data.armDelays = nil
+        -- Fire times learned from a fade are kept: only hit-blamed windows are dropped.
         data.armSpans = nil
     end
     if type(data.learnedTelegraphNames) == "table" then

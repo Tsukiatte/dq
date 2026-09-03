@@ -277,3 +277,32 @@ a Studio recreation of the Midgardian Champion room (`tools/studio_install.lua`,
   Model, UNKNOWN to the index) in the last cluster.
 - Unknown: the orbs' size (radius guessed 5), the smite radius (10), how
   long the damage parts stay live (4 s).
+
+
+## 7. Northern Lands, live through the Potassium bridge (2026-09-02)
+
+Recorded with `tools/recorder_live.lua`; captures under `game/captures/`.
+
+**Midgardian Champion (first boss).** 234 criss-cross events in 220 s: 214
+lattice projectiles fired from the arena edges (x = -699.8 / -459.8,
+z = 349.9 / 589.9; a 15-stud lane grid; axis-aligned; 240 studs in 8 s) and
+20 "aimed" ones whose origin is the player's own position with a random
+direction, every 8 s. All 14 deaths were aimed shots at a character parked
+106-137 studs from the boss. The passive beam Model: precast 0.6 at spawn
+and at 0.6 s, gone by 2.0 s; Model deleted at 7.0 s; hitBox 8 x 63.7 x 250
+centred on the hub (-579.8, 469.9). Beams spawn 0.1-0.5 s apart.
+
+**Bob the Frost Giant (second boss).** Events: `Second Boss Moving Beam`
+{340, 18 s, startTime, endTime, cframe} every 5 s, axis-aligned, a wall
+crossing the arena over 18 s. Models: `secondBossHorizontalBeam` (hitBox
+10 x 63.7 x 400, precast 10 x 2.1 x 400) spawned as a fan of ~13 beams 22
+studs apart, 0.15 s between them; arms at 1.1 s; the Model is deleted at
+5 s. `secondBossCricleHitbox`: a line of growing circles (precast 22 -> 76
+studs across, 22 studs apart, 0.25 s between them) marching along the
+arena; each fires when its precast fades and its sound plays, ~1.6 s after
+it appears. A human stands off the line before it arrives.
+
+**Deferred (Chris, "for later"):** the second boss spawns orbs that follow
+the player and kill on touch; each must be led into the matching-coloured
+crystal (three in the arena). The bot will need to path around a crystal so
+the orb touches it while dodging everything else.
