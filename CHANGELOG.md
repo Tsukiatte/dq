@@ -11,6 +11,10 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.12.18 - 2026-09-03 - "Spent"
+
+- **Spent projectiles are over**: a known attack part that is not a hitBox/precast, has faded (transparency >= 0.97) and is not moving returns false from `isDamageBrick`, so its box and paint go when the game fades it rather than when it deletes the part.
+
 ## 4.12.17 - 2026-09-03 - "State"
 
 - `RT.movementState` mirrors the HUD movement state so tools can read it. Recorder samples the pursuit's navigation state (waypoints, index, direct route, failure streak, navmesh dead flag, blocked/gap/hub flags) once a second.

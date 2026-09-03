@@ -20,7 +20,7 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "4.12.17"
+local SCRIPT_VERSION = "4.12.18"
 -- Bump to throw away every learned attack timing in every save, once.
 local LEARN_EPOCH = 2
 local SCRIPT_BUILD_DATE = "2026-09-02"
@@ -28,6 +28,7 @@ local SCRIPT_CODENAME = "Aquatic Temple"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "4.12.18", date = "2026-09-03", notes = "Spent projectiles are over. A known attack part that is not a hitBox or precast, has faded out and is not moving is no longer danger: the criss cross fades at the end of its eight-second flight and is deleted two seconds later, and the known-name rule kept it dangerous, boxed and painted for those two seconds." },
     { version = "4.12.17", date = "2026-09-03", notes = "The movement state is kept in RT.movementState as well as on the HUD, so a tool reading the script can see whether pursuit is walking, holding for a gap, or has no path. Run 6 never came within sixty studs of the Champion and the one field that would have said why was only ever a label." },
     { version = "4.12.16", date = "2026-09-03", notes = "Short lead for moving projectiles. The Champion's lattice fires fifteen-stud-wide projectiles down fifteen-stud lanes that touch edge to edge; with the 1.2 s lead meant for standing telegraphs, each projectile painted thirty-six studs of lane ahead of itself as danger, and during a burst every candidate within reach read 1.0 - the recorder caught the dodge holding all eight of its cheapest spots at danger 1.0 while standing in two beams. A predicted line now counts as live 0.4 s before the projectile arrives, the time to step aside." },
     { version = "4.12.15", date = "2026-09-03", notes = "Wait for the player. Executed automatically on entering a place, the script ran before the local player had replicated: LocalPlayer was nil, every module captured nil, and startup died at the first thing that touched it, which since the config began saving is loading the config. The interface came up and nothing behind it ran. Core now waits for the game to load and for the player to exist before anything is captured." },
