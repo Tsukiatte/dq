@@ -58,7 +58,7 @@ each change is judged on deaths per boss and boss damage per minute alive.
 
 ## Rules learned from the live runs (2026-09-03, 5.1.8 - 5.1.12)
 
-- **Never write the root's position.** Three anti-cheat kicks, all server-side:
+- **Never write the root's position** for ordinary movement. Three anti-cheat kicks, all server-side:
   a 14-stud hop (4.12.11), a lag-spike step plus a fall through the floor
   (5.1.1), and ordinary per-frame CFrame driving (5.1.6/5.1.7). Since 5.1.8 the
   mover only calls `Humanoid:Move`; the escape burst is a temporary WalkSpeed
@@ -123,3 +123,15 @@ distance is above 8, which is why they were approached to 22 studs and one
 circle strike killed), backs straight off any target inside standoff minus six,
 and makes a melee mob's swing reach a hard zone. `abilityRadius` (42) must stay
 above `mobStandoff` or nothing is ever cast at a mob.
+
+### The blink (5.1.28, at Chris's direction)
+
+The one exception to the no-position-writes rule: a reflex in `field.decide`
+that fires when a lethal box covers the character and will fire within
+`blinkWindow` (0.45 s). It hops at most `blinkMax` (8) studs to the nearest
+clear spot whose floor is raycast at the destination and lies within 1.5 studs
+of the current feet, with a clear sweep and headroom, never while airborne,
+leaving rotation, velocity and WalkSpeed alone, at most once per
+`blinkCooldown` (1.2 s). Chris's rule: the character is never clipped into the
+ground. If this ever draws a kick, the bound has been found and the toggle
+goes off.
