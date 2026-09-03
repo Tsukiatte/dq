@@ -353,6 +353,9 @@ local DEFAULT_ARM_DELAYS = {
     spearmanstrikehitbox = 0.85,
     northernwarriorlinestrike = 0.85,
     northernwarriorcirclestrike = 0.85,
+    -- The Midgardian Champion's jump slam (67-stud cube round its landing,
+    -- precast shown): a certain hit at 1.8 s in Chris's capture of 2026-09-02.
+    firstbossjumpslam = 1.8,
 }
 -- Windows: first and last age at which an attack has been seen to hurt. A
 -- window makes the attack floor before its lead and floor again after
@@ -370,6 +373,7 @@ local DEFAULT_ARM_SPANS = {
     spearmanstrikehitbox = { first = 0.85, last = 1.2 },
     northernwarriorlinestrike = { first = 0.85, last = 1.2 },
     northernwarriorcirclestrike = { first = 0.85, last = 1.2 },
+    firstbossjumpslam = { first = 1.8, last = 2.3 },
 }
 -- Attacks that keep hurting after their warning fades: the fade does not
 -- end them. The Midgardian Champion's passive beams burn for seconds after

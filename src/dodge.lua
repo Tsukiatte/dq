@@ -343,7 +343,12 @@ local function dangerAt(px, py, pz, t)
     for i = 1, #PC.paths do
         local p = PC.paths[i]
         local at = now + t
-        if at >= p.t0 - 0.1 and at <= p.t1 + 0.1 and abs(py - p.oy) < halfHeight + p.halfHeight then
+        -- From the moment it exists, not from the moment it starts moving:
+        -- the game places the body at its origin on the event and it sits
+        -- there until its start time - and it hurts while it sits. The real
+        -- criss cross spawns ON the player; five of Chris's seven deaths were
+        -- that, at 0% along its path, with the dodge reading zero danger.
+        if at >= (p.spawn or p.t0) - 0.05 and at <= p.t1 + 0.1 and abs(py - p.oy) < halfHeight + p.halfHeight then
             local k = (at - p.t0) / p.dur
             if k < 0 then k = 0 elseif k > 1 then k = 1 end
             local s = k * p.dist + p.offset

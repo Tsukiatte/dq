@@ -241,3 +241,15 @@ a Studio recreation of the Midgardian Champion room (`tools/studio_install.lua`,
 - **Bosses are fought from ability range** (Chris, 2026-09-02): the bot must
   not close to melee - the boss has a melee too - and the abilities, radius
   about 30, are what win. `bossStandoff` 26.
+
+- **Real capture, 2026-09-02 (Chris, Midgardian Champion, 7 deaths):** the
+  criss cross projectile (`firstBossCrissCross`, 15-stud mesh, spins 10
+  degrees a frame - the "spiral") is placed at its origin ON THE PLAYER on the
+  event and sits there until its start time; it hurts while it sits (five
+  deaths at 0% along its path). After a death the character respawns at the
+  room 1 checkpoint ~90 studs from the boss, inside beam reach and still the
+  criss cross's target, so a respawn loop follows. `firstBossJumpSlam`:
+  hitBox 67 x 67 x 67, precast 4 x 67 x 67 at transparency 0.55, hit at 1.8 s
+  (certain). Hits cost ~262M-394M HP each on a 262.74M-HP level-191 character.
+  `firstBossMiddlePart`, `firstBossSpawnPart`, `firstBossLandingHeightPart`,
+  `firstBossSmokePart` exist near the boss (markers, not attacks).

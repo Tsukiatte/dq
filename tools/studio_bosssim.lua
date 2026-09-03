@@ -432,13 +432,23 @@ local function gameTime()
     end
     return tick()
 end
-local function rollingProjectile(eventName, templateName, radius, damage, distance, duration)
+local function rollingProjectile(eventName, templateName, radius, damage, distance, duration, atPlayer)
     if not remote then return end
     local target = nearestPlayerPosition(CENTRE) or CENTRE
     local flat = Vector3.new(target.X - CENTRE.X, 0, target.Z - CENTRE.Z)
     if flat.Magnitude < 1 then flat = Vector3.new(0, 0, -1) end
     local dir = flat.Unit
-    local startCF = CFrame.lookAt(CENTRE + Vector3.new(0, radius, 0) + dir * 8, CENTRE + Vector3.new(0, radius, 0) + dir * 40)
+    local startCF
+    if atPlayer then
+        -- The real criss cross: placed ON the player, then rolls off in some
+        -- direction. It hurts while it sits there.
+        local a = math.random() * math.pi * 2
+        local d2 = Vector3.new(math.cos(a), 0, math.sin(a))
+        local origin = Vector3.new(target.X, CENTRE.Y + radius, target.Z)
+        startCF = CFrame.lookAt(origin, origin + d2 * 40)
+    else
+        startCF = CFrame.lookAt(CENTRE + Vector3.new(0, radius, 0) + dir * 8, CENTRE + Vector3.new(0, radius, 0) + dir * 40)
+    end
     local t0 = gameTime() + 0.6          -- a short wind-up like the real one
     local t1 = t0 + duration
     remote:FireAllClients(eventName, { distance, duration, t0, t1, startCF })
@@ -461,7 +471,7 @@ local function rollingProjectile(eventName, templateName, radius, damage, distan
         if now > t1 then conn:Disconnect() end
     end)
     local realT0 = tick() + 0.6
-    addLive(body, damage, eventName, realT0, realT0 + duration)
+    addLive(body, damage, eventName, atPlayer and tick() or realT0, realT0 + duration)
     log(eventName .. " fired")
 end
 
@@ -509,7 +519,7 @@ task.spawn(function()
         if attr("DQSimEnabled", true) and attr("DQSimProjectiles", true) then
             i = i + 1
             if i % 3 == 1 then
-                rollingProjectile("First Boss Criss Cross Projectile", "firstBossCrissCross", 7.5, 120, 90, 3.0)
+                rollingProjectile("First Boss Criss Cross Projectile", "firstBossCrissCross", 7.5, 120, 90, 3.0, true)
             elseif i % 3 == 2 then
                 rollingProjectile("First Boss Seeking Spike", "firstBossSeekingSpikes", 10, 120, 90, 2.5)
             else

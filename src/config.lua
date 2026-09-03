@@ -453,7 +453,13 @@ local function applyConfigData(data)
         if b1 ~= b2 then return b1 > b2 end
         return c1 >= c2
     end
-    local trustLearned = versionAtLeast(savedVersion, "4.9.1")
+    -- Learned timing from before 4.10.2 was taught by whatever part was
+    -- nearest when a hit landed. Chris's real capture of 2026-09-02 showed
+    -- what that left behind: every beam and every mage shot "armed at 7.0 s",
+    -- the moment it was removed - floor for its whole life, so never dodged,
+    -- and drawn as a box the whole time. Only certain hits teach now, and
+    -- nothing taught before that is kept.
+    local trustLearned = versionAtLeast(savedVersion, "4.10.2")
     if not trustLearned then
         heavyDebug("Config", string.format(
             "Save is from %s: learned attack timing and auto-learned names are discarded (they were wrong); hand picks and the attack book are kept.",

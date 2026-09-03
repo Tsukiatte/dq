@@ -1038,6 +1038,18 @@ local function updateHazardHighlights()
             local eta = pending and st.impactAt and (st.impactAt - now) or nil
             local floorNow = eta ~= nil and eta > CFG.dodgeLead
             local color = floorNow and CFG.colorTelegraphPending or CFG.colorTelegraph
+            -- Floor is not drawn (4.10.10): thirteen beams and their mage
+            -- shots waiting on their timers filled the arena with boxes that
+            -- meant nothing to the dodge and everything to the person
+            -- watching. The box appears the moment the attack is about to arm.
+            if floorNow and not CFG.drawPendingHazards then
+                local stale = folder:FindFirstChild("Highlight_" .. debugId)
+                    or (HZ.highlightsFolder and HZ.highlightsFolder:FindFirstChild("Highlight_" .. debugId))
+                if stale then stale:Destroy() end
+                local staleTag = folder:FindFirstChild("Tag_" .. debugId)
+                if staleTag then staleTag:Destroy() end
+                continue
+            end
 
             -- Name tag.
             if CFG.hazardTagEnabled then
@@ -1990,7 +2002,7 @@ local function recordHit(damage)
                 local gnow = Workspace:GetServerTimeNow()
                 for i = 1, #paths do
                     local p = paths[i]
-                    if gnow >= p.t0 - 0.15 and gnow <= p.t1 + 0.15 then
+                    if gnow >= (p.spawn or p.t0) - 0.15 and gnow <= p.t1 + 0.15 then
                         local k = (gnow - p.t0) / p.dur
                         if k < 0 then k = 0 elseif k > 1 then k = 1 end
                         local s = k * p.dist + p.offset
