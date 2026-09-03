@@ -42,8 +42,19 @@ local function stageColor(b, now)
     return CFG.colorFloor
 end
 
+-- Anything else under our visuals root is a leftover from an older build
+-- (4.12's PrecastZones and Dodge folders froze in place when it was replaced).
+local function sweepForeign()
+    local root = getVisualRoot()
+    if not root then return end
+    for _, f in ipairs(root:GetChildren()) do
+        if f.Name ~= "Hazards" then f:Destroy() end
+    end
+end
+
 local function drawTick(now)
     if now - DR.lastDraw < 0.1 then return end
+    if now - (DR.lastSweep or -math.huge) > 3 then DR.lastSweep = now sweepForeign() end
     -- Our own drawing must never be the lag: only what is near, and not many.
     local lp = S.LocalPlayer.Character
     local rt = lp and lp:FindFirstChild("HumanoidRootPart")

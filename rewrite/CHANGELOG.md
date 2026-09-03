@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.45 - 2026-09-03 - "Sweep the floor"
+
+- Draw: `sweepForeign` removes non-Hazards children of the visuals root every 3 s.
+
 ## 5.1.44 - 2026-09-03 - "Short bursts"
 
 - Mover: `boostMaxRun` 1.5 s then `boostRest` 1.2 s; brain approaches at walking speed.
