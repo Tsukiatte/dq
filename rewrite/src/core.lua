@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.35"
+local SCRIPT_VERSION = "5.1.36"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.36", date = "2026-09-03", notes = "Blink lands at the Humanoid's standing height with a small downward velocity, and never fires mid-jump; a hop that inherited a mid-stride height left the character hovering until the anti-hover yanked it down. Hop is 4 or 6 studs, no longer 8." },
     { version = "5.1.35", date = "2026-09-03", notes = "Fifth kick with hops 3 s apart and two per ten seconds. The blink is now 8 s apart and at most three a minute; everything else about it is unchanged." },
     { version = "5.1.34", date = "2026-09-03", notes = "The bot walked onto beam lanes while gaps stood empty: a lane about to 'expire' in the model scored better than a gap padded by two neighbours' shoulders, but in the burst every lane re-fires every 1.1 s. Passive beams now hold 3.5 s and the shoulder is 1.5 studs, so gaps read clean and lanes read lethal for as long as the burst lasts." },
     { version = "5.1.33", date = "2026-09-03", notes = "The bot hovered outside the Champion arena and stood still under the aimed spiral. Two causes: the leash zone's graded shoulder reached 12 studs into the arena and turned the approach into a dodge from 110 studs (now a hard edge with a 4-stud margin); and in a field where every spot is hot the escape target was dropped and re-picked every frame, so the character jittered in place (now kept until reached unless a clearly better spot exists). Strafe at full walk speed: never stand still in the arena." },
@@ -102,7 +103,7 @@ local CFG = {
     dodgePathLead = 0.4,          -- a moving projectile's line: the time to sidestep
     dodgeDwell = 1.5,             -- a spot must stay clear this long after arrival (the big spike front: 100 studs/s, announced 1.4 s ahead)
     blink = true,                 -- reflex hop out of a lethal box that fires before a walk could clear it
-    blinkMax = 8,                 -- studs, at most; the other script's hop is barely visible
+    blinkMax = 6,                 -- studs, at most; an 8-wide beam needs 5.2 from its centre, and the other script's hop is barely visible
     blinkWindow = 0.45,           -- hop when the box on us fires within this many seconds (0 = already live)
     blinkCooldown = 8.0,          -- seconds between hops; kicks four and five came from hopping too often
     blinkPerMinute = 3,           -- and no more than this many in any sixty seconds

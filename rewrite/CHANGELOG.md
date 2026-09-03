@@ -1,5 +1,10 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.36 - 2026-09-03 - "Land"
+
+- Blink: standing height from HipHeight, refuse when mid-air, downward nudge after the write, rings 4/6, `blinkMax` 6.
+- Draw: outline colour initialised.
+
 ## 5.1.35 - 2026-09-03 - "Rarer"
 
 - `blinkCooldown` 8.0; `blinkPerMinute` 3 replaces the per-10-s cap.
