@@ -49,7 +49,7 @@ local function drawTick(now)
             local bx, bz
             if b.moving then bx, bz = b.ox, b.oz else bx, bz = b.cframe.Position.X, b.cframe.Position.Z end
             local near = not rp or ((bx - rp.X) ^ 2 + (bz - rp.Z) ^ 2) < 130 * 130
-            if not near or drawn >= 60 then continue end
+            if near and drawn < 60 then
             drawn = drawn + 1
             local key = i
             local p = DR.parts[key]
@@ -79,6 +79,7 @@ local function drawTick(now)
             local c = stageColor(b, now)
             if p.Color ~= c then p.Color = c end
             p.Transparency = CFG.hazardTransparency
+            end
         end
     end
     for key, p in pairs(DR.parts) do
