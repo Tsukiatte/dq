@@ -28,6 +28,29 @@ local function boxDistance(b, p)
     return r1(math.sqrt(ex * ex + ez * ez))
 end
 
+-- Everything that appears in workspace, kept for a few seconds: the killer
+-- that the reader never boxed shows up here.
+R.spawns = {}
+R.conns[#R.conns + 1] = workspace.ChildAdded:Connect(function(inst)
+    local rt = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+    local p = inst:IsA("BasePart") and inst or (inst:IsA("Model") and (inst.PrimaryPart or inst:FindFirstChildWhichIsA("BasePart")))
+    local d = (p and rt) and r1((Vector3.new(p.Position.X, 0, p.Position.Z) - Vector3.new(rt.Position.X, 0, rt.Position.Z)).Magnitude) or nil
+    R.spawns[#R.spawns + 1] = { at = os.clock(), name = inst.Name, class = inst.ClassName, dist = d,
+        size = p and string.format("%.0fx%.0fx%.0f", p.Size.X, p.Size.Y, p.Size.Z) or nil }
+    if #R.spawns > 400 then table.remove(R.spawns, 1) end
+end)
+local function recentSpawns(t)
+    local out = {}
+    for i = #R.spawns, 1, -1 do
+        local sp = R.spawns[i]
+        if t - sp.at > 2.5 then break end
+        if not sp.name:lower():find("passivebeam") or (sp.dist or 99) < 12 then
+            out[#out + 1] = string.format("%.1fs %s(%s) d%s %s", t - sp.at, sp.name, sp.class, tostring(sp.dist), sp.size or "")
+        end
+    end
+    return out
+end
+
 local function hookHumanoid(c)
     local hum = c:WaitForChild("Humanoid", 10)
     if not hum then return end
@@ -47,7 +70,7 @@ local function hookHumanoid(c)
                 end
                 table.sort(near, function(a, b) return a.dist < b.dist end)
             end
-            R.hits[#R.hits + 1] = { t = now(), lost = math.floor(last - h), fatal = h <= 0, pos = rt and v3(rt.Position) or nil, near = near,
+            R.hits[#R.hits + 1] = { t = now(), lost = math.floor(last - h), fatal = h <= 0, pos = rt and v3(rt.Position) or nil, near = near, spawns = recentSpawns(os.clock()),
                 state = S and S.RT.movementState, reason = S and S.DG and S.DG.reason, dangerHere = S and S.DG and r1(S.DG.dangerHere or 0),
                 grace = S and S.DG and S.DG.grace ~= math.huge and r1(S.DG.grace) or nil,
                 target = S and S.BR and S.BR.target and S.BR.target.model.Name or nil,
