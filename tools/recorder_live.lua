@@ -15,7 +15,7 @@ local S = _G.DungeonAutofarmState
 local lp = Players.LocalPlayer
 
 if _G.DQRec and _G.DQRec.stop then pcall(_G.DQRec.stop) end
-local R = { started = os.clock(), serverStart = workspace:GetServerTimeNow(), parts = {}, events = {}, hits = {},
+local R = { started = os.clock(), serverStart = workspace:GetServerTimeNow(), parts = {}, events = {}, hits = {}, bossHp = {}, states = {},
             byPart = setmetatable({}, { __mode = "k" }), conns = {}, partCount = 0 }
 _G.DQRec = R
 
@@ -179,6 +179,8 @@ local function hookHumanoid(c)
             end
             table.sort(near, function(a, b) return a.dist < b.dist end)
             R.hits[#R.hits + 1] = { t = now(), lost = math.floor(last - h), left = math.floor(h), fatal = h <= 0,
+                enemy = S and S.NAV and S.NAV.cachedEnemy and S.NAV.cachedEnemy.Name or nil,
+                state = S and S.RT and S.RT.movementState or nil, boost = S and S.RT and S.RT.moveBoost or nil,
                 pos = rt and v3(rt.Position) or nil, near = near,
                 dodge = S and S.DG and { target = S.DG.target and v3(S.DG.target) or nil, reason = S.DG.targetReason,
                     dangerHere = S.DG.dangerHere and r1(S.DG.dangerHere) or nil } or nil,
@@ -199,12 +201,34 @@ function R.stop()
     R.stopped = now()
 end
 
+-- Progress against the target: its health once a second, and the bot's
+-- movement state, so damage dealt and time spent can be read afterwards.
+task.spawn(function()
+    while _G.DQRec == R and not R.stopped do
+        task.wait(1)
+        local e = S and S.NAV and S.NAV.cachedEnemy
+        local hum = e and e:FindFirstChildOfClass("Humanoid")
+        if hum then
+            local style = e:FindFirstChild("enemyStyle")
+            R.bossHp[#R.bossHp + 1] = { t = now(), name = e.Name, hp = hum.Health, max = hum.MaxHealth,
+                boss = style and type(style.Value) == "string" and style.Value:lower():find("boss") ~= nil or nil }
+            if #R.bossHp > 2000 then table.remove(R.bossHp, 1) end
+        end
+        local st = S and S.RT and S.RT.movementState
+        local lastState = R.states[#R.states]
+        if st and (not lastState or lastState.s ~= st) then
+            R.states[#R.states + 1] = { t = now(), s = st }
+            if #R.states > 600 then table.remove(R.states, 1) end
+        end
+    end
+end)
+
 -- Periodic save.
 task.spawn(function()
     while _G.DQRec == R and not R.stopped do
         task.wait(10)
         pcall(function()
-            writefile("dq_rec.json", HttpService:JSONEncode({ started = R.started, parts = R.parts, events = R.events, hits = R.hits }))
+            writefile("dq_rec.json", HttpService:JSONEncode({ started = R.started, parts = R.parts, events = R.events, hits = R.hits, bossHp = R.bossHp, states = R.states, enemies = R.enemies }))
         end)
     end
 end)
