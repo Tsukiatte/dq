@@ -208,39 +208,148 @@ local function buildUI()
     applyVisibility()
 
     -- ---------------------------------------------------------------- HUD
+    -- Bottom-left, as the old build drew it: title chip, stat card, then the
+    -- hint and the status pill. Fixed geometry throughout: auto-sizing frames
+    -- anchored to the bottom never settled to a stable size in game.
     local hud = Instance.new("Frame")
     hud.Name = "HUD"
-    hud.BackgroundColor3 = T.SurfaceHeader or Color3.fromRGB(24, 24, 30)
-    hud.BackgroundTransparency = 0.15
-    hud.BorderSizePixel = 0
-    hud.Size = UDim2.fromOffset(250, 86)
-    hud.Position = UDim2.new(0, 12, 1, -98)
+    hud.BackgroundTransparency = 1
+    hud.AnchorPoint = Vector2.new(0, 1)
+    hud.Position = UDim2.new(0, 20, 1, -20)
+    hud.Size = UDim2.fromOffset(360, 173)
     hud.ZIndex = 2
     hud.Parent = gui
-    K.corner(hud, 6)
-    K.vlist(hud, 2)
-    K.pad(hud, 6, 8, 6, 8)
-    local function line(text, order)
-        local l = K.label(hud, text, "captionSub", order)
-        l.Size = UDim2.new(1, 0, 0, 16)
-        l.TextXAlignment = Enum.TextXAlignment.Left
+
+    -- A rounded panel with the accent along its top edge. The accent is a
+    -- pill inset from the corners: a full-width square bar poked out past
+    -- the rounding (ClipsDescendants clips to the rectangle, not the curve).
+    local function panel(name, y, w, h, radius)
+        local p = Instance.new("Frame")
+        p.Name = name
+        p.BackgroundColor3 = Color3.new(1, 1, 1)
+        p.BorderSizePixel = 0
+        p.Position = UDim2.fromOffset(0, y)
+        p.Size = UDim2.fromOffset(w, h)
+        p.ZIndex = 3
+        p.Parent = hud
+        K.corner(p, radius)
+        K.stroke(p, T.Hairline, 1)
+        K.bodyGradient(p)
+        K.shadow(p, 6, 2.0, 8, 0.065, radius)
+        local bar = Instance.new("Frame")
+        bar.Name = "AccentBar"
+        bar.BackgroundColor3 = Color3.new(1, 1, 1)
+        bar.BorderSizePixel = 0
+        bar.Position = UDim2.fromOffset(4, 0)
+        bar.Size = UDim2.new(1, -8, 0, 3)
+        bar.ZIndex = 5
+        bar.Parent = p
+        K.corner(bar, 2)
+        K.accentGradient(bar, 0)
+        return p
+    end
+
+    -- Title chip: name | build | fps.
+    local chip = panel("TitleChip", 0, 326, 34, T.RadiusMd)
+    local function chipText(text, style, x, width)
+        local l = K.label(chip, text, style, 1)
+        l.Position = UDim2.fromOffset(x, 7)
+        l.Size = UDim2.fromOffset(width, 20)
         l.TextTruncate = Enum.TextTruncate.AtEnd
+        l.ZIndex = 4
         return l
     end
-    local hudTitle = line("dqr autofarm  " .. SCRIPT_VERSION, 1)
-    local hudStatus = line("", 2)
-    local hudTarget = line("", 3)
-    local hudWorld = line("[" .. CFG.menuKey .. "] opens the interface", 4)
-    local frames, elapsed, fps = 0, 0, 0
+    chipText("dqr pathfinding", "windowChip", 12, 138)
+    chipText("|", "captionKey", 154, 6).TextColor3 = T.TextMuted
+    chipText(SCRIPT_VERSION, "rowStat", 168, 70).TextColor3 = T.TextSub
+    chipText("|", "captionKey", 240, 6).TextColor3 = T.TextMuted
+    local fpsLabel = chipText("fps: --", "monoStat", 254, 66)
+
+    -- Stat card: label left, value right in mono so the digits sit still.
+    local stats = panel("Stats", 42, 360, 95, T.RadiusLg)
+    local function statRow(name, y)
+        local key = K.label(stats, name, "rowStat", 1)
+        key.Position = UDim2.fromOffset(14, y)
+        key.Size = UDim2.fromOffset(120, 24)
+        key.ZIndex = 4
+        local value = K.label(stats, "--", "monoStat", 2)
+        value.Position = UDim2.fromOffset(140, y)
+        value.Size = UDim2.fromOffset(206, 24)
+        value.TextXAlignment = Enum.TextXAlignment.Right
+        value.TextTruncate = Enum.TextTruncate.AtEnd
+        value.ZIndex = 4
+        return value
+    end
+    local playtimeValue = statRow("Playtime", 11)
+    local statusValue = statRow("Status", 37)
+    local pingValue = statRow("Ping", 63)
+
+    -- Footer: the hint and the status pill.
+    local hint = K.label(hud, "[" .. CFG.menuKey .. "] to open GUI", "rowLabel", 1)
+    hint.Position = UDim2.fromOffset(0, 147)
+    hint.Size = UDim2.fromOffset(200, 24)
+    hint.TextColor3 = T.TextSub
+    hint.TextStrokeTransparency = 0.1
+    hint.ZIndex = 3
+
+    local status = Instance.new("Frame")
+    status.Name = "StatusChip"
+    status.BackgroundColor3 = T.SurfaceChip
+    status.BorderSizePixel = 0
+    status.Position = UDim2.fromOffset(210, 147)
+    status.Size = UDim2.fromOffset(150, 24)
+    status.ZIndex = 3
+    status.Parent = hud
+    K.corner(status, T.RadiusMd)
+    K.stroke(status, T.Hairline, 1)
+
+    local dot = Instance.new("Frame")
+    dot.Name = "Dot"
+    dot.BackgroundColor3 = T.StatusBad
+    dot.BorderSizePixel = 0
+    dot.AnchorPoint = Vector2.new(0, 0.5)
+    dot.Position = UDim2.new(0, 9, 0.5, 0)
+    dot.Size = UDim2.fromOffset(6, 6)
+    dot.ZIndex = 4
+    dot.Parent = status
+    K.corner(dot, 3)
+
+    local statusKey = K.label(status, "Autofarm:", "captionKey", 1)
+    statusKey.Position = UDim2.fromOffset(21, 0)
+    statusKey.Size = UDim2.new(1, -21, 1, 0)
+    statusKey.ZIndex = 4
+
+    local statusValueLabel = K.label(status, "Disabled", "captionStat", 2)
+    statusValueLabel.Position = UDim2.fromOffset(76, 0)
+    statusValueLabel.Size = UDim2.new(1, -85, 1, 0)
+    statusValueLabel.TextColor3 = T.StatusBad
+    statusValueLabel.ZIndex = 4
+
+    local Stats = game:GetService("Stats")
+    local frames, elapsed, playStart = 0, 0, RT.hudPlayStart or os.clock()
+    RT.hudPlayStart = playStart
     RT.hudConnection = RunService.Heartbeat:Connect(function(dt)
         if RT.destroyed then return end
         frames, elapsed = frames + 1, elapsed + dt
-        if elapsed >= 0.5 then fps = frames / elapsed frames, elapsed = 0, 0 end
-        hudStatus.Text = string.format("%s  |  %s", RT.farmEnabled and "running" or "off", tostring(RT.movementState))
-        hudStatus.TextColor3 = RT.farmEnabled and (T.StatusGood or Color3.fromRGB(90, 220, 120)) or (T.StatusBad or Color3.fromRGB(230, 90, 90))
-        local t = BR.target
-        hudTarget.Text = t and string.format("target: %s  %.0f%%", t.model.Name, t.humanoid.Health / math.max(t.humanoid.MaxHealth, 1) * 100) or "target: none"
-        hudWorld.Text = string.format("%d enemies  %d hazards  fps %d  %.1fms  blinks %d", #RD.enemies, RD.count, math.floor(fps + 0.5), RT.tickMs or 0, RT.blinks or 0)
+        if elapsed < 0.25 then return end
+        local fps = frames / elapsed
+        frames, elapsed = 0, 0
+
+        fpsLabel.Text = string.format("fps: %d", math.floor(fps + 0.5))
+        local seconds = os.clock() - playStart
+        playtimeValue.Text = string.format("%02d:%02d", math.floor(seconds / 60), math.floor(seconds % 60))
+        statusValue.Text = tostring(RT.movementState or "idle")
+        local ping = 0
+        pcall(function() ping = Stats.Network.ServerStatsItem["Data Ping"]:GetValue() end)
+        pingValue.Text = string.format("%d", math.floor(ping + 0.5))
+
+        local running = RT.farmEnabled and not RT.destroyed
+        local text, color = running and "Running" or "Disabled", running and T.StatusGood or T.StatusBad
+        if statusValueLabel.Text ~= text or dot.BackgroundColor3 ~= color then
+            statusValueLabel.Text = text
+            statusValueLabel.TextColor3 = color
+            dot.BackgroundColor3 = color
+        end
     end)
 end
 

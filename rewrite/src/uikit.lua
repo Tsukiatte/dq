@@ -1243,25 +1243,43 @@ local function window(parent, opts)
     bodyGradient(frame)
     shadow(frame)
 
-    local accent = Instance.new("Frame")
-    accent.Name = "AccentBar"
-    accent.BackgroundColor3 = Color3.new(1, 1, 1)
-    accent.BorderSizePixel = 0
-    accent.Size = UDim2.new(1, 0, 0, 3)
-    accent.ZIndex = 3
-    accent.Parent = frame
-    accentGradient(accent, 0)
-
+    -- The header runs from the very top with the frame's own radius, so its
+    -- corners coincide with the frame's; a square filler hides its rounded
+    -- bottom. (ClipsDescendants clips to the rectangle, not the rounding: a
+    -- square header at y=3 showed grey past the corners.)
     local header = Instance.new("Frame")
     header.Name = "Header"
     header.BackgroundColor3 = Theme.SurfaceHeader
     header.BorderSizePixel = 0
-    header.Size = UDim2.new(1, 0, 0, Theme.HeaderH)
-    header.Position = UDim2.fromOffset(0, 3)
+    header.Size = UDim2.new(1, 0, 0, Theme.HeaderH + 3)
+    header.Position = UDim2.fromOffset(0, 0)
     header.Active = true
     header.ZIndex = 3
     header.Parent = frame
-    pad(header, 0, 12, 0, 14)
+    corner(header, Theme.RadiusLg)
+    pad(header, 3, 12, 0, 14)
+
+    local headerFill = Instance.new("Frame")
+    headerFill.Name = "HeaderFill"
+    headerFill.BackgroundColor3 = Theme.SurfaceHeader
+    headerFill.BorderSizePixel = 0
+    headerFill.Position = UDim2.fromOffset(0, Theme.HeaderH + 3 - Theme.RadiusLg)
+    headerFill.Size = UDim2.new(1, 0, 0, Theme.RadiusLg)
+    headerFill.ZIndex = 3
+    headerFill.Parent = frame
+
+    -- The accent: a pill along the top, inset so its ends stay inside the
+    -- corner curve.
+    local accent = Instance.new("Frame")
+    accent.Name = "AccentBar"
+    accent.BackgroundColor3 = Color3.new(1, 1, 1)
+    accent.BorderSizePixel = 0
+    accent.Position = UDim2.fromOffset(4, 0)
+    accent.Size = UDim2.new(1, -8, 0, 3)
+    accent.ZIndex = 4
+    accent.Parent = frame
+    corner(accent, 2)
+    accentGradient(accent, 0)
     hlist(header, Theme.GapLg)
     makeDraggable(header, frame)
 
@@ -1362,7 +1380,9 @@ local function window(parent, opts)
     body.BackgroundTransparency = 1
     body.BorderSizePixel = 0
     body.Position = UDim2.fromOffset(0, 4 + Theme.HeaderH)
-    body.Size = UDim2.new(1, 0, 1, -(4 + Theme.HeaderH))
+    -- Stops one radius above the bottom: a row drawn into the corner showed
+    -- past the rounding.
+    body.Size = UDim2.new(1, 0, 1, -(4 + Theme.HeaderH + Theme.RadiusLg))
     body.CanvasSize = UDim2.new()
     body.AutomaticCanvasSize = Enum.AutomaticSize.Y
     body.ScrollBarThickness = 4

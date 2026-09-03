@@ -1,5 +1,10 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.55 - 2026-09-03 - "The old HUD"
+
+- UI: HUD rebuilt after 4.12's (chip: name | build | fps; card: Playtime, Status, Ping; hint; Autofarm pill).
+- UIKit `window`: header from y=0 with the frame radius plus a square filler; accent is a 3 px pill inset 4 px; body ends `RadiusLg` above the bottom.
+
 ## 5.1.54 - 2026-09-03 - "Never on a live box"
 
 - Field: boxes may carry `weight`; `score` returns the endpoint danger; lethal-endpoint candidates cost +100; kept target dropped on `spot closed`; mob retreat via `dodgeMobRetreat`.
