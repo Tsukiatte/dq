@@ -263,7 +263,7 @@ local function blinkTarget(root, hum, rx, ry, rz)
             -- 0.7 s was a teleport into the attack.
             local clear = true
             for _, tt in ipairs({ 0, 0.25, 0.5, 0.75, 1.0 }) do
-                if dangerAt(x, ry, z, tt, 1.2, 0) >= 0.5 then clear = false break end
+                if dangerAt(x, ry, z, tt, 2.5, 0) >= 0.5 then clear = false break end
             end
             -- Never land beside a mob: its strike is centred on it.
             if clear then
@@ -356,7 +356,7 @@ local function decide(root, hum)
                 if sqrt(tx * tx + tz * tz) <= CFG.blinkMax + 0.5 then
                     local clear = true
                     for _, tt in ipairs({ 0, 0.25, 0.5, 0.75, 1.0 }) do
-                        if dangerAt(tg.X, ry, tg.Z, tt, 1.2, 0) >= 0.5 then clear = false break end
+                        if dangerAt(tg.X, ry, tg.Z, tt, 2.5, 0) >= 0.5 then clear = false break end
                     end
                     if clear then dest = Vector3.new(tg.X, tg.Y + hum.HipHeight + root.Size.Y * 0.5, tg.Z) end
                 end

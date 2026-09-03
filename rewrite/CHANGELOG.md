@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.64 - 2026-09-03 - "Two studs wider"
+
+- Bob beam seeds `slim` 2.5, `slimShoulder` 1.0; blink bare reach 2.5 (both checks).
+
 ## 5.1.63 - 2026-09-03 - "Not into the wall"
 
 - Field: candidate openness (`dodgeWallLook` 24, `dodgeWallWeight` 0.05). Brain: back-off direction search over seven headings by free distance.
