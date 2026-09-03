@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.63 - 2026-09-03 - "Not into the wall"
+
+- Field: candidate openness (`dodgeWallLook` 24, `dodgeWallWeight` 0.05). Brain: back-off direction search over seven headings by free distance.
+
 ## 5.1.62 - 2026-09-03 - "See it"
 
 - Field: `DG.evalStats` and `DG.chosen`. Tools: `recorder6.lua` (10 Hz trace, death verdicts, movement effectiveness, blink/reflex logs) and `poll6.lua`.
