@@ -1298,7 +1298,7 @@ local function recolorAttackParts(now)
                     paintPart(st.precast, stage, false)
                     touched[st.precast] = true
                 end
-                if st.hitBox and st.hitBox.Parent then
+                if CFG.recolorHitbox and st.hitBox and st.hitBox.Parent then
                     paintPart(st.hitBox, stage, true)
                     touched[st.hitBox] = true
                 end
@@ -1311,7 +1311,7 @@ local function recolorAttackParts(now)
                     if d.Parent and d ~= st.precast and d ~= st.hitBox and d:IsA("BasePart") then
                         local n = string.lower(d.Name)
                         local isHb = n:find("hitbox", 1, true) ~= nil
-                        if isHb or n:find("precast", 1, true) then
+                        if (isHb and CFG.recolorHitbox) or (not isHb and n:find("precast", 1, true)) then
                             paintPart(d, stage, isHb)
                             touched[d] = true
                         end

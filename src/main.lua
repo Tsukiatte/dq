@@ -593,6 +593,7 @@ local function startAutofarm()
         -- than handing a destination to the humanoid.
         RT.frameDelta = delta or (1 / 60)
         if RT.destroyed or not RT.farmEnabled then return end
+        local tickStart = os.clock()
 
         -- xpcall, not pcall: a silent pcall here hid every downstream fault and
         -- made the loop look like it was simply choosing not to move.
@@ -811,6 +812,8 @@ local function startAutofarm()
             setMovementState("ERROR - see console")
             heavyDebugThrottled("loop_error", 1.0, "FATAL", "Main loop threw:\n" .. tostring(err))
         end
+        -- What this script costs per frame, smoothed, for the HUD.
+        RT.tickMs = (RT.tickMs or 0) * 0.9 + (os.clock() - tickStart) * 1000 * 0.1
     end)
 end
 

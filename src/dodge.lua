@@ -917,6 +917,39 @@ local function decide(root, humanoid)
         end
     end
 
+    -- Last resort (4.12.11): the ground under us fires before we could walk
+    -- to the spot chosen. If that spot is a short hop away, with a floor and
+    -- nothing solid between here and there, go there NOW instead of walking.
+    -- A few hitboxes at most, never through a wall, never twice in a row.
+    if CFG.blinkEnabled and best and best.valid and best.y and here0 >= moveAt and grace < math.huge
+        and os.clock() - (DG.lastBlink or -math.huge) >= CFG.blinkCooldown then
+        local walkTime = best.dist / speed
+        if walkTime > grace - CFG.blinkMargin then
+            local hop = best
+            if hop.dist > CFG.blinkMaxDistance then
+                -- The chosen spot is too far to hop: the nearest clean one within range.
+                hop = nil
+                for _, idx in ipairs(order) do
+                    local c = cands[idx]
+                    if c.valid and c.y and c.dist <= CFG.blinkMaxDistance and c.danger < moveAt
+                        and (not hop or c.cost < hop.cost) then hop = c end
+                end
+            end
+            if hop then
+                DG.lastBlink = os.clock()
+                RT.blinks = (RT.blinks or 0) + 1
+                local from = root.CFrame
+                root.CFrame = CFrame.new(hop.x, hop.y + aboveFloor, hop.z) * (from - from.Position)
+                root.AssemblyLinearVelocity = Vector3.zero
+                heavyDebugThrottled("dodge_blink", 0.5, "Dodge", string.format(
+                    "Hop: %.0f studs; the ground here fired in %.2fs and the walk needed %.2fs.", hop.dist, grace, walkTime))
+                DG.target = nil
+                DG.targetReason = "hopped"
+                return
+            end
+        end
+    end
+
     -- Hysteresis, for a box whose LINE is still clear and only then. The old
     -- check re-read danger at the box and nowhere else, so an attack placed
     -- between the character and the box did not exist as far as the held box
