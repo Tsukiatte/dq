@@ -1020,7 +1020,10 @@ local function updateHazardHighlights()
         local kept = {}
         for _, part in ipairs(shortlist) do
             local st = HZ.armState[part]
-            if not (st and st.doneAt) then kept[#kept + 1] = part end
+            -- Painted by stage instead of boxed (4.12.19): a box round an
+            -- invisible 64-stud hitBox was a red slab across the screen.
+            local painted = CFG.recolorAttacks and st ~= nil
+            if not (st and st.doneAt) and not painted then kept[#kept + 1] = part end
         end
         shortlist = kept
     end
