@@ -280,7 +280,12 @@ noteBeam = function(hb, now)
     if #beams > 24 then table.remove(beams, 1) end
     local recent = 0
     for i = #beams, 1, -1 do if now - beams[i].t <= 0.5 then recent = recent + 1 else break end end
-    if recent >= 4 then RD.fanUntil = now + 1.5 end
+    if recent >= 4 then
+        RD.fanUntil = now + 1.5
+        -- Out to the edge: the lanes are 38 studs apart at 110 from the hub and
+        -- 14 at 40. The reflex runs until the character is 100 studs out.
+        RT.reflex = { name = "fan", from = hb.Position, radius = CFG.fanRadius, untilAt = now + 2.5 }
+    end
     -- Predictions older than half a second are stale, whatever came of them.
     for i = #RD.zones, 1, -1 do
         local z = RD.zones[i]
@@ -337,7 +342,15 @@ local function args(a, n) return type(a) == "table" and #a >= n end
 local HANDLERS = {
     -- The jump's target is where the 67-stud slam lands about 2.5 s later; the
     -- slam Model itself appears only at landing.
-    ["First Boss Jump Down"] = function(a) if typeof(a) == "Vector3" then circleZone("slam soon", a, 38, gameClock() + 2.5, 1.5) end end,
+    -- The slam is an instadeath 67 studs wide landing where announced: a zone
+    -- for the field, and a reflex for the brain - straight out from the
+    -- landing point at escape speed until clear (Chris: it HAS to get away).
+    ["First Boss Jump Down"] = function(a)
+        if typeof(a) == "Vector3" then
+            circleZone("slam soon", a, 38, gameClock() + 2.5, 1.5)
+            RT.reflex = { name = "slam", from = a, radius = 44, untilAt = os.clock() + 3.2 }
+        end
+    end,
     ["First Boss Criss Cross Projectile"] = function(a) if args(a, 5) then addPath("criss cross", a[5], a[1], a[2], a[3], a[4], 7.5, 7.5, 8) end end,
     ["First Boss Seeking Spike"] = function(a) if args(a, 5) then addPath("seeking spike", a[5], a[1], a[2], a[3], a[4], 10, 10, 4) end end,
     ["First Boss Big Spike"] = function(a) if args(a, 5) then addPath("big spike", a[5], a[1], a[2], a[3], a[4], 28, 28, 6) end end,
