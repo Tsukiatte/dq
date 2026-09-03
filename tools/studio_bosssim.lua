@@ -471,7 +471,7 @@ local function rollingProjectile(eventName, templateName, radius, damage, distan
         if now > t1 then conn:Disconnect() end
     end)
     local realT0 = tick() + 0.6
-    addLive(body, damage, eventName, atPlayer and tick() or realT0, realT0 + duration)
+    addLive(body, damage, eventName, atPlayer and (tick() + attr("DQSimCrissDelay", 0.3)) or realT0, realT0 + duration)
     log(eventName .. " fired")
 end
 

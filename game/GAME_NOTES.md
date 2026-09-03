@@ -253,3 +253,27 @@ a Studio recreation of the Midgardian Champion room (`tools/studio_install.lua`,
   (certain). Hits cost ~262M-394M HP each on a 262.74M-HP level-191 character.
   `firstBossMiddlePart`, `firstBossSpawnPart`, `firstBossLandingHeightPart`,
   `firstBossSmokePart` exist near the boss (markers, not attacks).
+
+
+## 6. Aquatic Temple (capture + place file, 2026-09-02)
+
+- Remote `ReplicatedStorage.remotes.aquaticBossSpecficEvents`. Events and
+  args (client handler in the place's LocalScript):
+  `first boss laser shot` {startTime, endTime, cframe, distance, bossModel,
+  topIndex}: `firstBossLaserPrecast` Model cloned, **renamed "Model"**,
+  placed at cframe (precast flashes 0.22 s); a Beam from the boss's top to an
+  attach part that travels the line from startTime to endTime.
+  `first boss moving orb` / `last boss moving orb` {cframe, startTime, endTime,
+  distance, duration}: `firstBossMoveOrb` / `finalBossOrbShot` **Parts
+  renamed "Model"** rolling along the look vector, faded at endTime.
+  `third boss smite` (position): `thirdBossSmite` particles + beam 0.3 s.
+  `second boss show damage parts`: `workspace.secondBossDamageParts` children
+  become visible. `last boss mark character` / `last boss remove mark`
+  (25-stud green ball at the marked player). `Shake Screens`.
+- Mobs: `cubePylonShot` (hitBox 34 x 100 x 7 or 10 x 57 x 10, precast visible
+  0.65) from `Defensive Cube Pylon`; certain hit at 0.8 s.
+- The capture's 8 hits: 6 on "Model" hitBoxes 4.4 x 7.9 x 35 (the laser
+  lines) at 0.9-4.5 s, 1 cube pylon shot at 0.8 s, and the orb (a Part named
+  Model, UNKNOWN to the index) in the last cluster.
+- Unknown: the orbs' size (radius guessed 5), the smite radius (10), how
+  long the damage parts stay live (4 s).

@@ -11,6 +11,30 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.11.0 - 2026-09-02 - "Aquatic Temple"
+
+From Chris's Aquatic Temple capture (8 hits) and the place file's client
+handler for `aquaticBossSpecficEvents`:
+
+- The boss's attack Models are renamed **"Model"** on the client (the laser
+  precast, the orbs). Learning by name pooled them all into one window
+  (396 "model" lifecycles, all live for their whole 5 s). A generic name is
+  keyed with the hitBox's rounded size: `model:4x8x35`.
+- **`first boss laser shot`** `{start, end, cframe, distance, ...}`: the
+  window is stamped onto the precast Model at that place
+  (`S.stampAttackWindow`, `HZ.windowStamps` for Models not yet tracked) and
+  kept as a cube zone along the line for the sweep.
+- **`first boss moving orb` / `last boss moving orb`** `{cframe, start, end,
+  distance, duration}`: Parts with no hitBox, so the index never sees them;
+  `PC.paths` from the event, radius `aquaticOrbRadius` (5, not captured yet).
+- **`third boss smite`**: circle zone (`aquaticSmiteRadius` 10, 0.6 s).
+  **`second boss show damage parts`**: each child of
+  `workspace.secondBossDamageParts` a cube zone for `aquaticDamagePartHold`.
+- Seeds: `cubepylonshot` 0.8-1.1 s (certain hit), `model:4x8x35` 0.9-3.6 s.
+- **Learning epoch** (`LEARN_EPOCH` 2): every save drops its learned timing
+  once, whatever build wrote it - a save rewritten by a new build had carried
+  the poisoned values forward.
+
 ## 4.10.10 - 2026-09-02 - "From the moment it exists"
 
 Chris's real capture of the Midgardian Champion (2026-09-02), seven deaths:

@@ -274,6 +274,7 @@ local function buildConfigTable()
         armDelays = RT.armDelays,
         armSpans = RT.armSpans,
         armLongLived = RT.armLongLived,
+        learnEpoch = S.LEARN_EPOCH,
         zonesByMap = RT.zoneData,
     }
 end
@@ -459,7 +460,10 @@ local function applyConfigData(data)
     -- the moment it was removed - floor for its whole life, so never dodged,
     -- and drawn as a box the whole time. Only certain hits teach now, and
     -- nothing taught before that is kept.
-    local trustLearned = versionAtLeast(savedVersion, "4.10.2")
+    -- And an epoch: a save written by a new build still carried the old
+    -- values forward (loaded, then re-saved under the new version). Below the
+    -- current epoch, learned timing goes whatever the version says.
+    local trustLearned = versionAtLeast(savedVersion, "4.10.2") and (tonumber(data.learnEpoch) or 0) >= S.LEARN_EPOCH
     if not trustLearned then
         heavyDebug("Config", string.format(
             "Save is from %s: learned attack timing and auto-learned names are discarded (they were wrong); hand picks and the attack book are kept.",
