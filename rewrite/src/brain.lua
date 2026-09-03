@@ -165,9 +165,12 @@ local function strafePoint(root, e, standoff, now)
     local ux, uz = rx / d, rz / d
     local tx, tz = -uz * BR.strafeDir, ux * BR.strafeDir
     local stepLen = 6
-    -- Pull toward the band as we go round.
+    -- Pull toward the band as we go round; a melee mob inside the band is
+    -- backed away from, not circled.
     local radial = standoff - d
-    local px, pz = rp.X + tx * stepLen + ux * max(min(radial, 4), -4), rp.Z + tz * stepLen + uz * max(min(radial, 4), -4)
+    local clampR = e.melee and 8 or 4
+    if e.melee and radial > 2 then stepLen = 2 end
+    local px, pz = rp.X + tx * stepLen + ux * max(min(radial, clampR), -clampR), rp.Z + tz * stepLen + uz * max(min(radial, clampR), -clampR)
     local params = raycastParams(e.model)
     local y = floorY(px, rp.Y, pz, params)
     local blocked = (not y) or abs(y - rp.Y) > CFG.maxStepHeight + 3 or dangerAt(px, rp.Y, pz, stepLen / CFG.tweenWalk) >= CFG.dodgeMoveAt
@@ -218,7 +221,7 @@ local function brainTick(now)
         local standoff = standoffFor(target)
         local d = flat(root.Position, target.root.Position)
         if d > standoff + 3 then
-            local speed = target.isBoss and d > 45 and CFG.tweenEscape or CFG.tweenWalk
+            local speed = (target.isBoss and d > 45) and CFG.tweenEscape or CFG.tweenWalk
             travel(hum, root, target.root.Position, speed, "approach")
             if d <= CFG.abilityRadius then fight(hum, root, target, now) end
             return
@@ -228,7 +231,8 @@ local function brainTick(now)
         if CFG.strafe then
             local p = strafePoint(root, target, standoff, now)
             if p then
-                driveTo(hum, root, p, CFG.tweenWalk * CFG.strafeSpeedFraction, 1.0)
+                local speed = (target.melee and d < standoff - 2) and CFG.tweenEscape or CFG.tweenWalk * CFG.strafeSpeedFraction
+                driveTo(hum, root, p, speed, 1.0)
                 setMovementState("strafe")
                 return
             end

@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.0"
+local SCRIPT_VERSION = "5.1.1"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.1", date = "2026-09-03", notes = "First live run of the rewrite: the Champion from 100% to dead at ability range, four deaths on the aimed shot's cadence. Then the mob rooms said two things. Melee mobs killed at three and six studs: their danger radius now runs eight studs past their swing and they are fought from twenty, retreating rather than circling. Crossing mage lines had every near spot hot and the character shuttled between two attacks: an escape spot is now kept until reached or its line closes, the far look goes to four times reach, and when everything near is hot spots away from the target are preferred, so it backs out." },
     { version = "5.1.0", date = "2026-09-03", notes = "Rewrite. About 1400 lines of logic on the same interface kit: a reader that turns every attack into boxes with live windows, a field that scores a ring of spots with the fire time of the ground under you as the cutoff, a floor-following tween, and a brain that clears rooms, walks straight to the boss, fights at ability range and strafes. Timings are seeds measured in eight recorded runs, never learned from being hit." },
 }
 
@@ -39,7 +40,8 @@ local CFG = {
     maxDropHeight = 30,
 
     -- Standing.
-    meleeStandoff = 14,           -- studs past a melee mob's body
+    meleeStandoff = 20,           -- studs past a melee mob's body: they close fast and one swing kills
+    meleeBuffer = 8,              -- the field treats a melee mob as dangerous this far past its swing
     rangedStandoff = 10,          -- studs from a ranged mob
     bossStandoff = 26,            -- inside ability range, outside its melee
     meleeMobMaxReach = 8,         -- a mob whose meleeDistance is at most this is melee
@@ -69,6 +71,8 @@ local CFG = {
     dodgeHysteresis = 0.1,
     dodgeDistanceCost = 0.008,
     dodgeFarScale = 2.5,          -- second look this many times further when nothing near is safe
+    dodgeFarScale2 = 4.0,         -- and a third, further still
+    dodgeOutwardWeight = 0.25,    -- when everything near is hot, prefer spots away from the target: back out
     dodgeInsideWeight = 0.85,
     dodgeStrafeWeight = 0.15,     -- preference for moving across the target's line rather than along it
     dodgeApproachWeight = 0.03,   -- pull toward the standoff band, per stud out of it
