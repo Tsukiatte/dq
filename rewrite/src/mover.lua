@@ -70,17 +70,16 @@ local function driveTo(hum, root, target, speed, arrive)
     if hum.AutoRotate == aimed then hum.AutoRotate = not aimed end
     local scale = math.clamp(speed / math.max(hum.WalkSpeed, 1), 0.15, 1)
     hum:Move(flat.Unit * scale, false)
-    -- Standing against something for half a second: a hop.
+    -- Standing against something: noted for the brain (which re-plans);
+    -- never a jump. Jumping in place after a hop looked like spam and did
+    -- nothing, and the anticheat watches jumps.
     local now = os.clock()
     if MV.lastPos and (pos - MV.lastPos).Magnitude < 0.05 then
         MV.stallSince = MV.stallSince or now
-        if now - MV.stallSince > 0.5 then
-            count("jump")
-            hum.Jump = true
-            MV.stallSince = now
-        end
+        RT.stalledFor = now - MV.stallSince
     else
         MV.stallSince = nil
+        RT.stalledFor = 0
     end
     MV.lastPos = pos
     return false
