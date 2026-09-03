@@ -42,9 +42,8 @@ local function flat(a, b) local dx, dz = a.X - b.X, a.Z - b.Z return sqrt(dx * d
 -- How far the abilities reach: measured range plus the geyser's own radius,
 -- else the configured cast radius.
 S.abilityReach = function()
-    if CFG.autoStandoff then
-        local measured = math.max(RD.abilityRange or 0, RD.abilityReach or 0)
-        if measured > 0 then return math.max(CFG.abilityRadius, math.min(measured, CFG.autoStandoffMax) + 5) end
+    if CFG.autoStandoff and RD.abilityRange then
+        return math.max(CFG.abilityRadius, math.min(RD.abilityRange, CFG.autoStandoffMax) + 3)
     end
     return CFG.abilityRadius
 end
@@ -58,11 +57,15 @@ local function standoffFor(e)
         -- During the beam fan the fight is from the edge: the lanes are far
         -- enough apart there to stand between and hop across.
         if os.clock() < (RD.fanUntil or -math.huge) + 1.0 then return CFG.fanRadius end
-        if CFG.autoStandoff then
-            local measured = math.max(RD.abilityRange or 0, RD.abilityReach or 0)
-            if measured > 0 then
-                return math.max(CFG.bossStandoff, math.min(measured + CFG.autoStandoffOffset, CFG.autoStandoffMax))
+        if CFG.autoStandoff and RD.abilitySlots then
+            -- The least ranged slot: two studs inside a known cap, one past a
+            -- reach that is only a lower bound. Never closer than the slider.
+            local best = nil
+            for _, s in pairs(RD.abilitySlots) do
+                local v = s.cap and (s.cap - 2) or (s.reach and (s.reach + 1))
+                if v and (not best or v < best) then best = v end
             end
+            if best then return math.max(CFG.bossStandoff, math.min(best, CFG.autoStandoffMax)) end
         end
         return CFG.bossStandoff
     end
@@ -188,6 +191,12 @@ local function travel(hum, root, to, speed, label, exclude)
         if not stepSafe(root.Position, to, speed) then
             -- The next stretch is cut by an attack: stand for the moment rather
             -- than walk into it (the field moves us if standing is unsafe).
+            if DG.target then
+                -- The spot instead of standing beside the box that cut the line.
+                driveTo(hum, root, DG.target, CFG.tweenEscape, 1.0)
+                setMovementState(label .. " blocked; via spot")
+                return false
+            end
             releaseMover(hum, root)
             setMovementState(label .. " blocked")
             return false
@@ -224,6 +233,11 @@ local function travel(hum, root, to, speed, label, exclude)
         return
     end
     if not stepSafe(root.Position, wp, speed) then
+        if DG.target then
+            driveTo(hum, root, DG.target, CFG.tweenEscape, 1.0)
+            setMovementState(label .. " blocked; via spot")
+            return false
+        end
         releaseMover(hum, root)
         setMovementState(label .. " blocked")
         return false
@@ -243,10 +257,15 @@ local function fight(hum, root, e, now)
     local d = flat(root.Position, ep)
     faceToward(root, hum, ep)
     if d <= S.abilityReach() then
-        local cast = false
-        if CFG.autoQ and now - RT.lastQ >= CFG.abilityInterval then RT.lastQ = now pressKey(Enum.KeyCode.Q) cast = true end
-        if CFG.autoE and now - RT.lastE >= CFG.abilityInterval then RT.lastE = now pressKey(Enum.KeyCode.E) cast = true end
-        if cast then RT.lastCastAt = now RT.lastCastPos = root.Position RT.lastCastTargetPos = ep end   -- the reader measures the range from where the geyser lands
+        -- Each cast queues up for the reader, which measures the range from
+        -- where the projectile lands.
+        RT.castQueue = RT.castQueue or {}
+        local function queueCast(slot)
+            RT.castQueue[#RT.castQueue + 1] = { slot = slot, at = now, pos = root.Position, targetPos = ep }
+            while #RT.castQueue > 4 do table.remove(RT.castQueue, 1) end
+        end
+        if CFG.autoQ and now - RT.lastQ >= CFG.abilityInterval then RT.lastQ = now pressKey(Enum.KeyCode.Q) queueCast("q") end
+        if CFG.autoE and now - RT.lastE >= CFG.abilityInterval then RT.lastE = now pressKey(Enum.KeyCode.E) queueCast("e") end
     end
     if CFG.autoAttack and d <= CFG.attackRange + e.extent and now - RT.lastClick >= CFG.clickInterval then
         RT.lastClick = now

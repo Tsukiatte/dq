@@ -134,35 +134,59 @@ local function trackPart(part)
     RD.parts[part] = { part = part, x = p.X, z = p.Z, vx = 0, vz = 0, at = os.clock(), spawn = os.clock() }
 end
 
--- Our own ability. The Geyser is placed on the target, or at the range cap
--- along the aim when the target is further: a geyser that lands short of a
--- far target measures the range (Chris: read the range, stand at it).
-local function noteGeyser(model)
+-- Our own abilities, per slot. The projectile Model carries the Tool's
+-- name. A cast queues up with its slot and where the character and target
+-- stood; the projectile that appears within 0.8 s takes the oldest. Placed on
+-- the target = reach (the range is at least this); short of a further target
+-- along the aim = the cap. The least ranged slot sets the fight distance.
+local function ourAbilityNames()
+    local names = {}
+    for _, c in ipairs({ LocalPlayer.Backpack, LocalPlayer.Character }) do
+        if c then
+            for _, t in ipairs(c:GetChildren()) do
+                if t:IsA("Tool") and t:FindFirstChild("abilitySlot") then names[t.Name] = t.abilitySlot.Value end
+            end
+        end
+    end
+    return names
+end
+local function noteOurProjectile(model)
     task.defer(function()
-        local castAt = RT.lastCastAt or -math.huge
-        if os.clock() - castAt > 0.8 then return end
-        local castPos, targetPos = RT.lastCastPos, RT.lastCastTargetPos
-        local ring = model:FindFirstChild("geyserRing") or model:FindFirstChildWhichIsA("BasePart")
-        if not castPos or not targetPos or not ring then return end
-        local g = Vector3.new(ring.Position.X, 0, ring.Position.Z)
+        local q = RT.castQueue
+        if not q or #q == 0 then return end
+        local cast = table.remove(q, 1)
+        if os.clock() - cast.at > 0.8 then return end
+        local part = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
+        if not part then return end
+        local g = Vector3.new(part.Position.X, 0, part.Position.Z)
+        local castPos, targetPos = cast.pos, cast.targetPos
         local d = (g - Vector3.new(castPos.X, 0, castPos.Z)).Magnitude
         local toTarget = (g - Vector3.new(targetPos.X, 0, targetPos.Z)).Magnitude
         local targetD = (Vector3.new(targetPos.X, 0, targetPos.Z) - Vector3.new(castPos.X, 0, castPos.Z)).Magnitude
+        RD.abilitySlots = RD.abilitySlots or {}
+        local slot = RD.abilitySlots[cast.slot] or { name = model.Name }
+        RD.abilitySlots[cast.slot] = slot
+        slot.name = model.Name
         if toTarget <= 8 then
-            -- On the target: the range is at least this.
-            if d > (RD.abilityReach or 0) then RD.abilityReach = math.floor(d + 0.5) end
+            if d > (slot.reach or 0) then slot.reach = math.floor(d + 0.5) end
         elseif targetD > d + 3 then
-            -- Short of the target, along the aim: the cap.
             local cap = math.floor(d + 0.5)
-            if cap >= 15 and cap <= 80 and cap > (RD.abilityRange or 0) then RD.abilityRange = cap end
+            if cap >= 15 and cap <= 90 and cap > (slot.cap or 0) then slot.cap = cap end
         end
-        -- A reach beyond the supposed cap means the cap was misread.
-        if RD.abilityRange and RD.abilityReach and RD.abilityReach > RD.abilityRange + 2 then RD.abilityRange = nil end
+        if slot.cap and slot.reach and slot.reach > slot.cap + 2 then slot.cap = nil end
+        -- The least ranged slot, for the brain and the interface.
+        local least = nil
+        for _, s in pairs(RD.abilitySlots) do
+            local range = s.cap or s.reach
+            if range and (not least or range < least) then least = range end
+        end
+        RD.abilityRange = least
+        RD.abilityReach = least
     end)
 end
 
 local function consider(inst)
-    if inst:IsA("Model") and inst.Name == "Geyser" then noteGeyser(inst) return end
+    if inst:IsA("Model") and RT.castQueue and #RT.castQueue > 0 and (RD.ourAbilityNames or {})[inst.Name] then noteOurProjectile(inst) return end
     if inst:IsA("Model") and lower(inst.Name):find("movingbeam", 1, true) then trackWall(inst) return end
     if inst:IsA("Model") then
         trackModel(inst)
@@ -467,6 +491,10 @@ end
 
 -- ------------------------------------------------------------ tick
 local function readerTick(now)
+    if now - (RD.abilityNamesAt or -math.huge) > 5 then
+        RD.abilityNamesAt = now
+        RD.ourAbilityNames = ourAbilityNames()
+    end
     -- New instances arrive through DescendantAdded; a cheap sweep every quarter
     -- second catches anything that was renamed or moved in afterwards.
     if now - RD.lastSweep > 0.25 then
@@ -562,8 +590,14 @@ local function hazards(now)
                 if isCyl then size = Vector3.new(size.X, size.Y + r.pad * 2, size.Z + r.pad * 2)
                 else size = Vector3.new(size.X + r.pad * 2, size.Y, size.Z + r.pad * 2) end
             end
-            out[#out + 1] = { cframe = anchor.CFrame, size = size, round = isCyl and anchor.Size.Y == anchor.Size.Z, cyl = isCyl,
+            -- Remembered: a precast that is destroyed when it fires must not
+            -- take the box with it while the window is still open.
+            r.lastCFrame, r.lastSize, r.lastRound, r.lastCyl = anchor.CFrame, size, isCyl and anchor.Size.Y == anchor.Size.Z, isCyl
+            out[#out + 1] = { cframe = anchor.CFrame, size = size, round = r.lastRound, cyl = isCyl,
                 from = r.from, untilAt = r.long and huge or r.untilAt, name = r.name, kind = "model", slim = r.slim }
+        elseif r.lastCFrame and now <= r.untilAt then
+            out[#out + 1] = { cframe = r.lastCFrame, size = r.lastSize, round = r.lastRound, cyl = r.lastCyl,
+                from = r.from, untilAt = r.untilAt, name = r.name, kind = "model", slim = r.slim }
         end
     end
     for part, r in pairs(RD.parts) do

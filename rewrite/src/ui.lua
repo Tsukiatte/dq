@@ -108,14 +108,14 @@ local function buildUI()
     track(K.toggle(combat.content, "Auto Q", function() return CFG.autoQ end, function(v) CFG.autoQ = v end, 1, "Press Q on cooldown while the target is inside the ability radius."))
     track(K.toggle(combat.content, "Auto E", function() return CFG.autoE end, function(v) CFG.autoE = v end, 2, "Press E on cooldown while the target is inside the ability radius."))
     track(K.toggle(combat.content, "Auto attack", function() return CFG.autoAttack end, function(v) CFG.autoAttack = v end, 3, "Swing the weapon while the target is in reach. Off for high-level dungeons: abilities only."))
-    track(K.slider(combat.content, "Ability radius", "studs", 15, 50, false, function() return CFG.abilityRadius end, function(v) CFG.abilityRadius = v end, 4, "Q and E fire only with the target inside this."))
+    track(K.slider(combat.content, "Ability radius", "studs", 15, 80, false, function() return CFG.abilityRadius end, function(v) CFG.abilityRadius = v end, 4, "Q and E fire only with the target inside this."))
     track(K.slider(combat.content, "Attack range", "studs", 4, 20, false, function() return CFG.attackRange end, function(v) CFG.attackRange = v end, 5, "The weapon's reach."))
     combat.setOpen(true)
 
     local standing = K.section(body, "Standing", next(), "How far from each kind of enemy to fight.")
     track(K.toggle(standing.content, "Standoff from ability range", function() return CFG.autoStandoff end, function(v) CFG.autoStandoff = v end, 0, "Measure how far your ability reaches from where it lands, and fight bosses from just inside that. The slider below is used until it has been measured, or when this is off."))
     local rangeCaption = K.caption(standing.content, "Ability range: not measured yet", 0)
-    track(K.slider(standing.content, "Boss standoff", "studs", 10, 60, false, function() return CFG.bossStandoff end, function(v) CFG.bossStandoff = v end, 1, "Inside ability range, outside its melee."))
+    track(K.slider(standing.content, "Boss standoff", "studs", 10, 80, false, function() return CFG.bossStandoff end, function(v) CFG.bossStandoff = v end, 1, "Inside ability range, outside its melee."))
     track(K.slider(standing.content, "Mob standoff", "studs", 15, 50, false, function() return CFG.mobStandoff end, function(v) CFG.mobStandoff = v end, 2, "From any mob, past its body. Abilities reach about 40; at high level one swing or shot kills, so never inside weapon reach."))
     track(K.toggle(standing.content, "Strafe at standoff", function() return CFG.strafe end, function(v) CFG.strafe = v end, 4, "Circle the target instead of standing still."))
     track(K.slider(standing.content, "Strafe speed", "of walk", 0.2, 1.0, true, function() return CFG.strafeSpeedFraction end, function(v) CFG.strafeSpeedFraction = v end, 5, "Fraction of the walking speed used while circling."))
@@ -343,9 +343,12 @@ local function buildUI()
         playtimeValue.Text = string.format("%02d:%02d", math.floor(seconds / 60), math.floor(seconds % 60))
         statusValue.Text = tostring(RT.movementState or "idle")
         if rangeCaption and rangeCaption.Parent then
-            local r = RD.abilityRange
-            rangeCaption.Text = r and string.format("Ability range measured: %d studs (fighting bosses from %d)", r, math.max(CFG.bossStandoff, math.min(r + CFG.autoStandoffOffset, CFG.autoStandoffMax)))
-                or (RD.abilityReach and string.format("Ability reached a target from %d studs; cap not seen yet", RD.abilityReach) or "Ability range: not measured yet (cast at a far target)")
+            local parts = {}
+            for slot, s in pairs(RD.abilitySlots or {}) do
+                parts[#parts + 1] = string.format("%s %s: %s", string.upper(slot), s.name or "?", s.cap and (s.cap .. " studs") or (s.reach and ("at least " .. s.reach) or "?"))
+            end
+            table.sort(parts)
+            rangeCaption.Text = #parts > 0 and ("Ability range measured - " .. table.concat(parts, ", ") .. ". The least ranged one sets the fight distance.") or "Ability range: not measured yet (cast at a target)"
         end
         local ping = 0
         pcall(function() ping = Stats.Network.ServerStatsItem["Data Ping"]:GetValue() end)

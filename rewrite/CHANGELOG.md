@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.65 - 2026-09-03 - "Per slot"
+
+- Reader: `ourAbilityNames`, `noteOurProjectile`, `RD.abilitySlots[slot] = { name, cap, reach }`; cached geometry for anchor-less records. Brain: `RT.castQueue`; standoff from the least ranged slot; blocked travel goes via the spot. UI: sliders to 80, per-slot caption. Core: `autoStandoffMax` 70, circle pad 10.
+
 ## 5.1.64 - 2026-09-03 - "Two studs wider"
 
 - Bob beam seeds `slim` 2.5, `slimShoulder` 1.0; blink bare reach 2.5 (both checks).
