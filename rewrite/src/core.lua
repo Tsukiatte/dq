@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.71"
+local SCRIPT_VERSION = "5.1.72"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.72", date = "2026-09-03", notes = "Champion slam: the reflex starts when the slam Model appears, two seconds before the hit; the Jump Down event turned out to arrive with the hit itself (the trace showed the reflex starting at the moment of death). Mage volley: the predicted march covers the whole line, so the closest clean spot is sideways rather than further along it. A blink to the marker needs it four studs away." },
     { version = "5.1.71", date = "2026-09-03", notes = "Bob (Chris): the fight position is his home point - at ability range from him on the crystals' side, near the arena centre - so the orbs can be led without leaving range. An orb that follows the character is led into the crystal of its colour: the bot runs to the far side of that crystal at escape speed and holds there while the orb comes. Bob only." },
     { version = "5.1.70", date = "2026-09-03", notes = "Bob: the circle Model itself is destroyed when it fires, not only its precast, and the reader dropped the record with it - two more deaths seven studs outside a circle it had just forgotten. A record whose Model is gone now lives on its remembered geometry until its window closes." },
     { version = "5.1.69", date = "2026-09-03", notes = "Per-boss profiles (Chris: keep the Champion and Bob apart). The arena pull, the fan reflex and the slam reflex are the Champion only; Bob keeps the chain line, the wall and the orb bubble. Attack windows stay keyed by attack name; the blink, the measured range and the mob rules are shared." },
