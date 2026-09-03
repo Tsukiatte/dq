@@ -11,6 +11,10 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.12.13 - 2026-09-03 - "Start"
+
+- **Press START** (`autoStartDungeon`, `autoStartDelay` 6): a queued run teleports the party to the dungeon and waits at the spawn until the START button is pressed; run 4 sat there for two minutes. The button fires `remotes.changeStartValue`; the script fires it after 6 s in an unstarted dungeon and every 10 s until `dungeonStarted` flips. Runs with auto queue off too. Toggle under Auto queue; saved with the config.
+
 ## 4.12.12 - 2026-09-03 - "Re-read"
 
 Run 3 re-read (`game/captures/nl_run3_2026-09-03_c.json`): 14 of 16 audited deaths coincide with an aimed criss cross whose origin is within 3.6 studs of the death; the two others were inside beams under 1 s old. Chris was right that the beam is not lethal for 7 s.
