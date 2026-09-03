@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.39 - 2026-09-03 - "Look before stepping"
+
+- Brain: `travel` checks `stepSafe` before each drive; blocked steps stand still.
+
 ## 5.1.38 - 2026-09-03 - "In the fight only"
 
 - Blink requires `DG.approach` within 70 studs.
