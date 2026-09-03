@@ -1,5 +1,10 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.56 - 2026-09-03 - "Back inside"
+
+- Brain: fan standoff override removed. Core: passive beam seed back to 3.5 s, no slim.
+- Reader: `First Boss Jump Up` places a `slam soon` zone (36) at the player, firing in 3.0 s.
+
 ## 5.1.55 - 2026-09-03 - "The old HUD"
 
 - UI: HUD rebuilt after 4.12's (chip: name | build | fps; card: Playtime, Status, Ping; hint; Autofarm pill).
