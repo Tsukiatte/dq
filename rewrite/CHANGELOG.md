@@ -1,5 +1,10 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.50 - 2026-09-03 - "Bob, read properly"
+
+- Reader: `noteCircle` predicts nine circles of a chain as `circle next` zones.
+- Reader: `RD.walls` tracks `secondBossMovingBeam` models by their balls; the `Second Boss Moving Beam` remote handler is removed.
+
 ## 5.1.49 - 2026-09-03 - "Danger first"
 
 - Field: `dodgeDangerWeight` 3.0 multiplies the graded danger in `costOf`.

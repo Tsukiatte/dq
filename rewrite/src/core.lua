@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.49"
+local SCRIPT_VERSION = "5.1.50"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.50", date = "2026-09-03", notes = "Bob: the circle chain is predicted from its first circle (0.27 s, 22 studs and 6 studs wider per step, lethal 0.6 s after each appears) so the bot leaves the line before the chain reaches it. The sweeping wall is tracked from its real model (balls and beam, ~19 studs/s); the announced path was a hundred studs off and is no longer used." },
     { version = "5.1.49", date = "2026-09-03", notes = "Danger weighs three times as much as before in a spot's cost. At every death in the beam fan the cheapest spots were all lethal while clean ones 75 studs out lost on the pull toward the boss and the distance term; that is why it stood in the red." },
     { version = "5.1.48", date = "2026-09-03", notes = "Bob's circles: seeded to fire 0.6 s after the Model appears (deaths came 0.2-0.5 s before the old 1.2) and padded 3 studs wider than their precast cylinder (deaths at 1.5 studs outside it). Seeds may carry a pad the reader applies to the box." },
     { version = "5.1.47", date = "2026-09-03", notes = "A moving projectile's whole remaining lane (spirals, saw discs, the big spike) is soft danger ahead of the body, so the bot never sits where one is going to pass, and the lane is drawn to its end." },
