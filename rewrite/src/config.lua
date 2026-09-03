@@ -13,10 +13,24 @@ local function hasFiles()
     return type(writefile) == "function" and type(readfile) == "function" and type(isfile) == "function"
 end
 
--- Everything in CFG that is a number, boolean or string, plus colours as hex.
+-- Only what the UI exposes is saved. Tuning constants follow the code: a
+-- snapshot of all of CFG kept every old default alive across releases.
+local PERSIST = {
+    "abilityRadius", "attackRange", "autoAttack", "autoE", "autoQ", "autoFarmByPlace",
+    "autoQueue", "autoQueueDelay", "autoQueueDifficulty", "autoQueueHardcore", "autoQueueMap", "autoQueuePrivate", "autoQueueReplay", "autoStartDungeon",
+    "bossStandoff", "meleeStandoff", "rangedStandoff", "strafe", "strafeSpeedFraction", "tweenEscape", "tweenWalk",
+    "colorFloor", "colorLive", "colorSoon", "drawHazards", "drawTarget", "hazardTransparency",
+    "debugPrints", "defaultFire", "defaultLive", "dodgeDwell", "dodgeFarScale", "dodgeLead", "dodgeMoveAt", "dodgePathLead", "dodgeReach", "dodgeStrafeWeight",
+    "menuKey",
+}
+local PERSIST_SET = {}
+for _, k in ipairs(PERSIST) do PERSIST_SET[k] = true end
+S.persistKeys = PERSIST_SET
+
 local function snapshot()
     local out = {}
-    for k, v in pairs(CFG) do
+    for _, k in ipairs(PERSIST) do
+        local v = CFG[k]
         local t = typeof(v)
         if t == "number" or t == "boolean" or t == "string" then out[k] = v
         elseif t == "Color3" then out[k] = "#" .. v:ToHex() end
@@ -29,7 +43,7 @@ end
 local function apply(data)
     for k, v in pairs(data) do
         local cur = CFG[k]
-        if cur ~= nil then
+        if cur ~= nil and PERSIST_SET[k] then
             local t = typeof(cur)
             if t == "Color3" and type(v) == "string" then
                 local ok, c = pcall(Color3.fromHex, v)
