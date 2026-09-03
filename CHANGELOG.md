@@ -11,6 +11,13 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.10.7 - 2026-09-02
+
+- The hub ring is held from wherever the last dodge left the character: the
+  approach (and so the ring pull) is set whenever the target hub is active or
+  imminent, not only within a box-length of the boss or with pursuit blocked.
+  A dodge that ended 80 studs out during a burst had left it standing there.
+
 ## 4.10.6 - 2026-09-02
 
 - **The hub's rhythm sets where to stand.** `hub.active` (lines coming now)
