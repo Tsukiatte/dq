@@ -92,15 +92,16 @@ local function roomTargets()
     return out
 end
 
+-- The next room is the first one past the furthest we have stood in. A room
+-- whose anchor we never came within 25 studs of (its mobs died from range) is
+-- behind us all the same; 5.1.9 walked back to room 2 after the Champion.
 local function nextRoom(rp)
-    for _, r in ipairs(roomTargets()) do
-        if not BR.visitedRooms[r.name] then
-            if flat(rp, r.position) < 25 then
-                BR.visitedRooms[r.name] = true
-            else
-                return r
-            end
-        end
+    local rooms = roomTargets()
+    for _, r in ipairs(rooms) do
+        if flat(rp, r.position) < 25 and r.order > (BR.reachedOrder or 0) then BR.reachedOrder = r.order end
+    end
+    for _, r in ipairs(rooms) do
+        if r.order > (BR.reachedOrder or 0) then return r end
     end
     return nil
 end
