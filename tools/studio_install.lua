@@ -22,7 +22,7 @@
 
 local BASE = "https://raw.githubusercontent.com/Tsukiatte/dq/main/src/"
 local LOADER_URL = "https://raw.githubusercontent.com/Tsukiatte/dq/main/tools/studio_loader.lua"
-local ORDER = { "core", "gamedata", "uikit", "hazards", "precast", "bossevents", "nav", "mover", "dodge", "path", "streamer", "config", "ui", "main" }
+local ORDER = { "core", "gamedata", "uikit", "reader", "field", "bosses", "mover", "dodge", "pursuit", "draw", "tools", "path", "streamer", "config", "ui", "main" }
 
 local HttpService = game:GetService("HttpService")
 local StarterPlayer = game:GetService("StarterPlayer")
