@@ -72,7 +72,7 @@ local CFG = {
     clickInterval = 0.25,
 
     -- Dodge field.
-    dodgeInterval = 0.05,
+    dodgeInterval = 0.016,
     dodgeReach = 18,
     dodgeRings = 3,
     dodgeRays = 16,
