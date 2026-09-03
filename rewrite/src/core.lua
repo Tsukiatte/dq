@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.17"
+local SCRIPT_VERSION = "5.1.18"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.18", date = "2026-09-03", notes = "The fan retreat is gone: beams fire eight to ten a second through most of the fight, so the detector held the boss at 135 studs and the character strafed there dealing nothing. Passive beams get a 0.3 s telegraph (the earliest death inside one), so the field may step out through a fresh beam instead of treating it as a wall." },
     { version = "5.1.17", date = "2026-09-03", notes = "Champion: the next two beam lanes of the slow sweep are zones (20 degrees on, half a second apart); the fast fan is detected and the boss is left for its 125-stud reach until it ends; the jump's target is a slam zone 2.5 s ahead. Standoff 35 (the abilities' best band). Dodge rings reach 30 studs so a 40-wide body can be sidestepped; far looks at 48 and 75." },
     { version = "5.1.16", date = "2026-09-03", notes = "A room counts as reached when the character stands inside its bounding box, not only within 25 studs of its first spawn part (the bot walked back toward room 2 after two boss kills). The field decides every frame: the aimed criss cross kills on spawn and a moving character survives it far more often than a parked one." },
     { version = "5.1.15", date = "2026-09-03", notes = "Dodge tuning keys are no longer persisted; the saved 0.6 s dwell was overriding 5.1.14 on load." },
@@ -140,7 +141,7 @@ local TIMING = {
     spearmanstrikehitbox        = { first = 0.6, last = 1.2 },
     northernwarriorlinestrike   = { first = 0.6, last = 1.2 },
     northernwarriorcirclestrike = { first = 0.6, last = 1.2 },
-    firstbosspassivebeam        = { first = 0.0, last = 2.0 },
+    firstbosspassivebeam        = { first = 0.3, last = 2.0 },   -- deaths inside beams start 0.3-0.4 s after the Model appears; a fresh beam can be stepped out of
     firstbossjumpslam           = { first = 1.8, last = 5.0 },
     secondbosscriclehitbox      = { first = 1.2, last = 2.5 },
     secondbosshorizontalbeam    = { first = 1.1, last = 5.0 },

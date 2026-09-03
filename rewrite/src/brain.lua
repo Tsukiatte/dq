@@ -40,9 +40,7 @@ local sqrt, abs, max, min = math.sqrt, math.abs, math.max, math.min
 local function flat(a, b) local dx, dz = a.X - b.X, a.Z - b.Z return sqrt(dx * dx + dz * dz) end
 
 local function standoffFor(e)
-    -- During the beam fan the boss is left alone: nothing inside the beams'
-    -- 125-stud reach lives through it.
-    if e.isBoss then return (os.clock() < (RD.fanUntil or -math.huge)) and 135 or CFG.bossStandoff end
+    if e.isBoss then return CFG.bossStandoff end
     if e.melee then return e.extent + CFG.meleeStandoff end
     return e.extent + CFG.rangedStandoff
 end

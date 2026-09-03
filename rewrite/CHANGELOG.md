@@ -1,5 +1,10 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.18 - 2026-09-03 - "No retreat"
+
+- Brain: boss standoff no longer depends on the beam fan (`RD.fanUntil` stays informational).
+- Passive beam timing seed `first` 0.3.
+
 ## 5.1.17 - 2026-09-03 - "Lanes"
 
 - Reader: `noteBeam` predicts the next two sweep lanes as `beam next` zones; four beams within 0.5 s set `RD.fanUntil`.
