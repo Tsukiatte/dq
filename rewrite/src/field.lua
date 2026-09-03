@@ -125,15 +125,18 @@ local function dangerAt(px, py, pz, t)
             if d > worst then worst = d if worst >= 1 then return 1 end end
         end
     end
-    -- Melee mobs: being next to one is the attack.
+    -- Melee mobs: a soft zone, never a wall. Their strikes are telegraphed
+    -- Models and count in full above; the zone only keeps the spots away from
+    -- them. A hard 19-stud circle made every spot in room 1 look lethal and
+    -- the character stood still in the mage shots.
     for i = 1, #RD.enemies do
         local e = RD.enemies[i]
         if e.melee and not e.isBoss then
             local tt = min(t, 0.6)
             local dx, dz = px - (e.x + e.vx * tt), pz - (e.z + e.vz * tt)
             local d = sqrt(dx * dx + dz * dz) - (e.extent + e.meleeDistance + CFG.meleeBuffer)
-            local v = dangerFromDepth(-d, reach, shoulder * 2)
-            if v > worst then worst = v if worst >= 1 then return 1 end end
+            local v = dangerFromDepth(-d, reach, shoulder * 2) * 0.5
+            if v > worst then worst = v end
         end
     end
     return worst

@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.10"
+local SCRIPT_VERSION = "5.1.11"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.11", date = "2026-09-03", notes = "Melee mobs are a soft zone (danger at most 0.5, buffer 4) instead of a lethal 19-stud circle; their strikes are tracked as boxes anyway, and the hard circle left the field with no spot in room 1 while mage shots landed. The body margin is 1.5 studs: a beam killed at 1.5 studs outside its box." },
     { version = "5.1.10", date = "2026-09-03", notes = "The next room is the first past the furthest room stood in; rooms passed at range no longer pull the character back (it walked toward room 2 after the Champion died)." },
     { version = "5.1.9", date = "2026-09-03", notes = "Sixteen deaths in one Champion fight, read from the recorder. A moving body is danger from the moment it is announced (the aimed criss cross sits on the player until its start time; the field used to notice it 0.4 s before). Remote-announced paths are ground attacks whatever height their CFrame carries (the big spike was filtered out vertically). A far spot up a ramp is allowed. Walks are planned at the Humanoid's real WalkSpeed, so the escape burst is no longer permanent when the saved walk speed is above 16." },
     { version = "5.1.8", date = "2026-09-03", notes = "Third anti-cheat kick, from the server, during ordinary driving. The mover no longer writes positions at all: every move is a Humanoid walk, and leaving danger raises WalkSpeed to the escape value for the burst and restores it after. Real collisions, real falls, legal speed. Half a second against a wall is a hop." },
@@ -50,7 +51,7 @@ local CFG = {
 
     -- Standing.
     meleeStandoff = 20,           -- studs past a melee mob's body: they close fast and one swing kills
-    meleeBuffer = 8,              -- the field treats a melee mob as dangerous this far past its swing
+    meleeBuffer = 4,              -- the field treats a melee mob as dangerous this far past its swing
     rangedStandoff = 10,          -- studs from a ranged mob
     bossStandoff = 26,            -- inside ability range, outside its melee
     meleeMobMaxReach = 8,         -- a mob whose meleeDistance is at most this is melee
@@ -71,7 +72,7 @@ local CFG = {
     dodgeReach = 18,
     dodgeRings = 3,
     dodgeRays = 16,
-    dodgeMargin = 0.5,            -- studs of clearance round the character
+    dodgeMargin = 1.5,            -- studs of clearance round the character
     dodgeShoulder = 3,            -- studs of warm edge outside a hazard
     dodgeLead = 1.2,              -- a standing telegraph counts as live this long before it fires
     dodgePathLead = 0.4,          -- a moving projectile's line: the time to sidestep

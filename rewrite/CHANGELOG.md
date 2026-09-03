@@ -1,5 +1,10 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.11 - 2026-09-03 - "Soft zone"
+
+- Melee-mob proximity is a soft preference (max 0.5), `meleeBuffer` 4; attack boxes decide.
+- `dodgeMargin` 1.5 (body radius): a beam killed 1.5 studs outside its box.
+
 ## 5.1.10 - 2026-09-03 - "Forward only"
 
 - `nextRoom` tracks the furthest room order reached; rooms passed at range count as behind.
