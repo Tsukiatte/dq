@@ -125,6 +125,15 @@ local function dangerAt(px, py, pz, t)
             if d > worst then worst = d if worst >= 1 then return 1 end end
         end
     end
+    -- Outside the arena leash is the attack that has no box.
+    local L = RD.leash
+    if L and L.enemy.root.Parent then
+        local ep = L.enemy.root.Position
+        local dx, dz = px - ep.X, pz - ep.Z
+        local depth = sqrt(dx * dx + dz * dz) - L.radius
+        local v = dangerFromDepth(depth, reach, shoulder * 2)
+        if v > worst then worst = v if worst >= 1 then return 1 end end
+    end
     -- Melee mobs: a soft zone, never a wall. Their strikes are telegraphed
     -- Models and count in full above; the zone only keeps the spots away from
     -- them. A hard 19-stud circle made every spot in room 1 look lethal and

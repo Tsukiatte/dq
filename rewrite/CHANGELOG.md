@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.19 - 2026-09-03 - "Leash"
+
+- Reader sets `RD.leash` for the Midgardian Champion; the field scores everything past `leashRadius` (122) as lethal.
+
 ## 5.1.18 - 2026-09-03 - "No retreat"
 
 - Brain: boss standoff no longer depends on the beam fan (`RD.fanUntil` stays informational).

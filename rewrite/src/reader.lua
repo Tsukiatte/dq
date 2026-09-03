@@ -299,6 +299,12 @@ local function scanEnemies(now)
     RD.enemyPrev = RD.enemyPrev or setmetatable({}, { __mode = "k" })
     for _, e in ipairs(list) do RD.enemyPrev[e.model] = { x = e.x, z = e.z, at = now } end
     RD.enemies = list
+    -- The Champion's arena kills past about 128 studs from him: every death
+    -- out there had nothing near it, and the respawn point is 131-137 out.
+    RD.leash = nil
+    for _, e in ipairs(list) do
+        if e.isBoss and e.model.Name == "Midgardian Champion" then RD.leash = { enemy = e, radius = CFG.leashRadius } break end
+    end
 end
 
 -- ------------------------------------------------------------ tick
