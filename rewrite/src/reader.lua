@@ -134,7 +134,31 @@ local function trackPart(part)
     RD.parts[part] = { part = part, x = p.X, z = p.Z, vx = 0, vz = 0, at = os.clock(), spawn = os.clock() }
 end
 
+-- Our own ability. The Geyser is placed on the target, or at the range cap
+-- along the aim when the target is further: a geyser that lands short of a
+-- far target measures the range (Chris: read the range, stand at it).
+local function noteGeyser(model)
+    task.defer(function()
+        local castAt = RT.lastCastAt or -math.huge
+        if os.clock() - castAt > 0.8 then return end
+        local c = LocalPlayer.Character
+        local rt = c and c:FindFirstChild("HumanoidRootPart")
+        local ring = model:FindFirstChild("geyserRing") or model:FindFirstChildWhichIsA("BasePart")
+        if not rt or not ring then return end
+        local d = (Vector3.new(ring.Position.X, 0, ring.Position.Z) - Vector3.new(rt.Position.X, 0, rt.Position.Z)).Magnitude
+        local targetD = RT.lastCastTargetDist or 0
+        if targetD > d + 3 then
+            -- Landed short: this is the cap.
+            local cap = math.floor(d + 0.5)
+            if cap >= 15 and cap <= 80 and cap > (RD.abilityRange or 0) then RD.abilityRange = cap end
+        elseif d > (RD.abilityReach or 0) then
+            RD.abilityReach = math.floor(d + 0.5)   -- reached the target from at least this far
+        end
+    end)
+end
+
 local function consider(inst)
+    if inst:IsA("Model") and inst.Name == "Geyser" then noteGeyser(inst) return end
     if inst:IsA("Model") and lower(inst.Name):find("movingbeam", 1, true) then trackWall(inst) return end
     if inst:IsA("Model") then
         trackModel(inst)

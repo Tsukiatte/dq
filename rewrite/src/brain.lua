@@ -39,10 +39,22 @@ local sqrt, abs, max, min = math.sqrt, math.abs, math.max, math.min
 
 local function flat(a, b) local dx, dz = a.X - b.X, a.Z - b.Z return sqrt(dx * dx + dz * dz) end
 
+-- How far the abilities reach: measured range plus the geyser's own radius,
+-- else the configured cast radius.
+S.abilityReach = function()
+    if CFG.autoStandoff and RD.abilityRange then return RD.abilityRange + 5 end
+    return CFG.abilityRadius
+end
+
 local function standoffFor(e)
     -- No fan override: a 95-stud standoff during the beam fan put the bot
     -- twenty studs from the arena edge and the leash killed it twice (run 28).
-    if e.isBoss then return CFG.bossStandoff end
+    -- With the ability's range measured, the boss is fought from just inside
+    -- it (Chris: the safest spot that still hits).
+    if e.isBoss then
+        if CFG.autoStandoff and RD.abilityRange then return RD.abilityRange + CFG.autoStandoffOffset end
+        return CFG.bossStandoff
+    end
     return e.extent + CFG.mobStandoff
 end
 
@@ -219,9 +231,11 @@ local function fight(hum, root, e, now)
     local ep = e.root.Position
     local d = flat(root.Position, ep)
     faceToward(root, hum, ep)
-    if d <= CFG.abilityRadius then
-        if CFG.autoQ and now - RT.lastQ >= CFG.abilityInterval then RT.lastQ = now pressKey(Enum.KeyCode.Q) end
-        if CFG.autoE and now - RT.lastE >= CFG.abilityInterval then RT.lastE = now pressKey(Enum.KeyCode.E) end
+    if d <= S.abilityReach() then
+        local cast = false
+        if CFG.autoQ and now - RT.lastQ >= CFG.abilityInterval then RT.lastQ = now pressKey(Enum.KeyCode.Q) cast = true end
+        if CFG.autoE and now - RT.lastE >= CFG.abilityInterval then RT.lastE = now pressKey(Enum.KeyCode.E) cast = true end
+        if cast then RT.lastCastAt = now RT.lastCastTargetDist = d end   -- the reader measures the range from where the geyser lands
     end
     if CFG.autoAttack and d <= CFG.attackRange + e.extent and now - RT.lastClick >= CFG.clickInterval then
         RT.lastClick = now
@@ -332,7 +346,7 @@ local function brainTick(now)
         if d > standoff + 3 then
             -- Walking speed, always: a boss approach at 22 for ten seconds was a kick.
             travel(hum, root, target.root.Position, walkSpeed(), "approach", target.model)
-            if d <= CFG.abilityRadius then fight(hum, root, target, now) end
+            if d <= S.abilityReach() then fight(hum, root, target, now) end
             return
         end
         BR.waypoints = nil

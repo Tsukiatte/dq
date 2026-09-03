@@ -293,6 +293,8 @@ local function blinkTarget(root, hum, rx, ry, rz)
     return nil
 end
 
+local BLINK_BOSSES = { ["midgardian champion"] = true, ["bob the frost giant"] = true }
+
 local function decide(root, hum)
     local now = os.clock()
     DG.now = now
@@ -328,7 +330,10 @@ local function decide(root, hum)
     -- Only inside a fight: a target within 70 studs. Hops while pathing
     -- between rooms were what the sixth kick was made of.
     local apB = DG.approach
+    -- Only where the attacks are mapped: on the third boss the hop fired at
+    -- everything and the bot teleported all over the arena (run 29).
     local inFight = apB ~= nil and sqrt((apB.x - rx) ^ 2 + (apB.z - rz) ^ 2) <= 70
+        and (not apB.isBoss or (apB.model and BLINK_BOSSES[string.lower(apB.model.Name)] == true))
     if CFG.blink and inFight and grace <= CFG.blinkWindow and now - (RT.lastBlinkAt or -math.huge) >= CFG.blinkCooldown then
         -- Walk first: if the spot the field already holds is reachable before
         -- the box fires, the legs do it. Only a box that fires sooner than the

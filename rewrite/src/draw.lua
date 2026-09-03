@@ -116,6 +116,29 @@ local function drawTick(now)
                 p.Size = Vector3.new(b.size.X, math.min(b.size.Y, 1.5), b.size.Z)
                 p.CFrame = b.cframe - Vector3.new(0, b.size.Y * 0.5 - 0.8, 0)
             end
+            -- What the bot treats as unsafe: the box grown by its margin and
+            -- shoulder, as a faint outline round the real hitbox.
+            local m = (b.slim and math.min(DG.reach, b.slim) or DG.reach) + (b.slim and CFG.slimShoulder or CFG.dodgeShoulder)
+            local sight = p:FindFirstChild("sight")
+            if not sight then
+                sight = Instance.new("Part")
+                sight.Name = "sight"
+                sight.Anchored, sight.CanCollide, sight.CanQuery, sight.CanTouch, sight.CastShadow = true, false, false, false, false
+                sight.Transparency = 1
+                local se = Instance.new("SelectionBox")
+                se.Name = "edge"
+                se.LineThickness = 0.03
+                se.SurfaceTransparency = 1
+                se.Color3 = Color3.fromRGB(235, 235, 245)
+                se.Adornee = sight
+                se.Parent = sight
+                sight.Parent = p
+            end
+            sight.Shape = p.Shape
+            if b.round then sight.Size = Vector3.new(p.Size.X, p.Size.Y + m * 2, p.Size.Z + m * 2)
+            elseif b.cyl then sight.Size = Vector3.new(p.Size.X, p.Size.Y + m * 2, p.Size.Z + m * 2)
+            else sight.Size = Vector3.new(p.Size.X + m * 2, p.Size.Y, p.Size.Z + m * 2) end
+            sight.CFrame = p.CFrame
             local c = stageColor(b, now)
             if p.Color ~= c then
                 p.Color = c

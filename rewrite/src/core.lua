@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.57"
+local SCRIPT_VERSION = "5.1.58"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.58", date = "2026-09-03", notes = "The ability's range is measured from where its geyser lands when the target is further away (the client script carries no range; the server caps the placement), and the boss is fought from two studs inside it (Chris). Shown in the Standing section. The blink is limited to the Champion, Bob and mob fights until the third boss is mapped: it teleported all over that arena. Margins: 2.5 studs of reach and a 4-stud shoulder, so spots on a box's edge cost and the bot stops further out (it was grazed on an edge). Every drawn hitbox now carries a faint second outline at the size the bot treats as unsafe." },
     { version = "5.1.57", date = "2026-09-03", notes = "Champion (Chris): boss-fight spots are pulled back inside the arena - beyond the standoff band plus twenty studs costs, past forty-five it is out of the question - because the aimed attacks spawn on you at the mouth with nowhere to step. The blink now fires for a box that will cover you within 0.6 s, moving bodies included (the criss cross gave no warning before), 5 s apart, four a minute, up to 8 studs. Slam counts as live from 1.5 s and five studs wider (a death landed 3.3 studs outside it). Passive beams hold 2.6 s with slim padding so the fan has gaps past 80 studs. A respawn outside the leash is pulled back in by a gradient instead of wandering out (run 28)." },
     { version = "5.1.56", date = "2026-09-03", notes = "Champion: back to the 5.1.51 beam window (3.5 s, normal padding) and standoff during the fan; the 95-stud fan standoff added in 5.1.53 left the bot twenty studs from the arena edge and the leash killed it twice. The jump slam lands where the player stood at Jump Up, so a slam zone is placed there at Jump Up: three seconds to leave instead of two." },
     { version = "5.1.55", date = "2026-09-03", notes = "Interface: the HUD is the old build's again - title chip with the build number and fps, a Playtime / Status / Ping card, the open-GUI hint and the Autofarm pill. Window corners: the header now shares the frame's rounding and the accent is an inset pill, so nothing square shows past the corners; the body stops short of the bottom corners." },
@@ -101,6 +102,8 @@ local CFG = {
     mobStandoff = 34,             -- from any mob, melee or ranged: abilities only, never within weapon reach (Chris)
     meleeBuffer = 10,             -- soft band past a melee mob's swing where spots are merely disfavoured
     leashRadius = 122,            -- Champion arena: death past ~128 studs from the boss; the respawn point is 131-137 out
+    autoStandoff = true,          -- boss standoff from the measured ability range (Chris); the slider is the fallback until a cast has measured it
+    autoStandoffOffset = 2,       -- studs inside the measured range
     bossStandoff = 38,            -- ability damage 11-15%/s at 30-40 studs, ~0 past 45 (48 measured 0.35%/s)
     meleeMobMaxReach = 16,        -- a mob whose meleeDistance is at most this is melee (warriors sit above 8)
     strafe = true,                -- circle the target at standoff instead of standing
@@ -120,8 +123,8 @@ local CFG = {
     dodgeReach = 30,              -- rings at 10/20/30: a 40-wide body needs 23 studs of sidestep
     dodgeRings = 3,
     dodgeRays = 16,
-    dodgeMargin = 2.0,            -- studs of clearance round the character; hits landed 1.5-3.3 studs outside their boxes            -- studs of clearance round the character
-    dodgeShoulder = 1.5,
+    dodgeMargin = 2.5,            -- studs of clearance round the character; hits landed 1.5-3.3 studs outside their boxes            -- studs of clearance round the character
+    dodgeShoulder = 4.0,          -- spots within this of a box edge cost: the bot stopped on the edge and was grazed (Chris)
     slimShoulder = 0.3,           -- shoulder for `slim` hazards (a seed's slim value is their reach): the beam fans need their gaps            -- studs of warm edge outside a hazard
     dodgeLead = 1.2,              -- a standing telegraph counts as live this long before it fires
     dodgePathLead = 0.4,          -- a moving projectile's line: the time to sidestep
