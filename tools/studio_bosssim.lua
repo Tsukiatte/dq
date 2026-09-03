@@ -199,7 +199,7 @@ attackRemote.OnServerEvent:Connect(function(player, kind)
             bossDown = true
             kills = kills + 1
             WS:SetAttribute("DQSimBossKills", kills)
-            log(string.format("BOSS DOWN #%d at t=%.0f after %d swings; hits taken so far %d", kills, WS.DistributedGameTime, swings, hits))
+            log(string.format("BOSS DOWN #%d at t=%.0f after %d swings and %d casts; hits taken so far %s", kills, WS.DistributedGameTime, swings, casts, tostring(WS:GetAttribute("DQSimHits"))))
             -- A dead Humanoid stays dead whatever its Health is set to:
             -- rebuild the boss instead.
             task.delay(5, function()
