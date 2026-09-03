@@ -165,14 +165,25 @@ local function refreshSources()
                         local rel = Vector3.new(e.x - p.X, 0, e.z - p.Z)
                         local along = rel:Dot(axis)
                         local perp = (rel - axis * along).Magnitude
-                        if perp <= CFG.dodgeHubTolerance and abs(along) <= L * 0.5 + 5 then
+                        -- Centred on the enemy, not merely passing it: a mage
+                        -- shot that happens to cross the boss was being counted
+                        -- as one of its lines, and took over the hub's name,
+                        -- arming delay and headings.
+                        if perp <= CFG.dodgeHubTolerance and abs(along) <= CFG.dodgeHubTolerance then
                             local hub = e.hub
                             -- Lines within a third of a second are one volley.
                             if t - hub.lastSpawn > 0.3 then
                                 if hub.lastSpawn > -math.huge then
                                     local interval = t - hub.lastSpawn
-                                    if interval < 30 then
+                                    -- The interval between lines of one burst is the
+                                    -- period; the gap between bursts is not. Folding
+                                    -- the ten-second gap in put the period at two
+                                    -- seconds for the first half of every burst, and
+                                    -- every predicted line came late.
+                                    if interval < CFG.dodgeHubBurstGap then
                                         hub.period = hub.period and (hub.period * 0.7 + interval * 0.3) or interval
+                                    elseif interval < 30 then
+                                        hub.gap = hub.gap and (hub.gap * 0.7 + interval * 0.3) or interval
                                     end
                                 end
                                 hub.lastSpawn = t
