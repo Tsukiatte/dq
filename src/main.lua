@@ -229,11 +229,17 @@ local function attackEnemy(enemy)
         -- Nor while the dodge is holding the ring off a hub: pursuit's
         -- standoff is the ability range, and walking there during a burst
         -- is walking into the sweep.
-        if not DG.gapWait and not DG.hubHold and dodgeStepClear(root, humanoid, pursuitAhead(enemyRoot)) then
+        -- A hold that has gone on while standing safe is released: the step
+        -- check is a moment's caution, not a reason to live at the spawn.
+        local heldFor = DG.blockedSince and (os.clock() - DG.blockedSince) or 0
+        local release = heldFor > CFG.pursuitHoldMax and (DG.dangerHere or 0) < CFG.dodgeMoveAt and not DG.gapWait
+        if not DG.gapWait and not DG.hubHold and (release or dodgeStepClear(root, humanoid, pursuitAhead(enemyRoot))) then
             DG.pursuitBlocked = false
+            DG.blockedSince = nil
             updatePursuitMovement(enemy, humanoid, root, enemyRoot)
         else
             DG.pursuitBlocked = true
+            DG.blockedSince = DG.blockedSince or os.clock()
             humanoid:MoveTo(root.Position)
             setMovementState(DG.gapWait and "waiting for a gap [hold]" or "holding for a gap")
         end
