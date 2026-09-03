@@ -196,7 +196,12 @@ local function hookHumanoid(c)
                     end
                     return list
                 end)(),
-                dangerHere = S and S.DG and S.DG.dangerHere and r1(S.DG.dangerHere) or nil }
+                dangerHere = S and S.DG and S.DG.dangerHere and r1(S.DG.dangerHere) or nil,
+                bossDist = (function()
+                    local e = S and S.NAV and S.NAV.cachedEnemy
+                    local er = e and (e:FindFirstChild("HumanoidRootPart") or e.PrimaryPart)
+                    if er and rt then local d = er.Position - rt.Position return r1(math.sqrt(d.X * d.X + d.Z * d.Z)) end
+                end)() }
         end
         last = h
     end)
@@ -222,7 +227,10 @@ task.spawn(function()
         local hum = e and e:FindFirstChildOfClass("Humanoid")
         if hum then
             local style = e:FindFirstChild("enemyStyle")
-            R.bossHp[#R.bossHp + 1] = { t = now(), name = e.Name, hp = hum.Health, max = hum.MaxHealth,
+            local er = e:FindFirstChild("HumanoidRootPart") or e.PrimaryPart
+            local rt = root()
+            local bd = (er and rt) and (function() local d = er.Position - rt.Position return r1(math.sqrt(d.X * d.X + d.Z * d.Z)) end)() or nil
+            R.bossHp[#R.bossHp + 1] = { t = now(), name = e.Name, hp = hum.Health, max = hum.MaxHealth, dist = bd,
                 boss = style and type(style.Value) == "string" and style.Value:lower():find("boss") ~= nil or nil }
             if #R.bossHp > 2000 then table.remove(R.bossHp, 1) end
         end

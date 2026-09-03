@@ -414,7 +414,7 @@ local function dangerAt(px, py, pz, t)
         if pred then
             for i = 1, #pred do
                 local L = pred[i]
-                if atc >= L.from - CFG.dodgeLead and atc <= L.untilAt and abs(py - L.y) < halfHeight + 40 then
+                if atc >= L.from - CFG.dodgePathLead and atc <= L.untilAt and abs(py - L.y) < halfHeight + 40 then
                     local dx, dz = math.cos(L.a), math.sin(L.a)
                     local qx, qz = px - L.x, pz - L.z
                     local along = abs(qx * dx + qz * dz) - L.L * 0.5
