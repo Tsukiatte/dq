@@ -345,6 +345,41 @@ local function brainTick(now)
         if not ok then heavyDebugThrottled("decide_err", 2, "Field", tostring(err)) end
     end
 
+    -- 0b. Bob's orbs: one that follows the character is led into the crystal
+    -- of its colour - run to the far side of that crystal and hold while it
+    -- comes. Bob only (profile).
+    if target and target.isBoss and S.bossProfile(target.model.Name).orbs then
+        local rp = root.Position
+        local orb, orbD = nil, math.huge
+        for part in pairs(RD.parts) do
+            local n = string.lower(part.Name)
+            if part.Parent and n:find("secondboss", 1, true) and n:find("orb", 1, true) then
+                local d = flat(rp, part.Position)
+                if d < orbD then orb, orbD = part, d end
+            end
+        end
+        if orb and orbD < 90 then
+            local colour = string.lower(orb.Name):match("secondboss(%a+)orb")
+            local crystal = colour and S.bobCrystal(colour)
+            if crystal then
+                local away = Vector3.new(crystal.X - orb.Position.X, 0, crystal.Z - orb.Position.Z)
+                if away.Magnitude > 0.5 then
+                    local goal = Vector3.new(crystal.X, rp.Y, crystal.Z) + away.Unit * CFG.orbLeadBehind
+                    if flat(rp, goal) > 3 then
+                        local dest = goal
+                        if not stepSafe(rp, goal, CFG.tweenEscape) and DG.target then dest = DG.target end
+                        driveTo(hum, root, dest, CFG.tweenEscape, 1.5)
+                        setMovementState(string.format("lead %s orb %.0f", colour, orbD))
+                    else
+                        releaseMover(hum, root)
+                        setMovementState(string.format("orb into %s crystal %.0f", colour, orbD))
+                    end
+                    return
+                end
+            end
+        end
+    end
+
     -- 0. A reflex: an announced instadeath with a known centre (the slam).
     -- Straight out from it at escape speed until clear of its radius, the
     -- field consulted only to bend the line round a live box.
