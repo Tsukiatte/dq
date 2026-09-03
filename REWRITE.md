@@ -55,3 +55,40 @@ needs more than its budget, the design is wrong, not the budget.
 Against the live client through the Potassium bridge: `execute_luau_file` the
 bundle, `tools/recorder_live.lua` records hits with the reader's verdicts, and
 each change is judged on deaths per boss and boss damage per minute alive.
+
+## Rules learned from the live runs (2026-09-03, 5.1.8 - 5.1.12)
+
+- **Never write the root's position.** Three anti-cheat kicks, all server-side:
+  a 14-stud hop (4.12.11), a lag-spike step plus a fall through the floor
+  (5.1.1), and ordinary per-frame CFrame driving (5.1.6/5.1.7). Since 5.1.8 the
+  mover only calls `Humanoid:Move`; the escape burst is a temporary WalkSpeed
+  of `tweenEscape` (22) restored the moment the burst ends. 4.12.14 ran the
+  boss approach at WalkSpeed 22 for whole runs without a kick, and the client
+  checker only resets values above 45.
+- **A moving body is danger from its announcement.** The aimed criss cross is
+  placed on the player's position at the event and hurts there until its start
+  time; the big spike's front leaves the boss at the event. The field evaluates
+  the body's position at the time asked for, so no lead gate is needed.
+- **Remote-announced paths carry the boss's height.** They are ground attacks
+  (`ground = true`); the vertical filter must not drop them.
+- **The body counts.** A beam killed 1.5 studs outside its hitBox: `dodgeMargin`
+  1.5 on top of the root's half width.
+- **Melee mobs are a soft zone.** Their strikes are telegraphed Models and are
+  tracked as boxes; a hard 19-stud circle round each mob left the field with no
+  spot in room 1 while mage shots landed.
+- **Settings, not constants, persist.** The config file keeps only UI-exposed
+  keys (`PERSIST` in config.lua); snapshotting all of CFG kept every old
+  default alive across releases.
+
+### Test loop
+
+1. `cd rewrite && python tools/check.py && python tools/build.py`, then copy
+   `rewrite/DungeonAutofarm.lua` to Potassium's workspace as `dq_rewrite.lua`.
+2. In the lobby instance, `queue_on_teleport` a script that waits 7 s, runs
+   `loadstring(readfile("dq_rewrite.lua"))()` and `dq_recorder5.lua`, and
+   re-loads if the autoexec's main bundle takes over later; then
+   `S.queueNow("claude")`.
+3. Poll with `tools/poll5.lua` (deaths with nearby boxes and the field's top
+   candidates, boss health, state histogram, mover counters).
+4. Patch, rebuild, `loadstring(readfile("dq_rewrite.lua"))()` mid-run; the new
+   instance destructs the old one.
