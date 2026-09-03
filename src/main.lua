@@ -50,6 +50,7 @@ local worldIndexStep = S.worldIndexStep
 local rebuildCatalogArrays = S.rebuildCatalogArrays
 local noteOwnAction = S.noteOwnAction
 local runRecovery = S.runRecovery
+local lobbyTick = S.lobbyTick
 local enterRecovery = S.enterRecovery
 local updateStuckDetector = S.updateStuckDetector
 local dodgeStepClear = S.dodgeStepClear
@@ -539,6 +540,9 @@ local function startAutofarm()
         end
 
         local now = os.clock()
+        -- The loop outside the fight runs whether or not there is a fight.
+        local okLobby, errLobby = pcall(lobbyTick, now)
+        if not okLobby then heavyDebugThrottled("lobby_error", 2.0, "Queue", "Auto queue threw: " .. tostring(errLobby)) end
         if RT.originalNamecall and now - RT.hookInstalledAt >= CFG.remoteHookLifetime then
             unhookAttackRemotes()
         end

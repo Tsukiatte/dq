@@ -11,6 +11,15 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.12.5 - 2026-09-02 - "Auto queue"
+
+Read from the game's own lobby scripts (`PlayerScripts.Ui.queue.*` and the Replay button), decompiled live; copies under `game/lobby/`. Every lobby button ends in a remote call, so the loop makes the same calls and never has to find a button on screen.
+
+- **Lobby**: `createLobby:InvokeServer(map, difficulty, minLevel, hardcore, private, false)` returns true when the party exists, then `startDungeon:FireServer()`. Map and difficulty are the names on the lobby tiles.
+- **In a run**: `workspace.dungeon.bossRoom.dungeonFinished` goes true when the run ends, win or lose. As the party owner (`PlaceManager.GetPlaceTeleportData().ownerId`) the script sends `replayDungeon:FireServer(data)` with the same values the game's Replay button collects. Anyone else is returned to the lobby by the game and queues from there.
+- Which place we are in comes from `ReplicatedStorage.Utility.PlaceManager.GetPlaceName()` ("Lobby" / "Level").
+- New module `lobby.lua` (after config, before ui). New **Auto queue** section: master toggle, map, difficulty, hardcore, private party, lobby delay, replay toggle and delay, live status, Queue now / Replay now. Saved with the config under `lobby`. Off until switched on; also needs the autofarm master switch.
+
 ## 4.12.4 - 2026-09-02 - "Traffic light"
 
 - **Attacks painted by stage.** The game's own precast and hitBox parts are recoloured: green while the dodge treats the spot as floor (known timing, more than `dodgeLead` away), yellow inside the lead, red while live or when nothing is known about the timing. Put back the moment the attack is over, the toggle goes off, or the script leaves.

@@ -1264,6 +1264,63 @@ local function createControlUI()
     -- ------------------------------------------------------------------
     -- Overlays
     -- ------------------------------------------------------------------
+    -- ------------------------------------------------------------------
+    -- Auto queue: the loop outside the fight
+    -- ------------------------------------------------------------------
+    local queueSection = K.section(autofarm.body, "Auto queue", nextOrder(),
+        "Queue the next run from the lobby, and replay a finished one.")
+    K.caption(queueSection.content,
+        "In the lobby: a party for the map and difficulty below is created and started through the game's own lobby remotes, no button pressed. In a run: when the dungeon ends and you own the party, the same replay the Replay button sends goes out and the next run begins. Set this up once and let the script run on join.", 1)
+    track(K.toggle(queueSection.content, "Auto queue",
+        function() return CFG.autoQueue end,
+        function(v)
+            CFG.autoQueue = v
+            if S.LB then S.LB.arrivedAt = nil S.LB.lastAttempt = -math.huge end
+        end, 2,
+        "Queue and replay on their own. Needs the autofarm master switch on too; off, it only reports."))
+    local mapOptions = {}
+    for i, name in ipairs(S.QUEUE_MAPS or {}) do mapOptions[i] = { value = name, label = name } end
+    track(K.dropdown(queueSection.content, "Map", mapOptions,
+        function() return CFG.autoQueueMap end,
+        function(v) CFG.autoQueueMap = v end, 3,
+        "The dungeon to queue, by the name on its lobby tile."))
+    local diffOptions = {}
+    for i, name in ipairs(S.QUEUE_DIFFICULTIES or {}) do diffOptions[i] = { value = name, label = name } end
+    track(K.dropdown(queueSection.content, "Difficulty", diffOptions,
+        function() return CFG.autoQueueDifficulty end,
+        function(v) CFG.autoQueueDifficulty = v end, 4,
+        "The difficulty tile to pick."))
+    track(K.toggle(queueSection.content, "Hardcore",
+        function() return CFG.autoQueueHardcore end, function(v) CFG.autoQueueHardcore = v end, 5,
+        "The lobby's hardcore option: one life for everyone in the party."))
+    track(K.toggle(queueSection.content, "Private party",
+        function() return CFG.autoQueuePrivate end, function(v) CFG.autoQueuePrivate = v end, 6,
+        "Nobody joins the run uninvited. Off, the party is listed for others to join."))
+    track(K.slider(queueSection.content, "Lobby delay", "seconds", 2, 30, false,
+        function() return CFG.autoQueueDelay end, function(v) CFG.autoQueueDelay = v end, 7,
+        "How long to sit in the lobby before queueing, so the character and data have loaded."))
+    track(K.toggle(queueSection.content, "Replay when a run ends",
+        function() return CFG.autoQueueReplay end, function(v) CFG.autoQueueReplay = v end, 8,
+        "As the party owner, send the game's own replay when the dungeon-finished flag goes up, so the next run starts without a trip through the lobby."))
+    track(K.slider(queueSection.content, "Replay delay", "seconds", 0, 30, false,
+        function() return CFG.autoQueueReplayDelay end, function(v) CFG.autoQueueReplayDelay = v end, 9,
+        "Seconds after the run ends before replaying. Loot lands in that time."))
+    local queueLabel = K.label(queueSection.content, "", "captionSub", 10)
+    queueLabel.Size = UDim2.new(1, 0, 0, 22)
+    queueLabel.TextWrapped = true
+    S.refreshQueuePanel = function()
+        if not queueLabel.Parent then return end
+        queueLabel.Text = "Queue: " .. tostring(S.LB and S.LB.status or "off")
+    end
+    S.refreshQueuePanel()
+    local queueButtons = K.buttonRow(queueSection.content, 11)
+    queueButtons.add("Queue now", "accent", function()
+        if S.queueNow then S.queueNow("button") end
+    end)
+    queueButtons.add("Replay now", "accent", function()
+        if S.replayNow then S.replayNow() end
+    end)
+
     local overlays = K.section(autofarm.body, "Overlays", nextOrder(),
         "Everything the script draws in the world. Each one can be switched off and recoloured.")
     local function overlayPair(name, orderBase, getShow, setShow, getColor, setColor, explain)
