@@ -35,12 +35,22 @@ local function stageColor(b, now)
 end
 
 local function drawTick(now)
-    if now - DR.lastDraw < 0.05 then return end
+    if now - DR.lastDraw < 0.1 then return end
+    -- Our own drawing must never be the lag: only what is near, and not many.
+    local lp = S.LocalPlayer.Character
+    local rt = lp and lp:FindFirstChild("HumanoidRootPart")
+    local rp = rt and rt.Position
     DR.lastDraw = now
     local used = {}
     if CFG.drawHazards then
         local list = hazards(now)
+        local drawn = 0
         for i, b in ipairs(list) do
+            local bx, bz
+            if b.moving then bx, bz = b.ox, b.oz else bx, bz = b.cframe.Position.X, b.cframe.Position.Z end
+            local near = not rp or ((bx - rp.X) ^ 2 + (bz - rp.Z) ^ 2) < 130 * 130
+            if not near or drawn >= 60 then continue end
+            drawn = drawn + 1
             local key = i
             local p = DR.parts[key]
             if not p or not p.Parent then p = newBox() DR.parts[key] = p end
