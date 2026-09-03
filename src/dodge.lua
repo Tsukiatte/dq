@@ -536,9 +536,15 @@ end
 -- Swept as a slab the width of the character, not a line through its middle:
 -- a single centre ray passed spots the body could not reach, and the tween
 -- then stopped against the wall it had not seen.
-local function walkable(rootPos, x, y, z, params)
+-- `above` is how far the root rides above the floor here; the slab is swept
+-- to the SAME height above the destination floor, so up a staircase it
+-- climbs with the steps and clears the risers (a riser under the step height
+-- never reaches a slab centred three studs up). It used to be swept from the
+-- root to two studs above the destination floor, which on any upward run of
+-- steps clipped the first riser and rejected every spot uphill.
+local function walkable(rootPos, x, y, z, params, above)
     local from = Vector3.new(rootPos.X, rootPos.Y, rootPos.Z)
-    local to = Vector3.new(x, y + 2.0, z)
+    local to = Vector3.new(x, y + (above or 2.0), z)
     local w = DG.reach * 2
     local ok, hit = pcall(function()
         return Workspace:Blockcast(CFrame.new(from), Vector3.new(w, 1.5, w), to - from, params)
@@ -558,6 +564,17 @@ local function decide(root, humanoid)
     local rx, ry, rz = rootPos.X, rootPos.Y, rootPos.Z
     local speed = max(humanoid.WalkSpeed, 4)
     local dwell = CFG.dodgeDwell
+    -- Where the feet are. Heights below are judged from here, not from the
+    -- root: the root rides about three studs up, and comparing a floor
+    -- height against it with abs() rejected any spot even a fraction of a
+    -- stud DOWNHILL while allowing six studs up - the dodge could not step off
+    -- a kerb but would happily pick a ledge it had to jump onto.
+    local aboveFloor = humanoid.HipHeight + root.Size.Y * 0.5
+    do
+        local under = Workspace:Raycast(rootPos, Vector3.new(0, -8, 0), DG.rayParams)
+        if under then aboveFloor = ry - under.Position.Y end
+    end
+    local feetY = ry - aboveFloor
 
     -- Here: now, and a moment from now. Standing still is a decision too.
     local here0 = dangerAt(rx, ry, rz, 0)
@@ -773,9 +790,11 @@ local function decide(root, humanoid)
         if best and c.cost >= bestCost then break end
         checked = checked + 1
         local y = floorAt(c.x, c.z, ry, params)
-        if y and abs(y - ry) <= CFG.dodgeMaxClimb + 0.1 and y > ry - CFG.dodgeMaxDrop then
+        -- Asymmetric, from the feet: a climb has to be within reach, a drop is
+        -- allowed down to the drop limit.
+        if y and (y - feetY) <= CFG.dodgeMaxClimb and (y - feetY) >= -CFG.dodgeMaxDrop then
             c.y = y
-            if walkable(rootPos, c.x, y, c.z, params) then
+            if walkable(rootPos, c.x, y, c.z, params, aboveFloor) then
                 c.valid = true
                 -- Room beyond: a spot with a wall right behind it is a pocket.
                 -- Continuing to flee from there is impossible, so it costs in
