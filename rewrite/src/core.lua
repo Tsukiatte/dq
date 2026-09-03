@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.64"
+local SCRIPT_VERSION = "5.1.65"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.65", date = "2026-09-03", notes = "Ability range per slot (Chris): every cast is queued with its slot, and the projectile that appears takes the measurement, so Q and E are measured separately and the least ranged one sets the fight distance - two studs inside a known cap, one past a reach that is only a lower bound. The Ability radius and Boss standoff sliders go to 80; auto standoff can go to 70. Bob: a circle whose precast is destroyed when it fires vanished from the field at that moment (three deaths just outside circles the model no longer had); the last geometry is kept while the window is open, and the circles are padded ten studs. A blocked travel step takes the spot instead of standing still beside the box." },
     { version = "5.1.64", date = "2026-09-03", notes = "Bob: the spread and horizontal beams kill at least 2.2 studs outside their 12-wide hitbox (the recorder saw a death there right after a blink to a spot the model called clear), so their padding is 2.5 studs with a 1-stud shoulder, and a blink destination must be 2.5 studs clear of every box." },
     { version = "5.1.63", date = "2026-09-03", notes = "Walls (Chris: melee mobs back it into a corner and it dies there). Every spot that passes the floor and sweep checks now looks 24 studs round itself in six directions and costs more the closer the walls are, so an open spot beats a corner. The back-off from a mob tries straight back, then 40, 80 and 120 degrees either side, and takes the most open way the field allows." },
     { version = "5.1.62", date = "2026-09-03", notes = "Telemetry: the field reports how many spots it evaluated and why they were rejected (no floor, not walkable, lethal on arrival) and which one it chose, for the new recorder that traces intent against movement at ten samples a second and gives every death a verdict. The marker is now the closest clean spot (clean path, clean ground), and when it is within blink range the blink goes to the marker itself (Chris)." },
@@ -113,7 +114,7 @@ local CFG = {
     bonusVoteDelay = 2.0,         -- seconds after the vote appears before answering
     autoStandoff = true,          -- boss standoff from the measured ability range (Chris); the slider is the fallback until a cast has measured it
     autoStandoffOffset = 2,       -- studs inside the measured range
-    autoStandoffMax = 45,         -- never further than this: the geyser's damage fell to nothing past 45 in the runs measured
+    autoStandoffMax = 70,         -- never further than this
     bossStandoff = 38,            -- ability damage 11-15%/s at 30-40 studs, ~0 past 45 (48 measured 0.35%/s)
     meleeMobMaxReach = 16,        -- a mob whose meleeDistance is at most this is melee (warriors sit above 8)
     strafe = true,                -- circle the target at standoff instead of standing
@@ -211,7 +212,7 @@ local TIMING = {
     northernwarriorcirclestrike = { first = 0.6, last = 1.5, holdFull = true },
     firstbosspassivebeam        = { first = 0.3, last = 3.5, holdFull = true },   -- lethal 0.3-2.1 s after appearing, held longer because a lane re-fires in the burst; the 5.1.51 window that killed the Champion in two minutes   -- hurts 0.3-2.2 s after appearing, and in the burst its lane re-fires every 1.1 s: a lane never expires while the burst lasts
     firstbossjumpslam           = { first = 1.5, last = 5.0, pad = 5 },   -- the Model appears at landing; deaths inside from ~1.8 s and 3.3 studs outside the 67-wide box
-    secondbosscriclehitbox      = { first = 0.6, last = 1.6, pad = 3 },   -- precast-only cylinder (22/28/34 wide, growing with distance); hits 0.7-1.0 s after it appears, a body wider than the cylinder
+    secondbosscriclehitbox      = { first = 0.6, last = 1.6, pad = 10 },   -- precast-only cylinder (22/28/34 wide, growing with distance); hits 0.7-1.0 s after it appears, a body wider than the cylinder
     secondbosshorizontalbeam    = { first = 1.1, last = 5.0, slim = 2.5 },   -- 10x64x400 beams 23.5 studs apart marching across the arena
     secondbossspreadbeam        = { first = 0.9, last = 2.5, slim = 2.5 },   -- a death landed 2.2 studs outside the 12-wide box (run 31)   -- killed 0.5 s before the 1.5 s default                            -- nine 12x64x400 spokes 20 degrees apart from Bob; gaps widen with distance
     cubepylonshot               = { first = 0.8, last = 1.1 },

@@ -169,7 +169,8 @@ local function verdictFor(p, t)
         local depth = boxDepth(b, p, t)
         local name = b.name or "?"
         local kind = b.kind or (b.moving and "path" or "zone")
-        if depth >= 0 then
+        -- A soft band (weighted) never kills; it only counts as "nearest".
+        if depth >= 0 and not b.weight then
             local class, by
             if t >= b.from and t <= b.untilAt then class, by = "inside-live", 0
             elseif t < b.from then class, by = "inside-early", r1(b.from - t)
