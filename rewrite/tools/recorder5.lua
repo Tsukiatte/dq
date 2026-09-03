@@ -51,6 +51,12 @@ local function hookHumanoid(c)
                 state = S and S.RT.movementState, reason = S and S.DG and S.DG.reason, dangerHere = S and S.DG and r1(S.DG.dangerHere or 0),
                 grace = S and S.DG and S.DG.grace ~= math.huge and r1(S.DG.grace) or nil,
                 target = S and S.BR and S.BR.target and S.BR.target.model.Name or nil,
+                cands = (function()
+                    if not (S and S.DG and S.DG.cands) then return nil end
+                    local list = {}
+                    for i = 1, math.min(6, #S.DG.cands) do local cd = S.DG.cands[i]; list[i] = { dist = r1(cd.dist), danger = r1(cd.danger), cost = r1(cd.cost), valid = cd.valid == true } end
+                    return list
+                end)(),
                 bossDist = (function()
                     local e = S and S.BR and S.BR.target
                     if e and rt then return r1(S.flatDistance(e.root.Position, rt.Position)) end

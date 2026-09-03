@@ -254,7 +254,9 @@ local function decide(root, hum)
         return cost
     end
 
-    local params = raycastParams(nil)
+    -- The target's own body is not a wall: a 60-stud boss beside you made
+    -- every far spot behind him unreachable and left only the near hot ones.
+    local params = raycastParams(ap and ap.model or nil)
     local cands = DG.cands
     table.clear(cands)
     local function evaluate(scale)
