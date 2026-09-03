@@ -120,7 +120,7 @@ local function dangerAt(px, py, pz, t)
         if e.melee and not e.isBoss then
             local tt = min(t, 0.6)
             local dx, dz = px - (e.x + e.vx * tt), pz - (e.z + e.vz * tt)
-            local d = sqrt(dx * dx + dz * dz) - (e.extent + e.meleeDistance + 1)
+            local d = sqrt(dx * dx + dz * dz) - (e.extent + e.meleeDistance + CFG.meleeBuffer)
             local v = dangerFromDepth(-d, reach, shoulder * 2)
             if v > worst then worst = v if worst >= 1 then return 1 end end
         end
@@ -224,6 +224,12 @@ local function decide(root, hum)
             local dot = (ox * hx + oz * hz) / dist
             cost = cost + 0.05 * (1 - dot) * 0.5
         end
+        -- Standing in danger with a target: prefer backing away from it. A
+        -- spot behind you is the one that is not in the next attack.
+        if ap and here0 >= CFG.dodgeMoveAt and adist > 1 then
+            local toward = (ox * ax + oz * az) / dist
+            cost = cost + CFG.dodgeOutwardWeight * (toward + 1) * 0.5
+        end
         -- The band pull shapes only the last stretch: far out, the brain
         -- travels on its own path and the field just keeps it out of harm.
         if ap and adist < ap.standoff + 30 then
@@ -272,10 +278,13 @@ local function decide(root, hum)
     end
 
     local best = evaluate(1)
-    if (not best or best.danger >= moveAt) and CFG.dodgeFarScale > 1 then
-        table.clear(cands)
-        local far = evaluate(CFG.dodgeFarScale)
-        if far and far.danger < moveAt and (not best or far.danger < best.danger) then best = far end
+    for _, scale in ipairs({ CFG.dodgeFarScale, CFG.dodgeFarScale2 }) do
+        if best and best.danger < moveAt then break end
+        if scale and scale > 1 then
+            table.clear(cands)
+            local far = evaluate(scale)
+            if far and (not best or far.danger < best.danger) then best = far end
+        end
     end
 
     -- Keep the current spot while its line stays clean and nothing beats it
@@ -293,6 +302,11 @@ local function decide(root, hum)
                 target = nil
                 DG.target = nil
                 DG.reason = "line closed"
+            elseif here0 >= moveAt then
+                -- Escaping: the spot is kept until reached or its line closes.
+                -- Re-picking between two near-equal spots each tick was the
+                -- shuttle between two attacks.
+                return
             elseif best then
                 local stillCost = costOf(tx, tz, d, graded)
                 if best.cost > stillCost - CFG.dodgeHysteresis then return end
