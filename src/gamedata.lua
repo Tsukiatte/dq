@@ -361,6 +361,10 @@ local DEFAULT_ARM_DELAYS = {
     -- at 0.9 and 3.5 s - the event stamps the exact window when it is heard.
     cubepylonshot = 0.8,
     ["model:4x8x35"] = 0.9,
+    -- Bob the Frost Giant (live, 2026-09-02): the beam fan arms at 1.1 s;
+    -- the marching circles fade (and sound) at about 1.6 s.
+    secondbosshorizontalbeam = 1.1,
+    secondbosscriclehitbox = 1.6,
 }
 -- Windows: first and last age at which an attack has been seen to hurt. A
 -- window makes the attack floor before its lead and floor again after

@@ -508,7 +508,14 @@ local function createControlUI()
     registerWindow("Account", account)
     registerWindow("Configs", configs)
     registerWindow("Attacks", attacks)
+    local queue = K.window(gui, {
+        onPinChanged = onPinChanged,
+        name = "Queue", title = "Auto queue", width = 310, height = 540,
+        position = place(1390, 24, 310, 540), visible = false,
+        info = "The loop outside the fight: which dungeon to queue from the lobby, and replaying a run when it ends.",
+    })
     registerWindow("Modules", modules)
+    registerWindow("Queue", queue)
 
     -- ------------------------------------------------------------------
     -- Account panel. Headshot, name, rank, and the two actions.
@@ -1267,7 +1274,7 @@ local function createControlUI()
     -- ------------------------------------------------------------------
     -- Auto queue: the loop outside the fight
     -- ------------------------------------------------------------------
-    local queueSection = K.section(autofarm.body, "Auto queue", nextOrder(),
+    local queueSection = K.section(queue.body, "Queue", 1,
         "Queue the next run from the lobby, and replay a finished one.")
     K.caption(queueSection.content,
         "In the lobby: a party for the map and difficulty below is created and started through the game's own lobby remotes, no button pressed. In a run: when the dungeon ends and you own the party, the same replay the Replay button sends goes out and the next run begins. Set this up once and let the script run on join.", 1)
@@ -1817,6 +1824,7 @@ local function createControlUI()
         if name == "Account" then return CFG.panelAccount end
         if name == "Configs" then return CFG.panelConfigs end
         if name == "Attacks" then return CFG.panelAttacks end
+        if name == "Queue" then return CFG.panelQueue end
         return true      -- Modules is never switchable; see the Modules panel.
     end
 
@@ -1863,6 +1871,10 @@ local function createControlUI()
         function() return CFG.panelConfigs end,
         function(v) CFG.panelConfigs = v applyVisibility() end,
         "Saved setups.")
+    panelToggle("Auto queue", 6.5,
+        function() return CFG.panelQueue end,
+        function(v) CFG.panelQueue = v applyVisibility() end,
+        "Queueing from the lobby and replaying a finished run.")
     panelToggle("HUD", 7,
         function() return CFG.showHud end,
         function(v) CFG.showHud = v end,
@@ -1896,6 +1908,7 @@ local function createControlUI()
     applyVisibility()
 
     combat.setOpen(true)
+    queueSection.setOpen(true)
     mapSection.setOpen(true)
     applyMode()
     refreshAllWidgets()

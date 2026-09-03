@@ -11,6 +11,18 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.12.6 - 2026-09-02 - "Defaults"
+
+From watching Bob the Frost Giant live: a marching line of growing circles read as a solid wall from the moment each appeared, and beams stayed live until the game deleted them five seconds later.
+
+- **Assumed fire time** (`armDefaultDelay` 1.5 s): a telegraphed attack with nothing known about its timing is floor until its assumed fire time minus the lead. Its fade or sound still arms it earlier. Labelled "assumed time" and never written down as a measurement.
+- **Default live window** (`armDefaultLive` 0.6 s): an armed attack with no measured window is over 0.6 s after arming, unless it is a projectile in flight, it was armed by hitting us, or it is known to burn on.
+- **Wider second look** (`dodgeReachEscalate` 2.5): when nothing within `dodgeReach` is safe, the dodge scores the same ring 2.5 times further out, once, every sample still taken at the moment it would happen; only a far spot whose whole line is clean is taken.
+- Fade-learned fire times load again across sessions; only hit-learned windows stay out (4.12.3 had dropped both).
+- Seeds: `secondbosshorizontalbeam` 1.1 s, `secondbosscriclehitbox` 1.6 s.
+- **Auto queue is its own window** ("Auto queue", switchable under Modules as `panelQueue`).
+- `game/GAME_NOTES.md` section 7: Northern Lands as seen live, and the deferred orb-leading mechanic.
+
 ## 4.12.5 - 2026-09-02 - "Auto queue"
 
 Read from the game's own lobby scripts (`PlayerScripts.Ui.queue.*` and the Replay button), decompiled live; copies under `game/lobby/`. Every lobby button ends in a remote call, so the loop makes the same calls and never has to find a button on screen.

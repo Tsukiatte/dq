@@ -20,7 +20,7 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "4.12.5"
+local SCRIPT_VERSION = "4.12.6"
 -- Bump to throw away every learned attack timing in every save, once.
 local LEARN_EPOCH = 2
 local SCRIPT_BUILD_DATE = "2026-09-02"
@@ -28,6 +28,7 @@ local SCRIPT_CODENAME = "Aquatic Temple"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "4.12.6", date = "2026-09-02", notes = "Timing defaults, from watching Bob the Frost Giant live. Every attack in this game hurts for a fraction of a second when its telegraph fades, yet an attack with nothing known about its timing was dodged as live from the moment it appeared, and an armed one stayed live until the game deleted its Model five seconds later - a marching line of growing circles read as a solid wall, and the character froze in it and died. Now a telegraphed attack with unknown timing is assumed to fire 1.5 s after it appears (its fade or sound still arms it earlier, and the assumption is never learned as fact), and an armed attack with no measured window is over 0.6 s after arming unless it is a projectile in flight, hit us, or is known to burn on. When nothing within eighteen studs is safe the dodge looks two and a half times further, once, with every sample still taken at the moment it would happen. Fade-learned fire times are loaded again across sessions; only hit-learned windows stay out. Auto queue is its own window, switchable under Modules. Seeds for the Frost Giant's beam fan and circle line." },
     { version = "4.12.5", date = "2026-09-02", notes = "Auto queue. The loop outside the fight, read from the game's own lobby scripts: in the lobby the script creates a party for the chosen map and difficulty and presses start through the same remotes the lobby buttons use, so no button has to be found on screen; in a run it watches the dungeon-finished flag and, as the party owner, sends the same replay the game's own Replay button sends, so the next run begins without a trip through the lobby. Anyone who is not the owner is returned by the game and queues again from there. New Auto queue section with map, difficulty, hardcore, private party, delays and a Queue now button; all of it is saved with the config. Off until switched on." },
     { version = "4.12.4", date = "2026-09-02", notes = "Traffic light. The game's own precast and hitBox parts are painted by stage: green while the dodge treats the spot as floor (known timing, more than the lead away), yellow inside the lead, red while live or when nothing is known about its timing, and put back the moment the attack is over. The hitBox, invisible by construction, is shown while painted so the volume that actually hurts can be seen; the reader keeps reading its original transparency. The announced zones we draw ourselves use the same three colours. Toggle under Telegraphs, colours under Overlays." },
     { version = "4.12.3", date = "2026-09-02", notes = "Midgardian Champion, from a live capture of fourteen deaths in 220 seconds. Every death was a projectile spawned at the character's own position, fired every eight seconds at a character parked 106-137 studs from the boss; nothing spawned there is dodgeable, so being there is the mistake. Three causes, all fixed: the passive beam was seeded as hurting from 0.3 s and as long-lived, so every beam was a seven-second wall and the arena never had a gap (the precast actually fades at 1.3-2.0 s; the seed now says 1.3-1.9 s and nothing is long-lived until a capture proves it); the ring held off a firing hub kept pursuit out for as long as the hub fired, which was the whole fight, so the character never reached ability range (the ring is now off by default, dodgeHubHold); and attack windows were learned from hits blamed on the nearest part, which is how the wrong seed was written in the first place (learnTimingFromHits, off, and saved windows are no longer loaded)." },
@@ -476,6 +477,7 @@ CFG.autoDetectMap = true
 -- were caught fighting each other three times in six versions.
 CFG.dodgeInterval = 0.05         -- seconds between decisions
 CFG.dodgeReach = 18              -- studs to the outer ring of candidates
+CFG.dodgeReachEscalate = 2.5     -- when nothing within reach is safe, look this many times further, once (4.12.6)
 CFG.dodgeRings = 4
 CFG.dodgeRays = 24
 CFG.dodgeProbe = 0               -- studs; 0 uses the root part's radius
@@ -536,6 +538,8 @@ CFG.dodgePredictedLive = 1.0   -- how long a predicted line hurts when nothing h
 -- appears is never treated as a telegraph again.
 CFG.armFadeStep = 0.08
 CFG.armMinDelay = 0.3
+CFG.armDefaultDelay = 1.5        -- a telegraphed attack with unknown timing is assumed to fire this long after it appears (4.12.6)
+CFG.armDefaultLive = 0.6         -- an armed attack with no measured window is over this long after arming (4.12.6)
 CFG.learnTimingFromHits = false  -- learn an attack's window from being hit by it (4.12.3: off; blame went to the nearest part and rewrote the seeds)
 -- Seconds after a precast has fully faded before the attack counts as over.
 CFG.armDoneLinger = 0.3
@@ -612,6 +616,7 @@ CFG.panelRoutes = true
 CFG.panelAccount = true
 CFG.panelConfigs = true
 CFG.panelAttacks = true
+CFG.panelQueue = true
 
 -- Saved configs. As many as you like, each a full snapshot of every setting.
 CFG.configFile = "DungeonAutofarm_configs.json"
