@@ -163,6 +163,12 @@ local function destructScript()
     table.clear(sliderConnections)
 
     pcall(saveConfig)
+    if RT.walkSpeedBefore then
+        local c = LocalPlayer.Character
+        local h = c and c:FindFirstChildOfClass("Humanoid")
+        if h then pcall(function() h.WalkSpeed = RT.walkSpeedBefore end) end
+        RT.walkSpeedBefore = nil
+    end
     setTelegraphPickerEnabled(false)
     setPathEditEnabled(false)
     S.setDodgeActive(false)

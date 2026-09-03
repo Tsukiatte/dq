@@ -3546,6 +3546,7 @@ end
 
 S.clearHazardHighlights = clearHazardHighlights
 S.restoreAttackColors = restoreAttackColors
+S.isBossModel = isBossModel
 S.clearHitboxVisualizer = clearHitboxVisualizer
 S.clearHoverHighlight = clearHoverHighlight
 S.clearWallHighlights = clearWallHighlights
