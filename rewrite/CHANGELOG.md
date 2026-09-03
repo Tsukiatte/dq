@@ -1,5 +1,11 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.33 - 2026-09-03 - "Commit"
+
+- Field: leash is a hard edge (danger 1 past `leashRadius` - 4), no shoulder.
+- Field: while escaping, the target is kept until reached unless a candidate is clearly better (danger lower by 0.25).
+- `strafeSpeedFraction` 1.0.
+
 ## 5.1.32 - 2026-09-03 - "Outlines"
 
 - Draw: SelectionBox outline per hazard part, coloured by stage; `hazardTransparency` 0.6.

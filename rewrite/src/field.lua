@@ -133,10 +133,10 @@ local function dangerAt(px, py, pz, t, reachO, shoulderO)
         local ep = L.enemy.root.Position
         local dx, dz = px - ep.X, pz - ep.Z
         local depth = sqrt(dx * dx + dz * dz) - L.radius
-        -- Armed only once the fight is joined (reader), so everything outside
-        -- the arena is lethal and the spots pull inward after a respawn.
-        local v = dangerFromDepth(depth, reach, shoulder * 2)
-        if v > worst then worst = v if worst >= 1 then return 1 end end
+        -- Armed only once the fight is joined (reader). A hard edge with a
+        -- four-stud margin and no shoulder: a graded band reached twelve studs
+        -- into the arena and turned the approach into a dodge at 110 studs.
+        if depth > -4 then return 1 end
     end
     -- Melee mobs: a soft zone, never a wall. Their strikes are telegraphed
     -- Models and count in full above; the zone only keeps the spots away from
@@ -432,15 +432,22 @@ local function decide(root, hum)
             DG.target = nil
         else
             local worst, graded = score(tx, tz, d)
-            if worst >= moveAt then
+            if here0 >= moveAt then
+                -- Escaping: the spot is kept until reached, or until a clearly
+                -- better one exists. Dropping it the moment its line reads hot
+                -- re-picked a different direction every frame when everything
+                -- was hot, and the character stood still and died.
+                if best and best.danger < worst - 0.25 then
+                    target = nil
+                    DG.target = nil
+                    DG.reason = "better spot"
+                else
+                    return
+                end
+            elseif worst >= moveAt then
                 target = nil
                 DG.target = nil
                 DG.reason = "line closed"
-            elseif here0 >= moveAt then
-                -- Escaping: the spot is kept until reached or its line closes.
-                -- Re-picking between two near-equal spots each tick was the
-                -- shuttle between two attacks.
-                return
             elseif best then
                 local stillCost = costOf(tx, tz, d, graded)
                 if best.cost > stillCost - CFG.dodgeHysteresis then return end

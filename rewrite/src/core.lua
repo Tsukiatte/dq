@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.32"
+local SCRIPT_VERSION = "5.1.33"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.33", date = "2026-09-03", notes = "The bot hovered outside the Champion arena and stood still under the aimed spiral. Two causes: the leash zone's graded shoulder reached 12 studs into the arena and turned the approach into a dodge from 110 studs (now a hard edge with a 4-stud margin); and in a field where every spot is hot the escape target was dropped and re-picked every frame, so the character jittered in place (now kept until reached unless a clearly better spot exists). Strafe at full walk speed: never stand still in the arena." },
     { version = "5.1.32", date = "2026-09-03", notes = "Hazard boxes get a thin outline in their stage colour so every known hitbox reads as a shape; fill transparency 0.6." },
     { version = "5.1.31", date = "2026-09-03", notes = "Fourth kick: three or four blinks in a row. Root cause was the reader ending a passive beam's danger when its precast faded at 0.6 s while the beam kills for two seconds, so hops landed in beams the model called safe and hopped again. Beams now hold their full window. The blink is walk-first (only when the field's own spot cannot be reached before the box fires), 3 s apart, at most two in ten seconds, destinations clear for 1.5 s and at least 26 studs from any mob." },
     { version = "5.1.30", date = "2026-09-03", notes = "A blink destination must stay clear of every box for a full second (five samples), moving bodies included; it was checked only now and at 0.5 s, and Chris watched the character land where the next shot arrived." },
@@ -77,7 +78,7 @@ local CFG = {
     bossStandoff = 38,            -- ability damage 11-15%/s at 30-40 studs, ~0 past 45 (48 measured 0.35%/s)
     meleeMobMaxReach = 16,        -- a mob whose meleeDistance is at most this is melee (warriors sit above 8)
     strafe = true,                -- circle the target at standoff instead of standing
-    strafeSpeedFraction = 0.6,    -- of tweenWalk
+    strafeSpeedFraction = 1.0,    -- of tweenWalk
 
     -- Fighting.
     attackRange = 10,             -- weapon reach
