@@ -11,6 +11,11 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.12.16 - 2026-09-03 - "Path lead"
+
+- **`dodgePathLead` 0.4 s** for predicted projectile lines (was the standing-telegraph `dodgeLead` 1.2 s). The Champion's lattice lanes are 15 studs wide on a 15-stud grid; with a 1.2 s lead each projectile painted 36 studs of lane ahead of itself and a burst made every candidate within reach read danger 1.0 (recorder candidate snapshot, run 5, 43.7 s). Saved with the config.
+- Recorder records live distance to the target at each hit and in the health samples; the Champion walks, so a fixed hub point misled the run-3 distances.
+
 ## 4.12.15 - 2026-09-03 - "Wait"
 
 - **Wait for the player before capturing it.** Under autoexec the script ran before `Players.LocalPlayer` replicated; `S.LocalPlayer` was nil and `startAutofarm()` died in `loadConfig()` (a config file now exists, so this path always runs). Symptom: UI up, HUD "Running", no loops, no dodge, no auto-start. Core waits for `game.Loaded` and the player.
