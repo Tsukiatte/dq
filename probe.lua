@@ -30,7 +30,7 @@
     Without writefile (Studio) the report stays in memory: _G.DQProbe.report().
 ]]
 
-local PROBE_VERSION = "0.1"
+local PROBE_VERSION = "0.2"
 local SAMPLE_DT = 0.05        -- 20 Hz sampling
 local WRITE_EVERY = 5         -- seconds between file writes
 local NEAR = 15               -- studs: an attack this close to a hit is listed as "near"
@@ -137,6 +137,11 @@ local function partRadius(part)
     local s = part.Size
     return math.max(s.X, s.Y, s.Z) * 0.5
 end
+-- Heading of a part's LookVector in degrees, 0..360 (a line attack's axis).
+local function yawOf(part)
+    local l = part.CFrame.LookVector
+    return (math.deg(math.atan2(l.X, -l.Z)) + 360) % 360
+end
 
 -- ------------------------------------------------------------------ records
 local function prune()
@@ -226,6 +231,7 @@ local function sampleModel(model, rec, now, p, step)
         if not rec.at then
             rec.at = box.Position
             rec.distAt = boxDistance(box, p)
+            rec.yaw = yawOf(box)
         end
         local inside = boxDistance(box, p) <= 0
         sampleInside(rec, inside, a)
@@ -319,6 +325,7 @@ local function onChildAdded(child)
         local rec = newRecord("part", child, false)
         rec.at = child.Position
         rec.radius = partRadius(child)
+        rec.yaw = yawOf(child)
         rec.distAt = (root and root.Parent) and (child.Position - root.Position).Magnitude or -1
         rec.hbInfo = fmt("%s %s", child.ClassName, sz(child.Size))
         rec.pcT0 = child.Transparency
@@ -414,6 +421,11 @@ local function onHealthChanged(h)
                 if d <= ENEMY_NEAR then
                     hit.enemies[#hit.enemies + 1] = fmt("%s dist=%.1f melee=%s style=%s", e.name, d, tostring(e.melee), tostring(e.style))
                 end
+                if tostring(e.style):find("boss") and (not hit.bossDist or d < hit.bossDist) then
+                    local off = p - e.root.Position
+                    hit.bossDist = d
+                    hit.boss = fmt("%s at %s dist=%.1f bearing=%.0f", e.name, v3(e.root.Position), d, (math.deg(math.atan2(off.X, -off.Z)) + 360) % 360)
+                end
             end
         end
     end
@@ -441,8 +453,9 @@ end
 local function modelLine(rec)
     local spans = table.concat(rec.spans, " ")
     if rec.inside then spans = spans .. (spans ~= "" and " " or "") .. fmt("%.2f-now", rec.insideAt) end
-    return fmt("%-26s @%7.2f%s dist=%5.1f  hb=%s  pc=%s tr0=%s vis@%s fade@%s rm@%s  trace=[%s]  inside=[%s]  HIT@[%s]",
-        rec.name, rec.spawn, rec.pre and "*" or " ", rec.distAt or -1, rec.hbInfo or "none", rec.pcSize or "none",
+    return fmt("%-26s @%7.2f%s dist=%5.1f at%s yaw=%s  hb=%s  pc=%s tr0=%s vis@%s fade@%s rm@%s  trace=[%s]  inside=[%s]  HIT@[%s]",
+        rec.name, rec.spawn, rec.pre and "*" or " ", rec.distAt or -1, rec.at and v3(rec.at) or "?", num(rec.yaw, 0),
+        rec.hbInfo or "none", rec.pcSize or "none",
         num(rec.pcT0), num(rec.visAt), num(rec.fadeAt), rec.removed and num(rec.removed) or "live",
         table.concat(rec.trace, " "), spans, table.concat(rec.hitAges, " "))
 end
@@ -455,8 +468,8 @@ local function partLine(rec)
         ev = fmt("  event=%s dist=%.0f dur=%.2f start%+.2f end%+.2f", rec.ev.name, rec.ev.dist, rec.ev.dur,
             rec.ev.start - rec.ev.gnow, rec.ev.stop - rec.ev.gnow)
     end
-    return fmt("%-26s @%7.2f  %s r=%.1f at%s dist=%5.1f tr0=%s moved@%s rm@%s  trace=[%s]  within=[%s]  HIT@[%s]%s",
-        rec.name, rec.spawn, rec.hbInfo, rec.radius, v3(rec.at), rec.distAt or -1, num(rec.pcT0), num(rec.movedAt),
+    return fmt("%-26s @%7.2f  %s r=%.1f at%s yaw=%s dist=%5.1f tr0=%s moved@%s rm@%s  trace=[%s]  within=[%s]  HIT@[%s]%s",
+        rec.name, rec.spawn, rec.hbInfo, rec.radius, v3(rec.at), num(rec.yaw, 0), rec.distAt or -1, num(rec.pcT0), num(rec.movedAt),
         rec.removed and num(rec.removed) or "live", table.concat(rec.trace, " "), spans, table.concat(rec.hitAges, " "), ev)
 end
 
@@ -507,6 +520,7 @@ local function report()
     w("HITS - what enclosed the root when health dropped")
     for i, h in ipairs(hits) do
         w(fmt("HIT #%d  age=%.2f  dmg=%.0f  hp=%.0f  pos=%s%s", i, h.age, h.dmg, h.hp, h.pos and v3(h.pos) or "?", h.stun and "  STUNNED" or ""))
+        if h.boss then w("    boss " .. h.boss) end
         for _, s in ipairs(h.enclosing) do w("    ENCLOSING " .. s) end
         for _, s in ipairs(h.proj) do w("    PART " .. s) end
         for _, s in ipairs(h.near) do w("    near " .. s) end
