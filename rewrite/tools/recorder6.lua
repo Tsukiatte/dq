@@ -139,6 +139,7 @@ task.spawn(function()
                 h0 = r2(DG.here0 or 0), hd = r2(DG.dangerHere or 0), gr = (DG.grace and DG.grace < math.huge) and r2(DG.grace) or nil,
                 nb = #boxes, near = nearest and string.format("%s %s d%.1f f%s", nearest.name or "?", nearest.kind or (nearest.moving and "path" or "zone"), nd == math.huge and 99 or nd, tostring(nf)) or nil,
                 rf = RT.reflex and RT.reflex.name or nil, bo = RT.walkSpeedBefore ~= nil, stall = r1(RT.stalledFor or 0),
+                bc = (c:FindFirstChild("busyCasting") and c.busyCasting.Value) and 1 or 0,
                 tgt = e and string.format("%s d%.0f", e.model.Name, S.flatDistance(e.root.Position, p)) or nil,
                 ch = ch and string.format("%.0fst dg%.2f end%.2f c%.2f", ch.dist, ch.danger, ch.endDanger or -1, ch.cost) or nil,
                 ev = st and string.format("tot%d val%d floor%d walk%d end%d", st.total or 0, st.valid or 0, st.noFloor or 0, st.notWalkable or 0, st.lethalEnd or 0) or nil,

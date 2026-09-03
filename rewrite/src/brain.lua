@@ -256,7 +256,10 @@ local function fight(hum, root, e, now)
     local ep = e.root.Position
     local d = flat(root.Position, ep)
     faceToward(root, hum, ep)
-    if d <= S.abilityReach() then
+    -- The cast animation roots the character for a moment: never cast while
+    -- the ground here is hot or about to be.
+    local castSafe = (DG.dangerHere or 0) < CFG.dodgeMoveAt and (DG.grace == nil or DG.grace > CFG.castSafeGrace)
+    if d <= S.abilityReach() and castSafe then
         -- Each cast queues up for the reader, which measures the range from
         -- where the projectile lands.
         RT.castQueue = RT.castQueue or {}

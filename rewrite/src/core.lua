@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.67"
+local SCRIPT_VERSION = "5.1.68"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.68", date = "2026-09-03", notes = "From the death verdicts at Bob: the horizontal beam fires 0.6 s after it appears, not 1.1 (a death 0.4 s before the model said so); the spread beam hits four studs outside its box; the following orbs get a 14-stud bubble (one killed at 1.2 studs with no box round it). No ability is cast while the ground here goes hot within 1.2 s: the cast animation roots the character, and the trace showed it commanded to run and not moving in the second before a death." },
     { version = "5.1.67", date = "2026-09-03", notes = "Into the arena, every time (Chris): boss-fight spots beyond the arena edge cost during the fan as well (the edge is the fan radius then), and the approach to a boss runs at escape speed while it is more than twenty-five studs outside the band, so the bot does not linger at the mouth where the aimed attacks spawn on it." },
     { version = "5.1.66", date = "2026-09-03", notes = "Champion fan: out to 85 studs, not 100, which was against the rocks (the trace showed 4 studs a second while commanded 22), and the reflex no longer re-arms once the bot is near that radius. A spot counts as clean only under 0.2 path danger, and a spot under eight studs costs extra while the ground here is hot. The blink may hop a second time inside its cooldown, two seconds on and once per twenty seconds, when a box is already on the character (the aimed criss cross spawns on you)." },
     { version = "5.1.65", date = "2026-09-03", notes = "Ability range per slot (Chris): every cast is queued with its slot, and the projectile that appears takes the measurement, so Q and E are measured separately and the least ranged one sets the fight distance - two studs inside a known cap, one past a reach that is only a lower bound. The Ability radius and Boss standoff sliders go to 80; auto standoff can go to 70. Bob: a circle whose precast is destroyed when it fires vanished from the field at that moment (three deaths just outside circles the model no longer had); the last geometry is kept while the window is open, and the circles are padded ten studs. A blocked travel step takes the spot instead of standing still beside the box." },
@@ -110,6 +111,8 @@ local CFG = {
     -- Standing.
     mobStandoff = 34,             -- from any mob, melee or ranged: abilities only, never within weapon reach (Chris)
     meleeBuffer = 10,             -- soft band past a melee mob's swing where spots are merely disfavoured
+    castSafeGrace = 1.2,          -- no ability cast while the ground here goes hot within this: the cast animation roots the character
+    orbBubble = 14,               -- studs round Bob's following orbs; they explode at contact and killed at 1.2 studs
     fanRadius = 85,               -- during the Champion's beam fan: out to here from the hub, between the lanes (100 was against the rocks: 4 studs/s while commanded 22)
     leashRadius = 122,            -- Champion arena: death past ~128 studs from the boss; the respawn point is 131-137 out
     bonusBoss = false,            -- after the last boss: stay for the bonus boss? Its arena is not mapped; off
@@ -217,8 +220,8 @@ local TIMING = {
     firstbosspassivebeam        = { first = 0.3, last = 3.5, holdFull = true },   -- lethal 0.3-2.1 s after appearing, held longer because a lane re-fires in the burst; the 5.1.51 window that killed the Champion in two minutes   -- hurts 0.3-2.2 s after appearing, and in the burst its lane re-fires every 1.1 s: a lane never expires while the burst lasts
     firstbossjumpslam           = { first = 1.5, last = 5.0, pad = 5 },   -- the Model appears at landing; deaths inside from ~1.8 s and 3.3 studs outside the 67-wide box
     secondbosscriclehitbox      = { first = 0.6, last = 1.6, pad = 10 },   -- precast-only cylinder (22/28/34 wide, growing with distance); hits 0.7-1.0 s after it appears, a body wider than the cylinder
-    secondbosshorizontalbeam    = { first = 1.1, last = 5.0, slim = 2.5 },   -- 10x64x400 beams 23.5 studs apart marching across the arena
-    secondbossspreadbeam        = { first = 0.9, last = 2.5, slim = 2.5 },   -- a death landed 2.2 studs outside the 12-wide box (run 31)   -- killed 0.5 s before the 1.5 s default                            -- nine 12x64x400 spokes 20 degrees apart from Bob; gaps widen with distance
+    secondbosshorizontalbeam    = { first = 0.6, last = 5.0, slim = 2.5 },   -- killed 0.4 s before the old 1.1   -- 10x64x400 beams 23.5 studs apart marching across the arena
+    secondbossspreadbeam        = { first = 0.9, last = 2.5, slim = 4.0 },   -- a hit landed 3.9 studs outside the 12-wide box (run 32)   -- a death landed 2.2 studs outside the 12-wide box (run 31)   -- killed 0.5 s before the 1.5 s default                            -- nine 12x64x400 spokes 20 degrees apart from Bob; gaps widen with distance
     cubepylonshot               = { first = 0.8, last = 1.1 },
 }
 
