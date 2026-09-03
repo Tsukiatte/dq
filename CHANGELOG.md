@@ -11,6 +11,10 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.12.14 - 2026-09-03 - "No blink"
+
+- **Blink off by default** (`blinkEnabled` false): the first run with it ended in an anticheat kick. The 22 studs/s tween had run a full fight without one, so the hop is the suspect. Kept in the code, off.
+
 ## 4.12.13 - 2026-09-03 - "Start"
 
 - **Press START** (`autoStartDungeon`, `autoStartDelay` 6): a queued run teleports the party to the dungeon and waits at the spawn until the START button is pressed; run 4 sat there for two minutes. The button fires `remotes.changeStartValue`; the script fires it after 6 s in an unstarted dungeon and every 10 s until `dungeonStarted` flips. Runs with auto queue off too. Toggle under Auto queue; saved with the config.
