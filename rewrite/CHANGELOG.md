@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.41 - 2026-09-03 - "Remember the room"
+
+- Brain: `reachedOrder` mirrored in `_G.DungeonAutofarmReached`.
+
 ## 5.1.40 - 2026-09-03 - "Walls are walls"
 
 - Field: the target model is no longer excluded from the walkability sweep; `RT.stalledFor` > 0.6 drops the current spot.
