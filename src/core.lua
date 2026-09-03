@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 4.10.5
+    VERSION : 4.10.6
     BUILD   : 2026-09-02
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "4.10.5"
+local SCRIPT_VERSION = "4.10.6"
 local SCRIPT_BUILD_DATE = "2026-09-02"
 local SCRIPT_CODENAME = "Fight from range"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "4.10.6", date = "2026-09-02", notes = "The hub's rhythm sets where to stand. While it fires, and for the last seconds of the gap before it fires again, the character holds a ring fifty studs out - far enough that a sweep's lines have gaps between them, which at twenty-seven studs they do not - and the ring is held from both sides. In the quiet it comes in to the ability standoff and casts. The radial cost applies only while the hub is actually firing: the rate stays up for ten seconds after a burst, and a cost that stayed with it kept the character out through the whole quiet gap, the one time it could have been casting. Pursuit does not walk in while the ring is held." },
     { version = "4.10.5", date = "2026-09-02", notes = "Two corrections to the sweep reading, from watching it in the harness. A hub's lines are the ones centred on it: a mage shot that happened to cross the boss was being counted as one of its beams and took over the hub's name, arming delay and headings. And the period is the interval between the lines of one burst; the ten-second gap between bursts was being folded in, which put the period at two seconds for the first half of every burst and made every predicted line come late - exactly when the hits were landing." },
     { version = "4.10.4", date = "2026-09-02", notes = "Fight from range. The enemy Models carry their own numbers - enemyStyle boss1, meleeDistance 4, aggroRange 50, moveSpeed 16 - and the script now reads them instead of guessing. An enemy whose style says boss, or that line attacks pass through, is a boss, and a boss is fought from ability range: the standoff is twenty-six studs, inside the thirty-stud ability radius and outside its melee, and the swing only goes if we happen to be in our own reach anyway. A mob's standoff is its body plus the melee distance the game gives it. The dodge's danger ring round an enemy is its melee, not where we stand, so standing at range no longer reads as danger. The stuck detector leaves the dodge's deliberate holds alone: it had been jumping the character into the pattern it was waiting out." },
     { version = "4.10.3", date = "2026-09-02", notes = "Two more from the harness. A scripted projectile is a hit candidate: where the game's own numbers put a spike right now. A hit while one rolled over us was pinned on whatever floor line we stood in, and that line learned a six-second window. And the Midgardian Champion's beams carry a window from the start - a pulse, 0.3 to 1.2 seconds after each appears - because nothing on them ever shows, and with no window every beam was a wall for its whole seven seconds: a burst of thirteen was a wall everywhere, the character froze at the arena edge, and the projectiles took it. The window is a hypothesis the game corrects: a certain hit at a later age widens it on the spot." },
@@ -493,7 +494,8 @@ CFG.dodgeHubWeight = 1.0       -- radial cost scale
 CFG.dodgeHubLineWidth = 8      -- typical beam width, for the coverage estimate
 CFG.dodgeHubExit = 0.8         -- seconds needed to get back out after going in
 CFG.dodgeHubFireGuess = 1.2    -- arming delay assumed for a hub's lines until one is learned
-CFG.dodgeHubStandoff = 20      -- where to wait, off the hub, while the gate is closed
+CFG.dodgeHubStandoff = 50      -- the ring to hold while a hub fires: out where a sweep's lines have gaps between them
+CFG.dodgeHubLeave = 2.5        -- seconds before the next burst is due to be back on the ring
 CFG.bossStandoff = 26          -- where to stand against a boss: inside ability range, outside its melee
 CFG.dodgeHubBurstGap = 2.0     -- an interval longer than this between a hub's lines is a gap, not the period
 CFG.dodgePredictSteps = 2      -- how many of a sweeping hub's next lines to predict

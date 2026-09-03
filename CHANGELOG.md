@@ -11,6 +11,18 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.10.6 - 2026-09-02
+
+- **The hub's rhythm sets where to stand.** `hub.active` (lines coming now)
+  and `hub.imminent` (the gap, `hub.gap`, is nearly used up: within
+  `dodgeHubLeave` 2.5 s of the next burst) hold a ring at `dodgeHubStandoff`
+  (now 50 studs: at 27 the lines of a 20-degree sweep have no gap between
+  them, at 50 they have ~10). The ring is held from both sides. In the quiet
+  the character comes in to the ability standoff and casts.
+- The radial hub cost applies only while the hub is active: the 10 s rate
+  window kept it on through the whole quiet gap.
+- Pursuit does not walk in while the ring is held (`DG.hubHold`).
+
 ## 4.10.5 - 2026-09-02
 
 - A hub's lines are the ones **centred** on it (within `dodgeHubTolerance`
