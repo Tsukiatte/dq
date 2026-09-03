@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.27 - 2026-09-03 - "Reach"
+
+- `abilityRadius` 42.
+
 ## 5.1.26 - 2026-09-03 - "Abilities only"
 
 - `mobStandoff` 34 replaces melee/ranged standoffs; `meleeMobMaxReach` 16; `autoAttack` off by default.
