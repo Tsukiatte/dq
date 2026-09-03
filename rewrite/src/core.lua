@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.45"
+local SCRIPT_VERSION = "5.1.46"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.46", date = "2026-09-03", notes = "The armed leash survives a reload of the script (mirrored in _G per boss); a reload at the respawn point left the character standing outside the arena and dead." },
     { version = "5.1.45", date = "2026-09-03", notes = "Leftover drawings from the older build that the autoexec loads first (its PrecastZones and Dodge folders) froze in place as yellow slabs; the draw module now removes anything under the visuals root that is not its own, every three seconds." },
     { version = "5.1.44", date = "2026-09-03", notes = "Seventh kick came while simply walking toward Bob at 22. Every kick so far shares speed above 16 held for seconds. The burst now runs at most 1.5 s before 1.2 s at walking speed, and approaches walk at 16." },
     { version = "5.1.43", date = "2026-09-03", notes = "Box footprints follow the part's orientation: whichever local axis points up is the height. At Bob a hitbox stood on end read as a 63-stud floor box, the whole arena counted as lethal, and the blink fired on every cooldown with nothing there." },

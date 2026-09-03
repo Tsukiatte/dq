@@ -346,10 +346,10 @@ local function scanEnemies(now)
     local rt = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
     for _, e in ipairs(list) do
         if e.isBoss and e.model.Name == "Midgardian Champion" then
-            if RD.leashBoss ~= e.model then RD.leashBoss = e.model RD.leashArmed = false end
+            if RD.leashBoss ~= e.model then RD.leashBoss = e.model RD.leashArmed = (_G.DungeonAutofarmLeashArmed == e.model) end
             if rt and not RD.leashArmed then
                 local dx, dz = rt.Position.X - e.x, rt.Position.Z - e.z
-                if dx * dx + dz * dz < 110 * 110 then RD.leashArmed = true end
+                if dx * dx + dz * dz < 110 * 110 then RD.leashArmed = true _G.DungeonAutofarmLeashArmed = e.model end
             end
             if RD.leashArmed then RD.leash = { enemy = e, radius = CFG.leashRadius } end
             break
