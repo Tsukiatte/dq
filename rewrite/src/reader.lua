@@ -114,6 +114,10 @@ local function trackModel(model)
     }
     RD.count = RD.count + 1
     if hb and name:find("passivebeam", 1, true) then noteBeam(hb, now) end
+    -- The slam Model appears two seconds before the hit, with the boss landing
+    -- on the character; the Jump Down event arrives with the hit itself. The
+    -- reflex starts here.
+    if hb and name == "firstbossjumpslam" then RT.reflex = { name = "slam", from = hb.Position, radius = 44, untilAt = now + 2.4 } end
     if hb and name:find("mageshot", 1, true) then noteVolley(hb, now) end
     if pc and name:find("cricle", 1, true) then noteCircle(pc, now) end
 end
@@ -291,7 +295,7 @@ noteVolley = function(hb, now)
         local z = RD.zones[i]
         if z.name == "volley next" and z.madeAt < now - 0.3 then table.remove(RD.zones, i) end
     end
-    local length = 70
+    local length = 240   -- the whole march: the shots run from the mage past the player, so the way out is sideways
     local centre = Vector3.new(pos.X, pos.Y, pos.Z) + dir * (length * 0.5)
     local cf = CFrame.lookAt(centre, centre + dir)
     addZone({ name = "volley next", cframe = cf, size = Vector3.new(hb.Size.X, math.max(hb.Size.Y, 12), length), from = now + 0.3, untilAt = now + 2.2, telegraphed = true, madeAt = now })

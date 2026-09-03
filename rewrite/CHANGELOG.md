@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.72 - 2026-09-03 - "Two seconds, sideways"
+
+- Reader: slam reflex from the `firstbossjumpslam` Model; volley zone 240 long. Field: marker blink needs 4+ studs.
+
 ## 5.1.71 - 2026-09-03 - "Home and the crystals"
 
 - Core: profile flags `orbs` / `home`; `S.bobCrystal(colour)`, `S.bobCrystalCentroid()`; `orbLeadBehind` 12, `bobHomeWeight` 0.02. Field: home pull for Bob. Brain: step 0b leads the nearest orb to the far side of its crystal.

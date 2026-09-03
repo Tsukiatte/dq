@@ -356,7 +356,8 @@ local function decide(root, hum)
             local tg = DG.target
             if tg then
                 local tx, tz = tg.X - rx, tg.Z - rz
-                if sqrt(tx * tx + tz * tz) <= CFG.blinkMax + 0.5 then
+                local md = sqrt(tx * tx + tz * tz)
+                if md >= 4 and md <= CFG.blinkMax + 0.5 then   -- a two-stud hop wastes the cooldown
                     local clear = true
                     for _, tt in ipairs({ 0, 0.25, 0.5, 0.75, 1.0 }) do
                         if dangerAt(tg.X, ry, tg.Z, tt, 2.5, 0) >= 0.5 then clear = false break end
