@@ -144,6 +144,7 @@ local function destructScript()
     resetPursuitPath()
     clearEscapeRoute()
     clearHazardHighlights()
+    if S.restoreAttackColors then S.restoreAttackColors() end
     clearWallHighlights()
     clearHitboxVisualizer()
     clearHoverHighlight()
@@ -613,6 +614,13 @@ local function createControlUI()
     track(K.toggle(attacks.body, "Draw announced attacks",
         function() return CFG.showPrecast end, function(v) CFG.showPrecast = v end, 4,
         "Draw each announced attack, warming from yellow to red as its impact approaches. Ours, not the game's - the game's own marker is invisible at first."))
+    track(K.toggle(attacks.body, "Paint attacks by stage",
+        function() return CFG.recolorAttacks end,
+        function(v)
+            CFG.recolorAttacks = v
+            if not v and S.restoreAttackColors then S.restoreAttackColors() end
+        end, 4.5,
+        "Paint the game's own attack parts: green while the spot is still safe to cross, yellow when it is about to fire, red while it hurts. The invisible damage volume is shown too. Colours are under Overlays."))
     track(K.toggle(attacks.body, "Stand in safe spots",
         function() return CFG.safeZoneEnabled end, function(v) CFG.safeZoneEnabled = v end, 5,
         "Some bosses mark the one circle you must stand IN. With this off the dodge treats the floor as uniformly safe and calmly walks you out of it."))
@@ -1290,6 +1298,12 @@ local function createControlUI()
         function() return CFG.colorTelegraph end,
         function(c) CFG.colorTelegraph = c updateHazardHighlights() end,
         "The box drawn around every enemy attack, and its name tag.")
+    track(K.colorRow(overlays.content, "Stage: safe to cross", function() return CFG.colorStageFloor end,
+        function(c) CFG.colorStageFloor = c end, 7.2, "Attack paint while the spot is still floor."))
+    track(K.colorRow(overlays.content, "Stage: about to fire", function() return CFG.colorStageSoon end,
+        function(c) CFG.colorStageSoon = c end, 7.3, "Attack paint inside the lead."))
+    track(K.colorRow(overlays.content, "Stage: live", function() return CFG.colorStageLive end,
+        function(c) CFG.colorStageLive = c end, 7.4, "Attack paint while it hurts, or when nothing is known about its timing."))
     overlayPair("Invisible walls", 9,
         function() return CFG.showWalls end,
         function(v)

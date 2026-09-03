@@ -20,7 +20,7 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "4.12.3"
+local SCRIPT_VERSION = "4.12.4"
 -- Bump to throw away every learned attack timing in every save, once.
 local LEARN_EPOCH = 2
 local SCRIPT_BUILD_DATE = "2026-09-02"
@@ -28,6 +28,7 @@ local SCRIPT_CODENAME = "Aquatic Temple"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "4.12.4", date = "2026-09-02", notes = "Traffic light. The game's own precast and hitBox parts are painted by stage: green while the dodge treats the spot as floor (known timing, more than the lead away), yellow inside the lead, red while live or when nothing is known about its timing, and put back the moment the attack is over. The hitBox, invisible by construction, is shown while painted so the volume that actually hurts can be seen; the reader keeps reading its original transparency. The announced zones we draw ourselves use the same three colours. Toggle under Telegraphs, colours under Overlays." },
     { version = "4.12.3", date = "2026-09-02", notes = "Midgardian Champion, from a live capture of fourteen deaths in 220 seconds. Every death was a projectile spawned at the character's own position, fired every eight seconds at a character parked 106-137 studs from the boss; nothing spawned there is dodgeable, so being there is the mistake. Three causes, all fixed: the passive beam was seeded as hurting from 0.3 s and as long-lived, so every beam was a seven-second wall and the arena never had a gap (the precast actually fades at 1.3-2.0 s; the seed now says 1.3-1.9 s and nothing is long-lived until a capture proves it); the ring held off a firing hub kept pursuit out for as long as the hub fired, which was the whole fight, so the character never reached ability range (the ring is now off by default, dodgeHubHold); and attack windows were learned from hits blamed on the nearest part, which is how the wrong seed was written in the first place (learnTimingFromHits, off, and saved windows are no longer loaded)." },
     { version = "4.12.2", date = "2026-09-02", notes = "Window. The shared state table is published as _G.DungeonAutofarmState while the script runs and cleared on destruct, so a live inspection tool can read what the reader classifies, which spot the dodge holds and what the mover is doing without a rebuild for every question. No behaviour change." },
     { version = "4.12.1", date = "2026-09-02", notes = "Stairs and walls. The tween mover stepped horizontally and never re-sampled the floor, and its single wall ray left the root centre three studs up and missed every riser beneath it - up a staircase it drove the legs into each step and physics fought back, and a flight that turns ninety degrees was hopeless. It follows the floor now: the floor under the next point is raycast each frame, the root is placed at its own measured height above it, a rise within the step height is climbed, and walls are read at knee and chest with the steerer's own step-versus-wall classifier. The dodge judged candidate heights against the root with abs(), which rejected any spot even a fraction of a stud downhill while allowing six studs up; heights are judged from the feet, asymmetric, and the walk sweep keeps the root's height above the destination floor so it clears stair risers. Pursuit no longer passes a waypoint until the one after it is in clear sight - with four-stud spacing and a four-stud advance radius it was passing every corner early and aiming through the inside wall - and a wall stall now goes round to the roomier side and keeps going that way, where it used to alternate sides and shuffle on the spot against a wall it could simply have walked along." },
@@ -646,6 +647,12 @@ CFG.accountRank = "DEVELOPER"
 CFG.colorTelegraph = Color3.fromRGB(255, 30, 30)
 CFG.drawPendingHazards = false  -- draw attacks still on their timer (floor)? Off: only what can hurt is boxed
 CFG.colorTelegraphPending = Color3.fromRGB(255, 176, 40)   -- announced, not yet live
+-- Traffic light (4.12.4): the game's own attack parts, painted by stage.
+CFG.recolorAttacks = true
+CFG.colorStageFloor = Color3.fromRGB(60, 220, 120)   -- known timing, more than the lead away: walkable
+CFG.colorStageSoon = Color3.fromRGB(255, 220, 40)    -- inside the lead: about to fire
+CFG.colorStageLive = Color3.fromRGB(255, 50, 50)     -- live, or nothing known (dodged as live)
+CFG.recolorHitboxTransparency = 0.55                 -- the damage volume is invisible by construction; shown while painted
 CFG.colorWall = Color3.fromRGB(40, 220, 90)
 CFG.colorHitbox = Color3.fromRGB(0, 220, 255)
 CFG.colorAbilityRadius = Color3.fromRGB(170, 100, 255)
@@ -756,7 +763,8 @@ HZ.arming = setmetatable({}, { __mode = "k" })
 HZ.armState = setmetatable({}, { __mode = "k" })   -- [part] = its Model's arming record
 HZ.lifeLog = {}                  -- one line per attack Model's lifecycle, for the capture file
 HZ.windowStamps = {}             -- windows announced by events for Models not yet tracked
-HZ.scenery = setmetatable({}, { __mode = "k" })   -- appearance-only detections that outlived appearanceMaxAge
+HZ.scenery = setmetatable({}, { __mode = "k" })
+HZ.recolored = setmetatable({}, { __mode = "k" })  -- [part] = its original look, while painted by stage   -- appearance-only detections that outlived appearanceMaxAge
 -- What was next to you each time you took damage. Newest last, capped.
 HZ.hitLog = {}
 HZ.lastHitAt = -math.huge
