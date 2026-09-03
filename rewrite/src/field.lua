@@ -131,12 +131,10 @@ local function dangerAt(px, py, pz, t)
         local ep = L.enemy.root.Position
         local dx, dz = px - ep.X, pz - ep.Z
         local depth = sqrt(dx * dx + dz * dz) - L.radius
-        -- A band, not a half-plane: the walk in from room 2 starts 200 studs
-        -- out and is safe; the kill applies once the fight is joined.
-        if depth <= 40 then
-            local v = dangerFromDepth(depth, reach, shoulder * 2)
-            if v > worst then worst = v if worst >= 1 then return 1 end end
-        end
+        -- Armed only once the fight is joined (reader), so everything outside
+        -- the arena is lethal and the spots pull inward after a respawn.
+        local v = dangerFromDepth(depth, reach, shoulder * 2)
+        if v > worst then worst = v if worst >= 1 then return 1 end end
     end
     -- Melee mobs: a soft zone, never a wall. Their strikes are telegraphed
     -- Models and count in full above; the zone only keeps the spots away from
