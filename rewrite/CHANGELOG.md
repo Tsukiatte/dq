@@ -1,5 +1,10 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.52 - 2026-09-03 - "Sideways"
+
+- Seeds may set `slim`; `slimReach` 0.8 / `slimShoulder` 0.3 replace the 3 + 1.5 padding for `secondbosshorizontalbeam` and `secondbossspreadbeam`.
+- Reader: `noteCircle` adds a `circle line` zone (400 long, chain width) from the first circle; per-step `circle next` zones only once the direction is measured.
+
 ## 5.1.51 - 2026-09-03 - "Cross the lane"
 
 - `stepBlockAt` 0.6 replaces `dodgeMoveAt` in `stepSafe`.
