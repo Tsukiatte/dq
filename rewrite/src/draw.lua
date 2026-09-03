@@ -28,6 +28,7 @@ local function newBox()
     edge.Name = "edge"
     edge.LineThickness = 0.05
     edge.SurfaceTransparency = 1
+    edge.Color3 = CFG.colorFloor
     edge.Adornee = p
     edge.Parent = p
     p.Parent = folder()

@@ -202,13 +202,17 @@ end
 local function blinkTarget(root, hum, rx, ry, rz)
     local params = raycastParams(DG.approach and DG.approach.model or nil)
     local rp = root.Position
-    local above = hum.HipHeight + root.Size.Y * 0.5
-    local under = Workspace:Raycast(rp, Vector3.new(0, -(above + 3), 0), params)
+    -- Standing height is the Humanoid's own, not whatever the stride is at
+    -- this instant: a hop that inherited a mid-step height left the character
+    -- hovering a hair above the floor until the game yanked it down.
+    local standard = hum.HipHeight + root.Size.Y * 0.5
+    local under = Workspace:Raycast(rp, Vector3.new(0, -(standard + 3), 0), params)
     if not under or under.Normal.Y < 0.7 then return nil end
-    above = rp.Y - under.Position.Y
-    if above < 1 or above > 6 then return nil end
+    local measured = rp.Y - under.Position.Y
+    if math.abs(measured - standard) > 0.8 then return nil end   -- mid-jump or mid-fall: no hop
+    local above = standard + 0.05
     local feetY = under.Position.Y
-    for _, dist in ipairs({ 4, 6, 8 }) do
+    for _, dist in ipairs({ 4, 6 }) do
         if dist > CFG.blinkMax + 0.01 then break end
         local best, bestScore = nil, math.huge
         for i = 0, 15 do
@@ -301,6 +305,8 @@ local function decide(root, hum)
             RT.blinks = (RT.blinks or 0) + 1
             RT.lastBlink = { at = now, from = rp, to = dest, dist = (Vector3.new(dest.X, 0, dest.Z) - Vector3.new(rx, 0, rz)).Magnitude, grace = grace }
             root.CFrame = CFrame.new(dest) * (root.CFrame - root.CFrame.Position)
+            local v = root.AssemblyLinearVelocity
+            root.AssemblyLinearVelocity = Vector3.new(v.X, -4, v.Z)   -- settle onto the floor at once
             DG.target = nil
             DG.reason = string.format("blink %.0f studs", RT.lastBlink.dist)
             heavyDebugThrottled("blink", 0.5, "Field", DG.reason)
