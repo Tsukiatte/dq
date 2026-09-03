@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.18"
+local SCRIPT_VERSION = "5.1.19"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.19", date = "2026-09-03", notes = "The Champion's arena has a leash: every unexplained death sat 129-137 studs from the boss with nothing tracked nearby, three of them while strafing at 135. The field now treats the ground past 122 studs from him as danger, so a respawn walks in at once and no spot is chosen out there." },
     { version = "5.1.18", date = "2026-09-03", notes = "The fan retreat is gone: beams fire eight to ten a second through most of the fight, so the detector held the boss at 135 studs and the character strafed there dealing nothing. Passive beams get a 0.3 s telegraph (the earliest death inside one), so the field may step out through a fresh beam instead of treating it as a wall." },
     { version = "5.1.17", date = "2026-09-03", notes = "Champion: the next two beam lanes of the slow sweep are zones (20 degrees on, half a second apart); the fast fan is detected and the boss is left for its 125-stud reach until it ends; the jump's target is a slam zone 2.5 s ahead. Standoff 35 (the abilities' best band). Dodge rings reach 30 studs so a 40-wide body can be sidestepped; far looks at 48 and 75." },
     { version = "5.1.16", date = "2026-09-03", notes = "A room counts as reached when the character stands inside its bounding box, not only within 25 studs of its first spawn part (the bot walked back toward room 2 after two boss kills). The field decides every frame: the aimed criss cross kills on spawn and a moving character survives it far more often than a parked one." },
@@ -60,6 +61,7 @@ local CFG = {
     meleeStandoff = 20,           -- studs past a melee mob's body: they close fast and one swing kills
     meleeBuffer = 4,              -- the field treats a melee mob as dangerous this far past its swing
     rangedStandoff = 10,          -- studs from a ranged mob
+    leashRadius = 122,            -- Champion arena: death past ~128 studs from the boss; the respawn point is 131-137 out
     bossStandoff = 35,            -- the abilities' best band: 11-15%/s of boss health at 30-40 studs, nothing past 40
     meleeMobMaxReach = 8,         -- a mob whose meleeDistance is at most this is melee
     strafe = true,                -- circle the target at standoff instead of standing
