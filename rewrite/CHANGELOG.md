@@ -1,5 +1,10 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.57 - 2026-09-03 - "Inside the arena, hop sooner"
+
+- Field: `graceHere` includes moving bodies; grace computed every tick; blink gate is `grace <= blinkWindow`; walk margin 0.35; destination clear for 1.0 s; `dodgeArenaWeight` 0.04 (+2 past band+45) for boss targets.
+- Core: `blinkWindow` 0.6, `blinkCooldown` 5, `blinkMax` 8, slam seed first 1.5. UI slider to 8.
+
 ## 5.1.56 - 2026-09-03 - "Back inside"
 
 - Brain: fan standoff override removed. Core: passive beam seed back to 3.5 s, no slim.

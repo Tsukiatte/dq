@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.56"
+local SCRIPT_VERSION = "5.1.57"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.57", date = "2026-09-03", notes = "Champion (Chris): boss-fight spots are pulled back inside the arena - beyond the standoff band plus twenty studs costs, past forty-five it is out of the question - because the aimed attacks spawn on you at the mouth with nowhere to step. The blink now fires for a box that will cover you within 0.6 s, moving bodies included (the criss cross gave no warning before), 5 s apart, four a minute, up to 8 studs. Slam counts as live from 1.5 s and five studs wider (a death landed 3.3 studs outside it). Passive beams hold 2.6 s with slim padding so the fan has gaps past 80 studs. A respawn outside the leash is pulled back in by a gradient instead of wandering out (run 28)." },
     { version = "5.1.56", date = "2026-09-03", notes = "Champion: back to the 5.1.51 beam window (3.5 s, normal padding) and standoff during the fan; the 95-stud fan standoff added in 5.1.53 left the bot twenty studs from the arena edge and the leash killed it twice. The jump slam lands where the player stood at Jump Up, so a slam zone is placed there at Jump Up: three seconds to leave instead of two." },
     { version = "5.1.55", date = "2026-09-03", notes = "Interface: the HUD is the old build's again - title chip with the build number and fps, a Playtime / Status / Ping card, the open-GUI hint and the Autofarm pill. Window corners: the header now shares the frame's rounding and the accent is an inset pill, so nothing square shows past the corners; the body stops short of the bottom corners." },
     { version = "5.1.54", date = "2026-09-03", notes = "The spot marker never sits on a box about to fire (Chris): a spot whose own ground is lethal on arrival or during the dwell sorts last, and a kept spot is dropped the moment its ground closes. Bob\'s chain line is a soft band the bot will not stand in but may cross; the circles are predicted both ways from the first one and pruned by the second. Against mobs, dodges prefer straight back over sideways." },
@@ -126,10 +127,10 @@ local CFG = {
     dodgePathLead = 0.4,          -- a moving projectile's line: the time to sidestep
     dodgeDwell = 1.5,             -- a spot must stay clear this long after arrival (the big spike front: 100 studs/s, announced 1.4 s ahead)
     blink = true,                 -- reflex hop out of a lethal box that fires before a walk could clear it
-    blinkMax = 6,                 -- studs, at most; an 8-wide beam needs 5.2 from its centre, and the other script's hop is barely visible
-    blinkWindow = 0.45,           -- hop when the box on us fires within this many seconds (0 = already live)
-    blinkCooldown = 8.0,          -- seconds between hops; kicks four and five came from hopping too often
-    blinkPerMinute = 3,           -- and no more than this many in any sixty seconds
+    blinkMax = 8,                 -- studs, at most; an 8-wide beam needs 5.2 from its centre, and the other script's hop is barely visible
+    blinkWindow = 0.6,            -- hop when the ground here goes lethal within this many seconds (0 = already live)
+    blinkCooldown = 5.0,          -- seconds between hops; kicks four and five came from hopping too often (3 s, chained)
+    blinkPerMinute = 4,           -- and no more than this many in any sixty seconds
     stepBlockAt = 0.6,            -- a travel step is refused at or above this danger during the crossing (lanes at 0.5 may be crossed)
     pathLaneDanger = 0.5,         -- standing anywhere on a projectile's remaining lane counts this much: relocate, never sit there
     dodgeMoveAt = 0.15,           -- danger here at or above this: relocate
@@ -143,6 +144,7 @@ local CFG = {
     dodgeInsideWeight = 0.85,
     dodgeStrafeWeight = 0.15,     -- preference for moving across the target's line rather than along it
     dodgeApproachWeight = 0.03,   -- pull toward the standoff band, per stud out of it
+    dodgeArenaWeight = 0.04,      -- boss fights: per stud beyond the band plus twenty, and a flat two past forty-five (the arena mouth)
 
     -- Reader defaults for attacks with no seed.
     defaultFire = 1.5,            -- a telegraphed Model with no seed fires this long after it appears
@@ -191,8 +193,8 @@ local TIMING = {
     spearmanstrikehitbox        = { first = 0.6, last = 1.5, holdFull = true },
     northernwarriorlinestrike   = { first = 0.6, last = 1.5, holdFull = true },
     northernwarriorcirclestrike = { first = 0.6, last = 1.5, holdFull = true },
-    firstbosspassivebeam        = { first = 0.3, last = 3.5, holdFull = true },   -- 5.1.53 tried 2.0 s and 1.5 padding: three more deaths in beams; back to what killed the Champion in two minutes   -- hurts 0.3-2.2 s after appearing, and in the burst its lane re-fires every 1.1 s: a lane never expires while the burst lasts
-    firstbossjumpslam           = { first = 1.8, last = 5.0 },
+    firstbosspassivebeam        = { first = 0.3, last = 2.6, holdFull = true, slim = 1.5 },   -- lethal 0.3-2.1 s after appearing (run 29: killers had fired 0-1.8 s before); slim so the fan's gaps exist past 80 studs   -- hurts 0.3-2.2 s after appearing, and in the burst its lane re-fires every 1.1 s: a lane never expires while the burst lasts
+    firstbossjumpslam           = { first = 1.5, last = 5.0, pad = 5 },   -- the Model appears at landing; deaths inside from ~1.8 s and 3.3 studs outside the 67-wide box
     secondbosscriclehitbox      = { first = 0.6, last = 1.6, pad = 3 },   -- precast-only cylinder (22/28/34 wide, growing with distance); hits 0.7-1.0 s after it appears, a body wider than the cylinder
     secondbosshorizontalbeam    = { first = 1.1, last = 5.0, slim = 0.8 },   -- 10x64x400 beams 23.5 studs apart marching across the arena
     secondbossspreadbeam        = { first = 0.9, last = 2.5, slim = 0.8 },   -- killed 0.5 s before the 1.5 s default                            -- nine 12x64x400 spokes 20 degrees apart from Bob; gaps widen with distance
