@@ -266,7 +266,9 @@ stepSafe = function(rp, to, speed)
     local ux, uz = dx / len * step, dz / len * step
     local T = step / max(speed, 4)
     local d = max(dangerAt(rp.X + ux * 0.5, rp.Y, rp.Z + uz * 0.5, T * 0.5), dangerAt(rp.X + ux, rp.Y, rp.Z + uz, T), dangerAt(rp.X + ux, rp.Y, rp.Z + uz, T + 0.3))
-    return d < CFG.dodgeMoveAt
+    -- A step is refused only for what would hurt during the crossing; a lane
+    -- whose body is far off (soft danger) may be crossed, never sat on.
+    return d < CFG.stepBlockAt
 end
 
 -- ------------------------------------------------------------ tick

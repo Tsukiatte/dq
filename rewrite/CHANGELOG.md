@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.51 - 2026-09-03 - "Cross the lane"
+
+- `stepBlockAt` 0.6 replaces `dodgeMoveAt` in `stepSafe`.
+
 ## 5.1.50 - 2026-09-03 - "Bob, read properly"
 
 - Reader: `noteCircle` predicts nine circles of a chain as `circle next` zones.

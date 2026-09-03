@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.50"
+local SCRIPT_VERSION = "5.1.51"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.51", date = "2026-09-03", notes = "Travel steps are refused only for danger that would land during the crossing (0.6+); the soft lane danger was blocking every other step of the approach." },
     { version = "5.1.50", date = "2026-09-03", notes = "Bob: the circle chain is predicted from its first circle (0.27 s, 22 studs and 6 studs wider per step, lethal 0.6 s after each appears) so the bot leaves the line before the chain reaches it. The sweeping wall is tracked from its real model (balls and beam, ~19 studs/s); the announced path was a hundred studs off and is no longer used." },
     { version = "5.1.49", date = "2026-09-03", notes = "Danger weighs three times as much as before in a spot's cost. At every death in the beam fan the cheapest spots were all lethal while clean ones 75 studs out lost on the pull toward the boss and the distance term; that is why it stood in the red." },
     { version = "5.1.48", date = "2026-09-03", notes = "Bob's circles: seeded to fire 0.6 s after the Model appears (deaths came 0.2-0.5 s before the old 1.2) and padded 3 studs wider than their precast cylinder (deaths at 1.5 studs outside it). Seeds may carry a pad the reader applies to the box." },
@@ -123,6 +124,7 @@ local CFG = {
     blinkWindow = 0.45,           -- hop when the box on us fires within this many seconds (0 = already live)
     blinkCooldown = 8.0,          -- seconds between hops; kicks four and five came from hopping too often
     blinkPerMinute = 3,           -- and no more than this many in any sixty seconds
+    stepBlockAt = 0.6,            -- a travel step is refused at or above this danger during the crossing (lanes at 0.5 may be crossed)
     pathLaneDanger = 0.5,         -- standing anywhere on a projectile's remaining lane counts this much: relocate, never sit there
     dodgeMoveAt = 0.15,           -- danger here at or above this: relocate
     dodgeHysteresis = 0.1,
