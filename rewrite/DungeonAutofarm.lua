@@ -1963,7 +1963,7 @@ local function addPath(name, cframe, distance, duration, t0, t1, halfW, halfL, h
         name = name, moving = true,
         ox = cframe.Position.X, oy = cframe.Position.Y, oz = cframe.Position.Z,
         dx = flat.X, dz = flat.Z, speed = speed, offset = offset or 0,
-        halfW = halfW, halfL = halfL, halfH = math.max(halfH, 6),
+        halfW = halfW, halfL = halfL, halfH = math.max(halfH, 6), ground = true,
         from = fromGame(t0), untilAt = fromGame(t1), pathStart = fromGame(t0),
     })
 end
@@ -2277,14 +2277,25 @@ local function dangerAt(px, py, pz, t)
     local worst = 0
     for i = 1, #DG.boxes do
         local b = DG.boxes[i]
-        local lead = b.moving and CFG.dodgePathLead or (b.telegraphed and CFG.dodgeLead or (b.from > now and CFG.dodgeLead or 0))
-        if at >= b.from - lead and at <= b.untilAt then
+        -- A moving body is real from the moment it is announced: the aimed
+        -- criss cross sits on the player until its start time and hurts there,
+        -- and the big spike's front is already on its way. Static zones fire at
+        -- `from`, so they matter from `lead` seconds before.
+        local live
+        if b.moving then
+            live = at <= b.untilAt
+        else
+            local lead = b.telegraphed and CFG.dodgeLead or (b.from > now and CFG.dodgeLead or 0)
+            live = at >= b.from - lead and at <= b.untilAt
+        end
+        if live then
             local depth
             if b.moving then
                 -- Where the body is at time `at`, along its line.
                 local along = b.offset + b.speed * max(at - b.pathStart, 0)
                 local cx, cz = b.ox + b.dx * along, b.oz + b.dz * along
-                if abs(py - b.oy) <= b.halfH + halfHeight then
+                -- Remote-announced paths carry the boss's height; they are ground attacks.
+                if b.ground or abs(py - b.oy) <= b.halfH + halfHeight then
                     local qx, qz = px - cx, pz - cz
                     local a = abs(qx * b.dx + qz * b.dz) - b.halfL
                     local s = abs(-qx * b.dz + qz * b.dx) - b.halfW
@@ -2466,7 +2477,8 @@ local function decide(root, hum)
             checked = checked + 1
             local x, z = rx + c.ox, rz + c.oz
             local y = floorY(x, ry, z, params)
-            if y and y - (ry - DG.halfHeight) <= CFG.maxStepHeight + 3 and y >= ry - CFG.maxDropHeight then
+            -- A far spot may sit up a ramp: the allowed rise grows with distance.
+            if y and y - (ry - DG.halfHeight) <= CFG.maxStepHeight + 3 + c.dist * 0.2 and y >= ry - CFG.maxDropHeight then
                 if walkable(rp, x, y, z, params) then
                     c.x, c.y, c.z, c.valid = x, y, z, true
                     if not best or c.cost < best.cost then best = c end

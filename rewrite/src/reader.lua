@@ -152,7 +152,7 @@ local function addPath(name, cframe, distance, duration, t0, t1, halfW, halfL, h
         name = name, moving = true,
         ox = cframe.Position.X, oy = cframe.Position.Y, oz = cframe.Position.Z,
         dx = flat.X, dz = flat.Z, speed = speed, offset = offset or 0,
-        halfW = halfW, halfL = halfL, halfH = math.max(halfH, 6),
+        halfW = halfW, halfL = halfL, halfH = math.max(halfH, 6), ground = true,
         from = fromGame(t0), untilAt = fromGame(t1), pathStart = fromGame(t0),
     })
 end
