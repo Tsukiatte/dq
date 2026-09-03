@@ -326,8 +326,8 @@ local function brainTick(now)
         local standoff = standoffFor(target)
         local d = flat(root.Position, target.root.Position)
         if d > standoff + 3 then
-            local speed = (target.isBoss and d > 45) and CFG.tweenEscape or walkSpeed()
-            travel(hum, root, target.root.Position, speed, "approach", target.model)
+            -- Walking speed, always: a boss approach at 22 for ten seconds was a kick.
+            travel(hum, root, target.root.Position, walkSpeed(), "approach", target.model)
             if d <= CFG.abilityRadius then fight(hum, root, target, now) end
             return
         end
