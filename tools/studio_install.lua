@@ -6,7 +6,8 @@
     What it builds:
       StarterPlayer.StarterPlayerScripts.DQHarness   (Folder)
           <one ModuleScript per src module, fetched from GitHub>
-          Loader                                      (LocalScript)
+          Loader                                      (LocalScript, tools/studio_loader.lua)
+          DQHarnessState / DQHarnessQuery             (made by the Loader at run time)
       ServerScriptService.DQBossSim                   (Script) - the fight simulator,
           installed separately by studio_bosssim.lua
 
@@ -20,6 +21,7 @@
 ]]
 
 local BASE = "https://raw.githubusercontent.com/Tsukiatte/dq/main/src/"
+local LOADER_URL = "https://raw.githubusercontent.com/Tsukiatte/dq/main/tools/studio_loader.lua"
 local ORDER = { "core", "gamedata", "uikit", "hazards", "precast", "bossevents", "nav", "mover", "dodge", "path", "streamer", "config", "ui", "main" }
 
 local HttpService = game:GetService("HttpService")
@@ -77,24 +79,14 @@ end
 
 local loader = Instance.new("LocalScript")
 loader.Name = "Loader"
-loader.Source = [[
--- DQHarness loader: mirrors main.lua's module wiring inside Studio.
-local ORDER = { "core", "gamedata", "uikit", "hazards", "precast", "bossevents", "nav", "mover", "dodge", "path", "streamer", "config", "ui", "main" }
-local folder = script.Parent
-local S = {}
-S.HARNESS = true
-for _, name in ipairs(ORDER) do
-    local module = require(folder:WaitForChild(name))
-    if type(module) ~= "function" then
-        error(("[DQHarness] %s did not return a module function"):format(name))
-    end
-    local ok, err = pcall(module, S)
-    if not ok then
-        error(("[DQHarness] %s failed while loading: %s"):format(name, tostring(err)))
-    end
+-- The Loader's source lives in tools/studio_loader.lua so it can be edited
+-- and versioned like everything else.
+local loaderUrl = LOADER_URL .. "?t=" .. tostring(os.time())
+local okL, loaderSource = pcall(function() return HttpService:GetAsync(loaderUrl, true) end)
+if not okL or type(loaderSource) ~= "string" or #loaderSource == 0 then
+    error("[DQHarness] could not fetch studio_loader.lua: " .. tostring(loaderSource))
 end
-print("[DQHarness] loaded " .. #ORDER .. " modules")
-]]
+loader.Source = loaderSource
 loader.Parent = folder
 
 print(("[DQHarness] installed %d modules + Loader under %s"):format(fetched, folder:GetFullName()))
