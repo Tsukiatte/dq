@@ -48,8 +48,8 @@ for i = firstShown, #R.hits do
     for j = math.max(1, #tr - 30), #tr, 3 do
         local r = tr[j]
         if r then
-            lines[#lines + 1] = string.format("  %+.1fs v%s ws%s md%s eff%s dot%s | %s%s | tg%s h0%s hd%s gr%s | %s | %s | %s%s",
-                r.t - h.t, tostring(r.v), tostring(r.ws), tostring(r.md), tostring(r.eff), tostring(r.dot), tostring(r.st), r.rf and (" RF:" .. r.rf) or "",
+            lines[#lines + 1] = string.format("  %+.1fs v%s ws%s md%s eff%s dot%s cast%s | %s%s | tg%s h0%s hd%s gr%s | %s | %s | %s%s",
+                r.t - h.t, tostring(r.v), tostring(r.ws), tostring(r.md), tostring(r.eff), tostring(r.dot), tostring(r.bc), tostring(r.st), r.rf and (" RF:" .. r.rf) or "",
                 tostring(r.tg), tostring(r.h0), tostring(r.hd), tostring(r.gr), tostring(r.near), tostring(r.ch), tostring(r.ev), r.bo and " boost" or "")
         end
     end

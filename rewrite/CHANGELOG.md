@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.68 - 2026-09-03 - "Verdicts"
+
+- Core: horizontal beam first 0.6; spread slim 4.0; `castSafeGrace` 1.2; `orbBubble` 14. Reader: orb bubble on bare parts; chain line width capped at three steps of growth. Brain: casts gated on safety. Recorder: `busyCasting` in the trace.
+
 ## 5.1.67 - 2026-09-03 - "In, every time"
 
 - Field: arena pull applies during the fan with `fanRadius` as the edge. Brain: boss approach at `tweenEscape` beyond band+25.

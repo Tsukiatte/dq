@@ -251,7 +251,7 @@ noteCircle = function(pc, now)
     -- pick, but crossable: a hard line made every escape path read lethal and
     -- the choice arbitrary); the circles themselves carry the timing.
     local width = size + 6
-    if measured and growth > 0 then width = size + growth * 9 + 6 end
+    if measured and growth > 0 then width = size + growth * 3 + 6 end
     addZone({ name = "circle line", cframe = CFrame.lookAt(pos, pos + dir), size = Vector3.new(width, 12, 400), from = now, untilAt = now + 3.0, telegraphed = true, madeAt = now, weight = 0.5 })
     local function chain(d, sp, gr, step)
         for k = 1, 9 do
@@ -610,6 +610,8 @@ local function hazards(now)
         local size = part.Size
         local half = math.max(size.X, size.Z) * 0.5
         if lower(part.Name):find("bigspike", 1, true) then half = half + 8 end   -- kills 4-7 studs outside its mesh
+        local pn = lower(part.Name)
+        if pn:find("secondboss", 1, true) and pn:find("orb", 1, true) then half = math.max(half, CFG.orbBubble) end   -- explodes at contact
         if speed > 2 then
             r.stillSince = nil
             out[#out + 1] = { moving = true, ox = part.Position.X, oy = part.Position.Y, oz = part.Position.Z,
