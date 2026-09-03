@@ -1,5 +1,12 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.26 - 2026-09-03 - "Abilities only"
+
+- `mobStandoff` 34 replaces melee/ranged standoffs; `meleeMobMaxReach` 16; `autoAttack` off by default.
+- Brain backs straight off any target inside standoff minus 6 (12 for the boss).
+- Field: a melee mob's swing reach (extent + meleeDistance + 2) is danger 1; the `meleeBuffer` (10) band past it is soft.
+- UI: one "Mob standoff" slider; config persists `mobStandoff`.
+
 ## 5.1.25 - 2026-09-03 - "Armed"
 
 - Reader arms `RD.leash` once inside 110 studs of the Champion (sticky per boss); the field applies it to everything outside `leashRadius`.

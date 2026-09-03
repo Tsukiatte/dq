@@ -41,8 +41,7 @@ local function flat(a, b) local dx, dz = a.X - b.X, a.Z - b.Z return sqrt(dx * d
 
 local function standoffFor(e)
     if e.isBoss then return CFG.bossStandoff end
-    if e.melee then return e.extent + CFG.meleeStandoff end
-    return e.extent + CFG.rangedStandoff
+    return e.extent + CFG.mobStandoff
 end
 
 -- The room first: a boss three rooms away sits behind gates that open only
@@ -319,8 +318,8 @@ local function brainTick(now)
         end
         BR.waypoints = nil
         fight(hum, root, target, now)
-        if target.isBoss and d < standoff - 12 then
-            -- Well inside the band (the boss leapt onto us, or the fan began): straight out.
+        if d < standoff - (target.isBoss and 12 or 6) then
+            -- Well inside the band (the boss leapt onto us, a mob charged): straight out.
             local rp, ep = root.Position, target.root.Position
             local away = Vector3.new(rp.X - ep.X, 0, rp.Z - ep.Z)
             if away.Magnitude > 0.5 then

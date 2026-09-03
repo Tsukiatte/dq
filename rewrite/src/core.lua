@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.25"
+local SCRIPT_VERSION = "5.1.26"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.26", date = "2026-09-03", notes = "Mobs are fought from 34 studs whatever their type, with abilities only (auto attack off by default): at high level any mob's one swing kills, and the warriors were counted as ranged because their melee distance is above 8. Any target that closes to within standoff minus six is backed away from in a straight line at the burst speed. A melee mob's swing reach is a hard zone, the ten studs past it a soft one." },
     { version = "5.1.25", date = "2026-09-03", notes = "The leash arms only after the character has been within 110 studs of the Champion and stays armed for that boss. As a band it was a wall from the outside: run 19 hopped at its outer edge for six minutes without entering." },
     { version = "5.1.24", date = "2026-09-03", notes = "Standoff back to 38: at 48 the abilities did 0.35% per second. The config keeps a trace of what it loaded and saved (RT.configTrace) to catch the standoff reverting to 26 between places." },
     { version = "5.1.23", date = "2026-09-03", notes = "Beam lanes: each new beam is matched to any beam of the last 0.8 s that sits 20 degrees away, and that chain's next two lanes become zones; the sweeps run interleaved, so a single last-pair rule never fired." },
@@ -64,12 +65,11 @@ local CFG = {
     maxDropHeight = 30,
 
     -- Standing.
-    meleeStandoff = 20,           -- studs past a melee mob's body: they close fast and one swing kills
-    meleeBuffer = 4,              -- the field treats a melee mob as dangerous this far past its swing
-    rangedStandoff = 22,          -- studs from a ranged mob
+    mobStandoff = 34,             -- from any mob, melee or ranged: abilities only, never within weapon reach (Chris)
+    meleeBuffer = 10,             -- soft band past a melee mob's swing where spots are merely disfavoured
     leashRadius = 122,            -- Champion arena: death past ~128 studs from the boss; the respawn point is 131-137 out
     bossStandoff = 38,            -- ability damage 11-15%/s at 30-40 studs, ~0 past 45 (48 measured 0.35%/s)
-    meleeMobMaxReach = 8,         -- a mob whose meleeDistance is at most this is melee
+    meleeMobMaxReach = 16,        -- a mob whose meleeDistance is at most this is melee (warriors sit above 8)
     strafe = true,                -- circle the target at standoff instead of standing
     strafeSpeedFraction = 0.6,    -- of tweenWalk
 
@@ -79,7 +79,7 @@ local CFG = {
     abilityInterval = 0.4,        -- seconds between presses of the same key
     autoQ = true,
     autoE = true,
-    autoAttack = true,
+    autoAttack = false,           -- high-level dungeons: abilities only
     clickInterval = 0.25,
 
     -- Dodge field.
