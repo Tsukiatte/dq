@@ -1930,13 +1930,20 @@ local function recordHit(damage)
         -- a mage line five studs away with a matching window was outscoring
         -- the beam we were standing in.
         local anyEnclosing = false
+        local enclosingModels = {}
+        local enclosingCount = 0
         for i = 1, math.min(#ranked, 12) do
             local r = ranked[i]
             if r.known and r.distance <= playerRadius + 0.5 then
                 local st0 = HZ.armState[r.part]
                 if not (st0 and (st0.dormant or (st0.onMax == 0 and not st0.hit and now - st0.spawn > 30))) then
                     anyEnclosing = true
-                    break
+                    -- Count Models, not parts: a hitBox and its precast are one attack.
+                    local model = r.part:FindFirstAncestorOfClass("Model") or r.part
+                    if not enclosingModels[model] then
+                        enclosingModels[model] = true
+                        enclosingCount = enclosingCount + 1
+                    end
                 end
             end
         end
@@ -1967,9 +1974,11 @@ local function recordHit(damage)
         end
         if best then
             local st = HZ.armState[best.part]
-            lines[#lines + 1] = string.format("     BLAMED %s (%s) at age %.1fs, score %d",
-                best.part.Name, st and st.name or "?", st and (now - st.spawn) or -1, bestScore)
-            S.noteAttackHit(best.part)
+            local confident = enclosingCount == 1 and best.distance <= playerRadius + 0.5
+            lines[#lines + 1] = string.format("     BLAMED %s (%s) at age %.1fs, score %d, %s",
+                best.part.Name, st and st.name or "?", st and (now - st.spawn) or -1, bestScore,
+                confident and "certain" or ("ambiguous (" .. enclosingCount .. " enclosing)"))
+            S.noteAttackHit(best.part, confident)
         end
     end
 
@@ -2883,21 +2892,30 @@ end
 -- hit learns its window: the first and last age at which it has hurt us. From
 -- the next cast on it is floor until the lead, danger through the window,
 -- and floor again after - and the one that just hit is certainly not over.
-local function noteAttackHit(part)
+-- `confident` says the blame is unambiguous: this attack encloses us and no
+-- other live one does. Only then does the hit teach the NAME anything. An
+-- ambiguous hit (we stood where two attacks overlap, or in none) still marks
+-- THIS instance as hurting, but a wrong guess used to stretch a window for
+-- the rest of the fight: the mage shot's 0.9-1.2 s became 0.9-6.9 s from
+-- being blamed for beams, and every red line on the floor was a wall for
+-- eight seconds. That was the "hitboxes stay longer than the attack".
+local function noteAttackHit(part, confident)
     local st = part and HZ.armState[part]
     if not st then return end
     local now = os.clock()
     local age = now - st.spawn
     local span = RT.armSpans[st.name]
-    if not span then
-        span = { first = age, last = age }
-        RT.armSpans[st.name] = span
-    else
-        if age < span.first then span.first = age end
-        if age > span.last then span.last = age end
+    if confident then
+        if not span then
+            span = { first = age, last = age }
+            RT.armSpans[st.name] = span
+        else
+            if age < span.first then span.first = age end
+            if age > span.last then span.last = age end
+        end
+        local known = RT.armDelays[st.name]
+        if known == nil or known == 0 or span.first < known then RT.armDelays[st.name] = span.first end
     end
-    local known = RT.armDelays[st.name]
-    if known == nil or known == 0 or span.first < known then RT.armDelays[st.name] = span.first end
     if not st.armedAt then st.armedAt = now st.armedBy = "hit" end
     st.byInvisible = nil
     st.dormant = nil
@@ -2906,18 +2924,21 @@ local function noteAttackHit(part)
     -- its warning is gone (the passive beams burn for four seconds after the
     -- precast fades). From now on only its learned window, a removed hitBox
     -- or the Model going away ends it.
-    if st.doneAt or (st.fadedAt and now - st.fadedAt > 0.2) then
+    if confident and (st.doneAt or (st.fadedAt and now - st.fadedAt > 0.2)) then
         if not RT.armLongLived[st.name] then
             RT.armLongLived[st.name] = true
             heavyDebug("Attacks", string.format("'%s' hit after fading; its fade no longer ends it.", st.name))
         end
     end
-    st.liveUntil = math.max(st.liveUntil or 0, st.spawn + span.last + CFG.armAssumedLinger)
+    local last = span and span.last or age
+    st.liveUntil = math.max(st.liveUntil or 0, st.spawn + last + CFG.armAssumedLinger, now + CFG.armAssumedLinger)
     st.doneAt = nil
     st.fadedAt = nil
-    note(st, age, "HIT")
-    heavyDebug("Attacks", string.format("'%s' hit at %.1fs; its window is now %.1f-%.1fs after it appears.",
-        st.name, age, span.first, span.last))
+    note(st, age, confident and "HIT" or "HIT?")
+    if confident then
+        heavyDebug("Attacks", string.format("'%s' hit at %.1fs; its window is now %.1f-%.1fs after it appears.",
+            st.name, age, span.first, span.last))
+    end
 end
 
 local function scanDamageBricks(rootPosition)
