@@ -11,6 +11,12 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.12.7 - 2026-09-02 - "Park"
+
+- **Autofarm follows the place** (`autoFarmByPlace`, on): the master switch is turned off on arriving in the lobby and on on arriving in a dungeon, once per place change, so flipping it by hand inside a place still sticks. The HUD and the master toggle follow.
+- Queueing no longer requires the master switch, since it is now off in the lobby by design.
+- Toggle under Auto queue; saved with the config.
+
 ## 4.12.6 - 2026-09-02 - "Defaults"
 
 From watching Bob the Frost Giant live: a marching line of growing circles read as a solid wall from the moment each appeared, and beams stayed live until the game deleted them five seconds later.

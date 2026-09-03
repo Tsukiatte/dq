@@ -47,6 +47,7 @@ local LB = {
     finishedSeenAt = nil,
     replayFired = false,
     placeManager = nil,
+    farmAppliedFor = nil,
 }
 
 local function placeManager()
@@ -72,6 +73,16 @@ local function placeName()
     if dn and dn.Value ~= "" then return "Level" end
     if Workspace:FindFirstChild("Lobby") then return "Lobby" end
     return "?"
+end
+
+-- The master switch, by place: off in the lobby (nothing to fight, and the
+-- loop must not try), on in a dungeon. Applied once per place change, so a
+-- hand on the switch inside a place is respected.
+local function setFarm(on, why)
+    if RT.farmEnabled == on then return end
+    RT.farmEnabled = on
+    if S.setLoopButtonState then pcall(S.setLoopButtonState) end
+    heavyDebug("Queue", (on and "Autofarm on: " or "Autofarm off: ") .. why)
 end
 
 local function setStatus(text)
@@ -184,21 +195,21 @@ local function replayNow()
 end
 
 local function lobbyTick(now)
-    if not CFG.autoQueue then
-        setStatus("off")
-        return
-    end
     -- The place does not change mid-session; re-read it now and then in case
     -- the module was not ready at the first tick.
     if not LB.place or LB.place == "?" or now - LB.placeAt > 5 then
         LB.place, LB.placeAt = placeName(), now
     end
+    if CFG.autoFarmByPlace and LB.place ~= LB.farmAppliedFor and (LB.place == "Lobby" or LB.place == "Level") then
+        LB.farmAppliedFor = LB.place
+        setFarm(LB.place == "Level", LB.place == "Level" and "in a dungeon" or "in the lobby")
+    end
+    if not CFG.autoQueue then
+        setStatus("off")
+        return
+    end
     if LB.place == "Lobby" then
         LB.arrivedAt = LB.arrivedAt or now
-        if not RT.farmEnabled then
-            setStatus("paused: autofarm is off")
-            return
-        end
         if LB.busy then return end
         local waited = now - LB.arrivedAt
         if waited < CFG.autoQueueDelay then
