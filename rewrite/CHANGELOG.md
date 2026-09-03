@@ -1,5 +1,10 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.38 - 2026-09-03 - "In the fight only"
+
+- Blink requires `DG.approach` within 70 studs.
+- Reader: bare projectiles still for 0.6 s are spent.
+
 ## 5.1.37 - 2026-09-03 - "No jumping"
 
 - Mover: stall no longer jumps; `RT.stalledFor` exposed.
