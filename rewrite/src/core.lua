@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.26"
+local SCRIPT_VERSION = "5.1.27"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.27", date = "2026-09-03", notes = "Ability radius 42: with the 34-stud mob standoff a 30-stud cast radius would never fire at a mob." },
     { version = "5.1.26", date = "2026-09-03", notes = "Mobs are fought from 34 studs whatever their type, with abilities only (auto attack off by default): at high level any mob's one swing kills, and the warriors were counted as ranged because their melee distance is above 8. Any target that closes to within standoff minus six is backed away from in a straight line at the burst speed. A melee mob's swing reach is a hard zone, the ten studs past it a soft one." },
     { version = "5.1.25", date = "2026-09-03", notes = "The leash arms only after the character has been within 110 studs of the Champion and stays armed for that boss. As a band it was a wall from the outside: run 19 hopped at its outer edge for six minutes without entering." },
     { version = "5.1.24", date = "2026-09-03", notes = "Standoff back to 38: at 48 the abilities did 0.35% per second. The config keeps a trace of what it loaded and saved (RT.configTrace) to catch the standoff reverting to 26 between places." },
@@ -75,7 +76,7 @@ local CFG = {
 
     -- Fighting.
     attackRange = 10,             -- weapon reach
-    abilityRadius = 30,           -- Q and E only when the target is inside this
+    abilityRadius = 42,           -- casts land out to ~40-42 studs (measured on the Champion); must exceed mobStandoff or mobs are never hit
     abilityInterval = 0.4,        -- seconds between presses of the same key
     autoQ = true,
     autoE = true,
