@@ -11,6 +11,16 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.10.5 - 2026-09-02
+
+- A hub's lines are the ones **centred** on it (within `dodgeHubTolerance`
+  along the line too). A mage shot crossing the boss was counted as one of its
+  beams and took over the hub's name, arming delay and headings.
+- The hub period is the interval between lines of one burst; an interval over
+  `dodgeHubBurstGap` (2 s) is a gap (`hub.gap`), not the period. Folding the
+  10 s gap in put the period at ~2 s for the first half of every burst, so
+  every predicted line came late - when the hits were landing.
+
 ## 4.10.4 - 2026-09-02 - "Fight from range"
 
 - The game's enemy Models carry their own numbers (`enemyStyle` "boss1",
