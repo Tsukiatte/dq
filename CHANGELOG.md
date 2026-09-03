@@ -11,6 +11,11 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.12.2 - 2026-09-02 - "Window"
+
+- The shared state table is published as `_G.DungeonAutofarmState` while the script runs and cleared on destruct, so a live inspection tool (the Potassium bridge) can read what the reader classifies, which spot the dodge holds and what the mover is doing, without a rebuild for every question.
+- No behaviour change.
+
 ## 4.12.1 - 2026-09-02 - "Stairs"
 
 Three defects behind "stuck on walls it could go around" and "cannot take a

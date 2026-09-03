@@ -182,9 +182,12 @@ local function destructScript()
 
     if _G.DungeonAutofarmDestruct == destructScript then _G.DungeonAutofarmDestruct = nil end
     if _G.DungeonAutofarmVersion == SCRIPT_VERSION then _G.DungeonAutofarmVersion = nil end
+    if _G.DungeonAutofarmState == S then _G.DungeonAutofarmState = nil end
 end
 
 _G.DungeonAutofarmDestruct = destructScript
+-- Read-only window for a live inspection tool; nothing in the script reads it back.
+_G.DungeonAutofarmState = S
 
 -- =========================================================================
 -- The HUD. The only thing on screen with the GUI closed: bottom-left with a
