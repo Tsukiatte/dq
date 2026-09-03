@@ -66,7 +66,10 @@ local function distToMe(p)
 end
 
 local function recordPart(p)
-    if R.byPart[p] or R.partCount >= 1500 then return end
+    if R.byPart[p] or R.partCount >= 8000 then return end
+    -- Anchor parts are never the danger and a boss spawns one every half second.
+    local ln = p.Name:lower()
+    if ln == "primarypart" then return end
     local m = p:FindFirstAncestorOfClass("Model")
     local e = { t = now(), name = p.Name, class = p.ClassName, model = m and m.Name or nil,
                 parent = p.Parent and p.Parent.Name or nil, size = v3(p.Size), t0 = r1(p.Transparency),
