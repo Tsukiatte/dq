@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.14 - 2026-09-03 - "Look further ahead"
+
+- `dodgeDwell` 1.5 (was 0.6).
+
 ## 5.1.13 - 2026-09-03 - "Margin"
 
 - `dodgeMargin` 2.0.
