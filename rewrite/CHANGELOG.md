@@ -4,6 +4,7 @@
 
 - Blink requires `DG.approach` within 70 studs.
 - Reader: bare projectiles still for 0.6 s are spent.
+- Draw: a moving body is drawn as the body, with the coming second's sweep as a faint strip.
 
 ## 5.1.37 - 2026-09-03 - "No jumping"
 

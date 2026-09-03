@@ -287,7 +287,8 @@ local function decide(root, hum)
     -- the floor at the destination.
     -- Only inside a fight: a target within 70 studs. Hops while pathing
     -- between rooms were what the sixth kick was made of.
-    local inFight = ap ~= nil and adist <= 70
+    local apB = DG.approach
+    local inFight = apB ~= nil and sqrt((apB.x - rx) ^ 2 + (apB.z - rz) ^ 2) <= 70
     if CFG.blink and inFight and here0 >= 0.999 and grace <= CFG.blinkWindow and now - (RT.lastBlinkAt or -math.huge) >= CFG.blinkCooldown then
         -- Walk first: if the spot the field already holds is reachable before
         -- the box fires, the legs do it. Only a box that fires sooner than the
