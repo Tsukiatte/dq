@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.63"
+local SCRIPT_VERSION = "5.1.64"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.64", date = "2026-09-03", notes = "Bob: the spread and horizontal beams kill at least 2.2 studs outside their 12-wide hitbox (the recorder saw a death there right after a blink to a spot the model called clear), so their padding is 2.5 studs with a 1-stud shoulder, and a blink destination must be 2.5 studs clear of every box." },
     { version = "5.1.63", date = "2026-09-03", notes = "Walls (Chris: melee mobs back it into a corner and it dies there). Every spot that passes the floor and sweep checks now looks 24 studs round itself in six directions and costs more the closer the walls are, so an open spot beats a corner. The back-off from a mob tries straight back, then 40, 80 and 120 degrees either side, and takes the most open way the field allows." },
     { version = "5.1.62", date = "2026-09-03", notes = "Telemetry: the field reports how many spots it evaluated and why they were rejected (no floor, not walkable, lethal on arrival) and which one it chose, for the new recorder that traces intent against movement at ten samples a second and gives every death a verdict. The marker is now the closest clean spot (clean path, clean ground), and when it is within blink range the blink goes to the marker itself (Chris)." },
     { version = "5.1.61", date = "2026-09-03", notes = "Champion slam: the landing announcement now starts a reflex - straight out from the landing point at escape speed until 44 studs clear, bending the line only round a live box - instead of leaving it to the spot search, whose rings reach 30 studs and kept picking spots inside the 67-stud circle (three slam deaths in run 30)." },
@@ -134,7 +135,7 @@ local CFG = {
     dodgeRays = 16,
     dodgeMargin = 2.0,            -- studs of clearance round the character; hits landed 1.5-3.3 studs outside their boxes            -- studs of clearance round the character
     dodgeShoulder = 2.5,          -- spots within this of a box edge cost a little: the bot stopped on an edge and was grazed (5.1.51 had 1.5; 4.0 kept it in dodge mode near everything)
-    slimShoulder = 0.3,           -- shoulder for `slim` hazards (a seed's slim value is their reach): the beam fans need their gaps            -- studs of warm edge outside a hazard
+    slimShoulder = 1.0,           -- shoulder for `slim` hazards (a seed's slim value is their reach): the beam fans need their gaps            -- studs of warm edge outside a hazard
     dodgeLead = 1.2,              -- a standing telegraph counts as live this long before it fires
     dodgePathLead = 0.4,          -- a moving projectile's line: the time to sidestep
     dodgeDwell = 1.5,             -- a spot must stay clear this long after arrival (the big spike front: 100 studs/s, announced 1.4 s ahead)
@@ -211,8 +212,8 @@ local TIMING = {
     firstbosspassivebeam        = { first = 0.3, last = 3.5, holdFull = true },   -- lethal 0.3-2.1 s after appearing, held longer because a lane re-fires in the burst; the 5.1.51 window that killed the Champion in two minutes   -- hurts 0.3-2.2 s after appearing, and in the burst its lane re-fires every 1.1 s: a lane never expires while the burst lasts
     firstbossjumpslam           = { first = 1.5, last = 5.0, pad = 5 },   -- the Model appears at landing; deaths inside from ~1.8 s and 3.3 studs outside the 67-wide box
     secondbosscriclehitbox      = { first = 0.6, last = 1.6, pad = 3 },   -- precast-only cylinder (22/28/34 wide, growing with distance); hits 0.7-1.0 s after it appears, a body wider than the cylinder
-    secondbosshorizontalbeam    = { first = 1.1, last = 5.0, slim = 0.8 },   -- 10x64x400 beams 23.5 studs apart marching across the arena
-    secondbossspreadbeam        = { first = 0.9, last = 2.5, slim = 0.8 },   -- killed 0.5 s before the 1.5 s default                            -- nine 12x64x400 spokes 20 degrees apart from Bob; gaps widen with distance
+    secondbosshorizontalbeam    = { first = 1.1, last = 5.0, slim = 2.5 },   -- 10x64x400 beams 23.5 studs apart marching across the arena
+    secondbossspreadbeam        = { first = 0.9, last = 2.5, slim = 2.5 },   -- a death landed 2.2 studs outside the 12-wide box (run 31)   -- killed 0.5 s before the 1.5 s default                            -- nine 12x64x400 spokes 20 degrees apart from Bob; gaps widen with distance
     cubepylonshot               = { first = 0.8, last = 1.1 },
 }
 
