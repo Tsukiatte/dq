@@ -29,8 +29,8 @@ end
 
 local function stageColor(b, now)
     if now >= b.from then return CFG.colorLive end
-    local lead = b.moving and CFG.dodgePathLead or CFG.dodgeLead
-    if b.from - now <= lead then return CFG.colorSoon end
+    if b.moving then return CFG.colorSoon end
+    if b.from - now <= CFG.dodgeLead then return CFG.colorSoon end
     return CFG.colorFloor
 end
 
@@ -61,7 +61,8 @@ local function drawTick(now)
                 local along = b.offset + b.speed * math.max(now - b.pathStart, 0)
                 local cx, cz = b.ox + b.dx * (along + len * 0.5 - b.halfL), b.oz + b.dz * (along + len * 0.5 - b.halfL)
                 p.Size = Vector3.new(b.halfW * 2, 1, len)
-                p.CFrame = CFrame.lookAt(Vector3.new(cx, b.oy - b.halfH + 0.6, cz), Vector3.new(cx + b.dx, b.oy - b.halfH + 0.6, cz + b.dz))
+                local y = (b.ground and rp) and (rp.Y - 2.4) or (b.oy - b.halfH + 0.6)
+                p.CFrame = CFrame.lookAt(Vector3.new(cx, y, cz), Vector3.new(cx + b.dx, y, cz + b.dz))
                 p.Shape = Enum.PartType.Block
             elseif b.round then
                 p.Shape = Enum.PartType.Cylinder
