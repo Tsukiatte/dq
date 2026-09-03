@@ -127,6 +127,11 @@ if not boss then
     hum.MaxHealth = attr("DQSimBossHP", 3000)
     hum.Health = hum.MaxHealth
     hum.Parent = boss
+    -- The values the real enemy Models carry.
+    local style = Instance.new("StringValue") style.Name = "enemyStyle" style.Value = "boss1" style.Parent = boss
+    local melee = Instance.new("IntValue") melee.Name = "meleeDistance" melee.Value = 4 melee.Parent = boss
+    local aggro = Instance.new("IntValue") aggro.Name = "aggroRange" aggro.Value = 50 aggro.Parent = boss
+    local speed = Instance.new("IntValue") speed.Name = "moveSpeed" speed.Value = 16 speed.Parent = boss
     boss.PrimaryPart = root
     boss.Parent = enemies
 end
@@ -154,19 +159,34 @@ if not attackRemote then
 end
 WS:SetAttribute("DQSimBossKills", 0)
 WS:SetAttribute("DQSimSwings", 0)
-local kills, swings = 0, 0
+local kills, swings, casts = 0, 0, 0
 local bossDown = false
-attackRemote.OnServerEvent:Connect(function(player)
+local lastCast = {}
+WS:SetAttribute("DQSimCasts", 0)
+attackRemote.OnServerEvent:Connect(function(player, kind)
     local char = player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     local bh = boss and boss:FindFirstChildOfClass("Humanoid")
     local br = boss and boss:FindFirstChild("HumanoidRootPart")
     if not (root and bh and br) or bossDown then return end
     local flat = Vector3.new(root.Position.X - br.Position.X, 0, root.Position.Z - br.Position.Z)
-    if flat.Magnitude <= attr("DQSimReach", 14) then
-        swings = swings + 1
-        WS:SetAttribute("DQSimSwings", swings)
-        bh:TakeDamage(attr("DQSimSwingDamage", 25))
+    local reach, damage = attr("DQSimReach", 14), attr("DQSimSwingDamage", 25)
+    if kind == "ability" then
+        -- Q/E: a cooldown per player, a longer reach, a bigger bite.
+        local t = tick()
+        if t - (lastCast[player] or 0) < attr("DQSimAbilityCooldown", 1.0) then return end
+        lastCast[player] = t
+        reach, damage = attr("DQSimAbilityReach", 30), attr("DQSimAbilityDamage", 100)
+    end
+    if flat.Magnitude <= reach then
+        if kind == "ability" then
+            casts = casts + 1
+            WS:SetAttribute("DQSimCasts", casts)
+        else
+            swings = swings + 1
+            WS:SetAttribute("DQSimSwings", swings)
+        end
+        bh:TakeDamage(damage)
         WS:SetAttribute("DQSimBossHP", math.floor(bh.Health))
         if bh.Health <= 0 then
             bossDown = true

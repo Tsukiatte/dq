@@ -18,6 +18,7 @@ local setMovementState = S.setMovementState
 local getVisualRoot = S.getVisualRoot
 local getPlayerHitboxMetrics = S.getPlayerHitboxMetrics
 local getEnemyStandoff = S.getEnemyStandoff
+local getEnemyMeleeReach = S.getEnemyMeleeReach
 local getEnemyExtent = S.getEnemyExtent
 local getHazardMotion = S.getHazardMotion
 local volumeClosestPoint = S.volumeClosestPoint
@@ -111,7 +112,7 @@ local function refreshSources()
                 end
                 DG.enemies[#DG.enemies + 1] = {
                     x = pos.X, y = pos.Y, z = pos.Z, vx = vx, vz = vz,
-                    hard = hard, soft = getEnemyStandoff(model) + CFG.dodgeEnemySoftWidth,
+                    hard = hard, soft = getEnemyMeleeReach(model) + CFG.dodgeEnemySoftWidth,
                     model = model, hub = hub,
                 }
             end
@@ -570,7 +571,7 @@ local function decide(root, humanoid)
             local near = CFG.dodgeReach * 1.5
             if ax * ax + az * az <= near * near or DG.pursuitBlocked then
                 approach = p
-                preferred = getEnemyStandoff(NAV.cachedEnemy) + 0.5
+                preferred = getEnemyStandoff(NAV.cachedEnemy) - 0.5
             end
         end
     end

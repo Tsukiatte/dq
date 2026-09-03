@@ -58,9 +58,41 @@ end
 -- because a standoff we cannot hit from is a bot that stands and watches.
 -- This replaces the Safe distance and Enemy space sliders; the enemy itself
 -- is the distance.
+-- The game's enemy Models carry their own numbers (Northern Lands fight save,
+-- 2026-09-02): enemyStyle "boss1", meleeDistance 4, aggroRange 50, moveSpeed
+-- 16, level, damage. Read, not guessed.
+local function enemyValue(model, name)
+    local v = model and model:FindFirstChild(name)
+    if v and v:IsA("ValueBase") then return v.Value end
+    return nil
+end
+
+local function isBossModel(model)
+    if not model then return false end
+    local style = enemyValue(model, "enemyStyle")
+    if type(style) == "string" and string.find(string.lower(style), "boss", 1, true) then return true end
+    local hub = S.DG and S.DG.hubs and S.DG.hubs[model]
+    return hub ~= nil and hub.rate >= CFG.dodgeHubMinRate
+end
+
+-- How far the enemy's own melee reaches: its body plus the swing the game
+-- gives it, or an ordinary swing when it does not say.
+local function getEnemyMeleeReach(model)
+    local extent = getEnemyExtent(model)
+    local melee = enemyValue(model, "meleeDistance")
+    if type(melee) ~= "number" or melee <= 0 then melee = CFG.enemyMeleeReach end
+    return extent + melee
+end
+
+-- Where to stand. A mob: at the edge of its melee, never further than our own
+-- swing reaches. A boss: at ability range - it has a melee too, and the
+-- abilities are what win the fight (4.10.4).
 local function getEnemyStandoff(model)
     local extent = getEnemyExtent(model)
-    return math.max(math.min(extent + CFG.enemyMeleeReach, CFG.attackRange - 1.5), extent + 1)
+    if isBossModel(model) then
+        return math.max(CFG.bossStandoff, getEnemyMeleeReach(model) + 1)
+    end
+    return math.max(math.min(getEnemyMeleeReach(model), CFG.attackRange - 1.5), extent + 1)
 end
 
 local function clearHitboxVisualizer()
@@ -3250,6 +3282,8 @@ S.getActiveHazardRepulsionVector = getActiveHazardRepulsionVector
 S.getPlayerHitboxMetrics = getPlayerHitboxMetrics
 S.getEnemyExtent = getEnemyExtent
 S.getEnemyStandoff = getEnemyStandoff
+S.getEnemyMeleeReach = getEnemyMeleeReach
+S.isBossModel = isBossModel
 S.isDamageBrick = isDamageBrick
 S.isInvisibleWall = isInvisibleWall
 S.isPositionSafeFromDamageBricks = isPositionSafeFromDamageBricks
