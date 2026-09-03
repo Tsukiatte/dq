@@ -11,6 +11,10 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.12.17 - 2026-09-03 - "State"
+
+- `RT.movementState` mirrors the HUD movement state so tools can read it. Recorder samples the pursuit's navigation state (waypoints, index, direct route, failure streak, navmesh dead flag, blocked/gap/hub flags) once a second.
+
 ## 4.12.16 - 2026-09-03 - "Path lead"
 
 - **`dodgePathLead` 0.4 s** for predicted projectile lines (was the standing-telegraph `dodgeLead` 1.2 s). The Champion's lattice lanes are 15 studs wide on a 15-stud grid; with a 1.2 s lead each projectile painted 36 studs of lane ahead of itself and a burst made every candidate within reach read danger 1.0 (recorder candidate snapshot, run 5, 43.7 s). Saved with the config.
