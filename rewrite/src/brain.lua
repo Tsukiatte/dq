@@ -31,6 +31,7 @@ local BR = {
     waypoints = nil, index = 1, pathAt = -math.huge, pathTo = nil,
     strafeDir = 1, strafeFlipAt = -math.huge,
     visitedRooms = {},
+    roomBoxes = {},
     lastDecision = -math.huge,
 }
 
@@ -85,7 +86,17 @@ local function roomTargets()
                 local p = room:FindFirstChildWhichIsA("BasePart", true)
                 anchor = p and p.Position
             end
-            if anchor then out[#out + 1] = { order = ord, position = anchor, name = room.Name } end
+            if anchor then
+                -- The room's footprint, measured once: standing inside it is what
+                -- 'reached' means. Anchors can sit far from the path walked.
+                local box = BR.roomBoxes[room]
+                if box == nil then
+                    local ok, cf, size = pcall(function() return room:GetBoundingBox() end)
+                    box = ok and { cf = cf, size = size } or false
+                    BR.roomBoxes[room] = box
+                end
+                out[#out + 1] = { order = ord, position = anchor, name = room.Name, box = box or nil }
+            end
         end
     end
     table.sort(out, function(a, b) return a.order < b.order end)
@@ -98,7 +109,12 @@ end
 local function nextRoom(rp)
     local rooms = roomTargets()
     for _, r in ipairs(rooms) do
-        if flat(rp, r.position) < 25 and r.order > (BR.reachedOrder or 0) then BR.reachedOrder = r.order end
+        local inside = false
+        if r.box then
+            local lp = r.box.cf:PointToObjectSpace(rp)
+            inside = abs(lp.X) <= r.box.size.X * 0.5 + 4 and abs(lp.Z) <= r.box.size.Z * 0.5 + 4
+        end
+        if (inside or flat(rp, r.position) < 25) and r.order > (BR.reachedOrder or 0) then BR.reachedOrder = r.order end
     end
     for _, r in ipairs(rooms) do
         if r.order > (BR.reachedOrder or 0) then return r end

@@ -1,5 +1,10 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.16 - 2026-09-03 - "Inside the room"
+
+- `nextRoom`: reached = inside the room's bounding box (cached) or within 25 studs of its anchor.
+- `dodgeInterval` 0.016: the field decides every frame.
+
 ## 5.1.15 - 2026-09-03 - "Tuning is not a setting"
 
 - Dodge tuning keys removed from the persisted set.
