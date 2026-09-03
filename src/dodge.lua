@@ -562,7 +562,8 @@ local function decide(root, humanoid)
 
     local rootPos = root.Position
     local rx, ry, rz = rootPos.X, rootPos.Y, rootPos.Z
-    local speed = max(humanoid.WalkSpeed, 4)
+    -- The mover's real speed, so a spot reachable in time is judged in time.
+    local speed = max(S.moverSpeed and S.moverSpeed(humanoid) or humanoid.WalkSpeed, 4)
     local dwell = CFG.dodgeDwell
     -- Where the feet are. Heights below are judged from here, not from the
     -- root: the root rides about three studs up, and comparing a floor

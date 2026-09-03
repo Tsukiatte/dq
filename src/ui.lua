@@ -1133,6 +1133,9 @@ local function createControlUI()
     track(K.toggle(cloneSection.content, "Manual run (no autofarm)",
         function() return CFG.dodgeManual end, function(v) CFG.dodgeManual = v end, 3,
         "Dodge only. No target hunting, no pursuit, no waypoints: you drive, and it pulls you out of attacks."))
+    track(K.slider(cloneSection.content, "Tween speed", "studs/s", 16, 40, false,
+        function() return CFG.tweenSpeed end, function(v) CFG.tweenSpeed = v end, 2.9,
+        "How fast the tween mover steps. The game resets WalkSpeed above 45 and watches for hovering; the tween never touches WalkSpeed and stays on the floor. 22 is a brisk walk."))
     track(K.dropdown(cloneSection.content, "Movement", {
         { value = "tween", label = "Tween - exact, walking pace, collision-checked" },
         { value = "walk", label = "Walk - Humanoid:MoveTo" },
