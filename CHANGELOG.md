@@ -11,6 +11,10 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.12.15 - 2026-09-03 - "Wait"
+
+- **Wait for the player before capturing it.** Under autoexec the script ran before `Players.LocalPlayer` replicated; `S.LocalPlayer` was nil and `startAutofarm()` died in `loadConfig()` (a config file now exists, so this path always runs). Symptom: UI up, HUD "Running", no loops, no dodge, no auto-start. Core waits for `game.Loaded` and the player.
+
 ## 4.12.14 - 2026-09-03 - "No blink"
 
 - **Blink off by default** (`blinkEnabled` false): the first run with it ended in an anticheat kick. The 22 studs/s tween had run a full fight without one, so the hop is the suspect. Kept in the code, off.
