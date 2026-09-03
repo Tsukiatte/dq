@@ -50,6 +50,8 @@ local LB = {
     farmAppliedFor = nil,
     levelArrivedAt = nil,
     lastStartPress = -math.huge,
+    bonusVoteSeenAt = nil,
+    bonusVoted = false,
 }
 
 local function placeManager()
@@ -219,6 +221,27 @@ local function lobbyTick(now)
             end
         end
     end
+    -- The bonus boss vote ("Stay and fight the bonus boss?") after the last
+    -- boss: answered through the same remote as the buttons, a couple of
+    -- seconds in. Declined unless asked for; the arena is not mapped.
+    if LB.place == "Level" then
+        local active = Workspace:FindFirstChild("bonusBossVotingActive")
+        if active and active:IsA("BoolValue") and active.Value then
+            LB.bonusVoteSeenAt = LB.bonusVoteSeenAt or now
+            if not LB.bonusVoted and now - LB.bonusVoteSeenAt >= CFG.bonusVoteDelay then
+                LB.bonusVoted = true
+                local vote = remote("bonusBossPlayerVote")
+                local answer = CFG.bonusBoss and "yes" or "no"
+                if vote then
+                    task.spawn(function() pcall(function() vote:InvokeServer(answer) end) end)
+                    heavyDebug("Queue", "Bonus boss vote: " .. answer .. ".")
+                end
+            end
+        else
+            LB.bonusVoteSeenAt = nil
+            LB.bonusVoted = false
+        end
+    end
     if not CFG.autoQueue then
         setStatus("off")
         return
@@ -260,6 +283,13 @@ end
 S.LB = LB
 S.lobbyTick = lobbyTick
 S.queueNow = queueNow
+-- The run is over: the boss room's flag, or the bonus boss vote on screen.
+S.runComplete = function()
+    local v = dungeonFinishedValue()
+    if v and v.Value then return true end
+    local active = Workspace:FindFirstChild("bonusBossVotingActive")
+    return active ~= nil and active:IsA("BoolValue") and active.Value == true
+end
 S.replayNow = replayNow
 -- The lobby's own tiles, in its order, released ones only (2026-09-02).
 S.QUEUE_MAPS = {
