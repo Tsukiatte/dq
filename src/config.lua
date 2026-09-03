@@ -263,6 +263,17 @@ local function buildConfigTable()
             autoHideOverlays = SM.autoHideOverlays,
             binds = binds,
         },
+        lobby = {
+            autoQueue = CFG.autoQueue,
+            map = CFG.autoQueueMap,
+            difficulty = CFG.autoQueueDifficulty,
+            hardcore = CFG.autoQueueHardcore,
+            private = CFG.autoQueuePrivate,
+            minLevel = CFG.autoQueueMinLevel,
+            delay = CFG.autoQueueDelay,
+            replay = CFG.autoQueueReplay,
+            replayDelay = CFG.autoQueueReplayDelay,
+        },
         learnedTelegraphNames = learned,
         ownAttackNames = ownNames,
         -- Plain data by construction (partSignature + name/hits/flags), so it
@@ -305,6 +316,18 @@ end
 -- the decoded table here, and the Configs panel hands it one it already had.
 -- Returns whether Streamer Mode should come up enabled.
 local function applyConfigData(data)
+    local lobby = data.lobby
+    if type(lobby) == "table" then
+        if lobby.autoQueue ~= nil then CFG.autoQueue = lobby.autoQueue == true end
+        if type(lobby.map) == "string" then CFG.autoQueueMap = lobby.map end
+        if type(lobby.difficulty) == "string" then CFG.autoQueueDifficulty = lobby.difficulty end
+        if lobby.hardcore ~= nil then CFG.autoQueueHardcore = lobby.hardcore == true end
+        if lobby.private ~= nil then CFG.autoQueuePrivate = lobby.private == true end
+        CFG.autoQueueMinLevel = tonumber(lobby.minLevel) or CFG.autoQueueMinLevel
+        CFG.autoQueueDelay = tonumber(lobby.delay) or CFG.autoQueueDelay
+        if lobby.replay ~= nil then CFG.autoQueueReplay = lobby.replay == true end
+        CFG.autoQueueReplayDelay = tonumber(lobby.replayDelay) or CFG.autoQueueReplayDelay
+    end
     local combat = data.combat
     if type(combat) == "table" then
         CFG.attackRange = tonumber(combat.attackRange) or CFG.attackRange

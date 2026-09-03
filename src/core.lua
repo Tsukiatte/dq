@@ -20,7 +20,7 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "4.12.4"
+local SCRIPT_VERSION = "4.12.5"
 -- Bump to throw away every learned attack timing in every save, once.
 local LEARN_EPOCH = 2
 local SCRIPT_BUILD_DATE = "2026-09-02"
@@ -28,6 +28,7 @@ local SCRIPT_CODENAME = "Aquatic Temple"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "4.12.5", date = "2026-09-02", notes = "Auto queue. The loop outside the fight, read from the game's own lobby scripts: in the lobby the script creates a party for the chosen map and difficulty and presses start through the same remotes the lobby buttons use, so no button has to be found on screen; in a run it watches the dungeon-finished flag and, as the party owner, sends the same replay the game's own Replay button sends, so the next run begins without a trip through the lobby. Anyone who is not the owner is returned by the game and queues again from there. New Auto queue section with map, difficulty, hardcore, private party, delays and a Queue now button; all of it is saved with the config. Off until switched on." },
     { version = "4.12.4", date = "2026-09-02", notes = "Traffic light. The game's own precast and hitBox parts are painted by stage: green while the dodge treats the spot as floor (known timing, more than the lead away), yellow inside the lead, red while live or when nothing is known about its timing, and put back the moment the attack is over. The hitBox, invisible by construction, is shown while painted so the volume that actually hurts can be seen; the reader keeps reading its original transparency. The announced zones we draw ourselves use the same three colours. Toggle under Telegraphs, colours under Overlays." },
     { version = "4.12.3", date = "2026-09-02", notes = "Midgardian Champion, from a live capture of fourteen deaths in 220 seconds. Every death was a projectile spawned at the character's own position, fired every eight seconds at a character parked 106-137 studs from the boss; nothing spawned there is dodgeable, so being there is the mistake. Three causes, all fixed: the passive beam was seeded as hurting from 0.3 s and as long-lived, so every beam was a seven-second wall and the arena never had a gap (the precast actually fades at 1.3-2.0 s; the seed now says 1.3-1.9 s and nothing is long-lived until a capture proves it); the ring held off a firing hub kept pursuit out for as long as the hub fired, which was the whole fight, so the character never reached ability range (the ring is now off by default, dodgeHubHold); and attack windows were learned from hits blamed on the nearest part, which is how the wrong seed was written in the first place (learnTimingFromHits, off, and saved windows are no longer loaded)." },
     { version = "4.12.2", date = "2026-09-02", notes = "Window. The shared state table is published as _G.DungeonAutofarmState while the script runs and cleared on destruct, so a live inspection tool can read what the reader classifies, which spot the dodge holds and what the mover is doing without a rebuild for every question. No behaviour change." },
@@ -514,6 +515,18 @@ CFG.dodgeHubHold = false       -- hold a ring off a firing hub instead of fighti
 CFG.dodgeHubStandoff = 50      -- the ring to hold while a hub fires, when dodgeHubHold is on
 CFG.dodgeHubLeave = 2.5        -- seconds before the next burst is due to be back on the ring
 CFG.dodgeHubRingWeight = 3     -- the ring pull, as a multiple of the ordinary approach weight
+-- Auto queue (4.12.5): the loop outside the fight. Off until switched on.
+CFG.autoQueue = false
+CFG.autoQueueMap = "Northern Lands"
+CFG.autoQueueDifficulty = "Nightmare"
+CFG.autoQueueHardcore = false
+CFG.autoQueuePrivate = true           -- a private party: nobody joins the run uninvited
+CFG.autoQueueMinLevel = 0
+CFG.autoQueueDelay = 8                -- seconds in the lobby before queueing (data and character load first)
+CFG.autoQueueRetry = 25               -- seconds between attempts while still in the lobby
+CFG.autoQueueStartDelay = 2.0         -- seconds between the party existing and pressing start
+CFG.autoQueueReplay = true            -- when a run ends and we own the party, replay it
+CFG.autoQueueReplayDelay = 6          -- seconds after the run ends before replaying (loot lands first)
 CFG.bossStandoff = 26          -- where to stand against a boss: inside ability range, outside its melee
 CFG.dodgeHubBurstGap = 2.0     -- an interval longer than this between a hub's lines is a gap, not the period
 CFG.dodgePredictSteps = 2      -- how many of a sweeping hub's next lines to predict
