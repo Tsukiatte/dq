@@ -107,13 +107,15 @@ end
 -- behind us all the same; 5.1.9 walked back to room 2 after the Champion.
 local function nextRoom(rp)
     local rooms = roomTargets()
+    -- Progress survives a reload of the script inside the same dungeon.
+    if BR.reachedOrder == nil then BR.reachedOrder = _G.DungeonAutofarmReached or 0 end
     for _, r in ipairs(rooms) do
         local inside = false
         if r.box then
             local lp = r.box.cf:PointToObjectSpace(rp)
             inside = abs(lp.X) <= r.box.size.X * 0.5 + 4 and abs(lp.Z) <= r.box.size.Z * 0.5 + 4
         end
-        if (inside or flat(rp, r.position) < 25) and r.order > (BR.reachedOrder or 0) then BR.reachedOrder = r.order end
+        if (inside or flat(rp, r.position) < 25) and r.order > (BR.reachedOrder or 0) then BR.reachedOrder = r.order _G.DungeonAutofarmReached = r.order end
     end
     for _, r in ipairs(rooms) do
         if r.order > (BR.reachedOrder or 0) then return r end
