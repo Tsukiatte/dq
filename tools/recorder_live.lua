@@ -33,7 +33,9 @@ local function verdict(p)
     local arm = nil
     if st then
         arm = { name = st.name, armedBy = st.armedBy, armed = st.armedAt ~= nil,
-                impactIn = st.impactAt and r1(st.impactAt - os.clock()) or nil }
+                impactIn = st.impactAt and r1(st.impactAt - os.clock()) or nil,
+                done = st.doneAt ~= nil and (st.doneBy or true) or nil,
+                liveFor = st.liveUntil and r1(st.liveUntil - os.clock()) or nil }
     end
     return { danger = v and true or false, arm = arm }
 end
