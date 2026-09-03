@@ -461,6 +461,19 @@ local function decide(root, hum)
             -- Always inside the arena (Chris): the edge is the band plus twenty,
             -- or the fan radius while the fan lasts; past it costs, twenty-five
             -- further it is out of the question.
+            -- Bob: pull toward his home point, band distance from him toward the
+            -- crystals, so an orb can be led without leaving ability range.
+            if ap.isBoss and S.bossProfile(ap.model and ap.model.Name).home then
+                local cen = S.bobCrystalCentroid()
+                if cen then
+                    local hx, hz = cen.X - ap.x, cen.Z - ap.z
+                    local hl = sqrt(hx * hx + hz * hz)
+                    if hl > 1 then
+                        local homeX, homeZ = ap.x + hx / hl * band, ap.z + hz / hl * band
+                        cost = cost + CFG.bobHomeWeight * sqrt((cx - homeX) ^ 2 + (cz - homeZ) ^ 2)
+                    end
+                end
+            end
             if ap.isBoss and S.bossProfile(ap.model and ap.model.Name).arenaPull then
                 local fan = now < (RD.fanUntil or -math.huge) + 1.0
                 local far = dd - (fan and CFG.fanRadius or (band + 20))

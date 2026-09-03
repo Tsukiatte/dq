@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.70"
+local SCRIPT_VERSION = "5.1.71"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.71", date = "2026-09-03", notes = "Bob (Chris): the fight position is his home point - at ability range from him on the crystals' side, near the arena centre - so the orbs can be led without leaving range. An orb that follows the character is led into the crystal of its colour: the bot runs to the far side of that crystal at escape speed and holds there while the orb comes. Bob only." },
     { version = "5.1.70", date = "2026-09-03", notes = "Bob: the circle Model itself is destroyed when it fires, not only its precast, and the reader dropped the record with it - two more deaths seven studs outside a circle it had just forgotten. A record whose Model is gone now lives on its remembered geometry until its window closes." },
     { version = "5.1.69", date = "2026-09-03", notes = "Per-boss profiles (Chris: keep the Champion and Bob apart). The arena pull, the fan reflex and the slam reflex are the Champion only; Bob keeps the chain line, the wall and the orb bubble. Attack windows stay keyed by attack name; the blink, the measured range and the mob rules are shared." },
     { version = "5.1.68", date = "2026-09-03", notes = "From the death verdicts at Bob: the horizontal beam fires 0.6 s after it appears, not 1.1 (a death 0.4 s before the model said so); the spread beam hits four studs outside its box; the following orbs get a 14-stud bubble (one killed at 1.2 studs with no box round it). No ability is cast while the ground here goes hot within 1.2 s: the cast animation roots the character, and the trace showed it commanded to run and not moving in the second before a death." },
@@ -114,7 +115,9 @@ local CFG = {
     mobStandoff = 34,             -- from any mob, melee or ranged: abilities only, never within weapon reach (Chris)
     meleeBuffer = 10,             -- soft band past a melee mob's swing where spots are merely disfavoured
     castSafeGrace = 1.2,          -- no ability cast while the ground here goes hot within this: the cast animation roots the character
-    orbBubble = 14,               -- studs round Bob's following orbs; they explode at contact and killed at 1.2 studs
+    orbBubble = 14,
+    orbLeadBehind = 12,           -- studs past the crystal, on the far side from the orb, to stand while it comes
+    bobHomeWeight = 0.02,         -- per stud from Bob's home point (band distance from him, toward the crystals)               -- studs round Bob's following orbs; they explode at contact and killed at 1.2 studs
     fanRadius = 85,               -- during the Champion's beam fan: out to here from the hub, between the lanes (100 was against the rocks: 4 studs/s while commanded 22)
     leashRadius = 122,            -- Champion arena: death past ~128 studs from the boss; the respawn point is 131-137 out
     bonusBoss = false,            -- after the last boss: stay for the bonus boss? Its arena is not mapped; off
@@ -224,10 +227,48 @@ local CFG = {
 --   Bob:      the circle chain line and per-step circles, the sweeping wall
 --             from its model, the orb bubble; no arena pull.
 local BOSS_PROFILES = {
-    ["midgardian champion"] = { arenaPull = true, fan = true, slam = true },
-    ["bob the frost giant"] = { arenaPull = false, fan = false, slam = false },
+    ["midgardian champion"] = { arenaPull = true, fan = true, slam = true, orbs = false, home = false },
+    ["bob the frost giant"] = { arenaPull = false, fan = false, slam = false, orbs = true, home = true },
 }
-local DEFAULT_PROFILE = { arenaPull = false, fan = false, slam = false }
+local DEFAULT_PROFILE = { arenaPull = false, fan = false, slam = false, orbs = false, home = false }
+
+-- Bob's crystals: the orbs that follow the player explode on it unless led
+-- into the crystal of their colour. Found by name under the crystal Model,
+-- with the measured positions as the fallback.
+local CRYSTAL_FALLBACK = { red = Vector3.new(-144, 23, 268), green = Vector3.new(-159, 23, 335), yellow = Vector3.new(-105, 23, 377) }
+local crystalCache = {}
+local function bobCrystal(colour)
+    colour = string.lower(colour or "")
+    local c = crystalCache[colour]
+    if c and os.clock() - c.at < 5 then return c.pos end
+    local pos = nil
+    local holder = workspace:FindFirstChild("secondBossCrystals", true)
+    if holder then
+        for _, d in ipairs(holder:GetDescendants()) do
+            if d:IsA("BasePart") and string.lower(d.Name):find(colour, 1, true) then pos = d.Position break end
+        end
+        if not pos then
+            for _, d in ipairs(holder:GetChildren()) do
+                if string.lower(d.Name):find(colour, 1, true) then
+                    local p = d:IsA("BasePart") and d or d:FindFirstChildWhichIsA("BasePart", true)
+                    if p then pos = p.Position break end
+                end
+            end
+        end
+    end
+    pos = pos or CRYSTAL_FALLBACK[colour]
+    crystalCache[colour] = { at = os.clock(), pos = pos }
+    return pos
+end
+local function bobCrystalCentroid()
+    local sum, n = Vector3.zero, 0
+    for _, colour in ipairs({ "red", "green", "yellow" }) do
+        local p = bobCrystal(colour)
+        if p then sum, n = sum + p, n + 1 end
+    end
+    if n == 0 then return nil end
+    return sum / n
+end
 local function bossProfile(name)
     return BOSS_PROFILES[string.lower(name or "")] or DEFAULT_PROFILE
 end
@@ -351,6 +392,8 @@ S.UI = UI
 S.sliderConnections = {}   -- the kit tracks widget connections here; the interface tears them down
 S.TIMING = TIMING
 S.bossProfile = bossProfile
+S.bobCrystal = bobCrystal
+S.bobCrystalCentroid = bobCrystalCentroid
 S.PROJECTILE_HINTS = PROJECTILE_HINTS
 S.heavyDebug = heavyDebug
 S.heavyDebugThrottled = heavyDebugThrottled
