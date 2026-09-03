@@ -20,7 +20,7 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "4.12.7"
+local SCRIPT_VERSION = "4.12.8"
 -- Bump to throw away every learned attack timing in every save, once.
 local LEARN_EPOCH = 2
 local SCRIPT_BUILD_DATE = "2026-09-02"
@@ -28,6 +28,7 @@ local SCRIPT_CODENAME = "Aquatic Temple"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "4.12.8", date = "2026-09-02", notes = "Quicker tween. The tween mover steps at tweenSpeed (22 studs a second, capped at 40) instead of the Humanoid's 16, and the dodge estimates its travel times at the same speed so a spot it can reach in time is judged in time. The client's own movement checker resets WalkSpeed above 45 and watches for hovering in Freefall; the tween never touches WalkSpeed and follows the floor, so both are untouched. After a death the character respawns at the arena entrance, 114 studs from the Champion, and the aimed projectile comes every eight seconds - closing that gap before it fires is what this is for." },
     { version = "4.12.7", date = "2026-09-02", notes = "Park in the lobby. The autofarm master switch is turned off on arriving in the lobby and back on on arriving in a dungeon, once per place change so a hand on the switch inside a place is respected. Queueing no longer needs the master switch on, since the switch is now off in the lobby by design. Toggle under Auto queue, saved with the config." },
     { version = "4.12.6", date = "2026-09-02", notes = "Timing defaults, from watching Bob the Frost Giant live. Every attack in this game hurts for a fraction of a second when its telegraph fades, yet an attack with nothing known about its timing was dodged as live from the moment it appeared, and an armed one stayed live until the game deleted its Model five seconds later - a marching line of growing circles read as a solid wall, and the character froze in it and died. Now a telegraphed attack with unknown timing is assumed to fire 1.5 s after it appears (its fade or sound still arms it earlier, and the assumption is never learned as fact), and an armed attack with no measured window is over 0.6 s after arming unless it is a projectile in flight, hit us, or is known to burn on. When nothing within eighteen studs is safe the dodge looks two and a half times further, once, with every sample still taken at the moment it would happen. Fade-learned fire times are loaded again across sessions; only hit-learned windows stay out. Auto queue is its own window, switchable under Modules. Seeds for the Frost Giant's beam fan and circle line." },
     { version = "4.12.5", date = "2026-09-02", notes = "Auto queue. The loop outside the fight, read from the game's own lobby scripts: in the lobby the script creates a party for the chosen map and difficulty and presses start through the same remotes the lobby buttons use, so no button has to be found on screen; in a run it watches the dungeon-finished flag and, as the party owner, sends the same replay the game's own Replay button sends, so the next run begins without a trip through the lobby. Anyone who is not the owner is returned by the game and queues again from there. New Auto queue section with map, difficulty, hardcore, private party, delays and a Queue now button; all of it is saved with the config. Off until switched on." },
@@ -652,6 +653,8 @@ CFG.diagnoseFile = "DungeonAutofarm_attacklog.txt"
 -- Writing the CFrame skips the Humanoid entirely, which is exactly why a script
 -- that tweens to a marker has precision the Humanoid API cannot give it.
 CFG.moveMode = "tween"
+CFG.tweenSpeed = 22              -- studs per second for the tween mover; 0 = the Humanoid's WalkSpeed. The client's own checker resets WalkSpeed above 45 and watches Freefall; the tween stays on the floor and well under that (4.12.8)
+CFG.tweenSpeedMax = 40           -- hard ceiling for tweenSpeed
 -- Take the player's controls while using a Move-based mode, and hand them back
 -- the moment it stops.
 CFG.moveTakeControls = true

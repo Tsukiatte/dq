@@ -11,6 +11,11 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.12.8 - 2026-09-02 - "Quicker"
+
+- **Tween speed** (`tweenSpeed` 22, capped by `tweenSpeedMax` 40): the tween mover steps at this speed instead of the Humanoid's 16. The dodge estimates travel times with the same number (`S.moverSpeed`). The client's checker resets WalkSpeed above 45 and watches Freefall; the tween never touches WalkSpeed and follows the floor. Slider under Dodge; saved with the config.
+- Why: after a death the character respawns at the arena entrance, 114 studs from the Champion, and the aimed projectile arrives every 8 s. Live run 2 (`game/captures/nl_run2_2026-09-02_b.json`): three deaths, all one-shots, timing verdicts for every mob attack correct.
+
 ## 4.12.7 - 2026-09-02 - "Park"
 
 - **Autofarm follows the place** (`autoFarmByPlace`, on): the master switch is turned off on arriving in the lobby and on on arriving in a dungeon, once per place change, so flipping it by hand inside a place still sticks. The HUD and the master toggle follow.

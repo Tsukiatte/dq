@@ -368,7 +368,7 @@ local function applyConfigData(data)
             "dodgeHysteresis", "dodgeDistanceCost", "dodgeEnemySoftWidth", "dodgeTurnCost",
             "dodgeEnemyLookahead", "dodgeInsideWeight",
             "dodgeMaxClimb", "dodgeMaxDrop", "dodgeCornerCost", "dodgeApproachWeight",
-            "dodgeStepProbe" }) do
+            "dodgeStepProbe", "tweenSpeed" }) do
             CFG[key] = tonumber(combat[key]) or CFG[key]
         end
         for _, key in ipairs({ "dodgeManual", "dodgeShowField", "dodgeShowTarget", "dodgeShowRange" }) do
