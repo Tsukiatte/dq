@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.33"
+local SCRIPT_VERSION = "5.1.34"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.34", date = "2026-09-03", notes = "The bot walked onto beam lanes while gaps stood empty: a lane about to 'expire' in the model scored better than a gap padded by two neighbours' shoulders, but in the burst every lane re-fires every 1.1 s. Passive beams now hold 3.5 s and the shoulder is 1.5 studs, so gaps read clean and lanes read lethal for as long as the burst lasts." },
     { version = "5.1.33", date = "2026-09-03", notes = "The bot hovered outside the Champion arena and stood still under the aimed spiral. Two causes: the leash zone's graded shoulder reached 12 studs into the arena and turned the approach into a dodge from 110 studs (now a hard edge with a 4-stud margin); and in a field where every spot is hot the escape target was dropped and re-picked every frame, so the character jittered in place (now kept until reached unless a clearly better spot exists). Strafe at full walk speed: never stand still in the arena." },
     { version = "5.1.32", date = "2026-09-03", notes = "Hazard boxes get a thin outline in their stage colour so every known hitbox reads as a shape; fill transparency 0.6." },
     { version = "5.1.31", date = "2026-09-03", notes = "Fourth kick: three or four blinks in a row. Root cause was the reader ending a passive beam's danger when its precast faded at 0.6 s while the beam kills for two seconds, so hops landed in beams the model called safe and hopped again. Beams now hold their full window. The blink is walk-first (only when the field's own spot cannot be reached before the box fires), 3 s apart, at most two in ten seconds, destinations clear for 1.5 s and at least 26 studs from any mob." },
@@ -95,7 +96,7 @@ local CFG = {
     dodgeRings = 3,
     dodgeRays = 16,
     dodgeMargin = 2.0,            -- studs of clearance round the character; hits landed 1.5-3.3 studs outside their boxes            -- studs of clearance round the character
-    dodgeShoulder = 3,            -- studs of warm edge outside a hazard
+    dodgeShoulder = 1.5,            -- studs of warm edge outside a hazard
     dodgeLead = 1.2,              -- a standing telegraph counts as live this long before it fires
     dodgePathLead = 0.4,          -- a moving projectile's line: the time to sidestep
     dodgeDwell = 1.5,             -- a spot must stay clear this long after arrival (the big spike front: 100 studs/s, announced 1.4 s ahead)
@@ -161,7 +162,7 @@ local TIMING = {
     spearmanstrikehitbox        = { first = 0.6, last = 1.2 },
     northernwarriorlinestrike   = { first = 0.6, last = 1.2 },
     northernwarriorcirclestrike = { first = 0.6, last = 1.2 },
-    firstbosspassivebeam        = { first = 0.3, last = 2.4, holdFull = true },   -- hurts 0.3-2.2 s after the Model appears; its precast fades at 0.6 s, which must NOT end the danger
+    firstbosspassivebeam        = { first = 0.3, last = 3.5, holdFull = true },   -- hurts 0.3-2.2 s after appearing, and in the burst its lane re-fires every 1.1 s: a lane never expires while the burst lasts
     firstbossjumpslam           = { first = 1.8, last = 5.0 },
     secondbosscriclehitbox      = { first = 1.2, last = 2.5 },
     secondbosshorizontalbeam    = { first = 1.1, last = 5.0 },
