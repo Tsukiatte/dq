@@ -92,3 +92,24 @@ each change is judged on deaths per boss and boss damage per minute alive.
    candidates, boss health, state histogram, mover counters).
 4. Patch, rebuild, `loadstring(readfile("dq_rewrite.lua"))()` mid-run; the new
    instance destructs the old one.
+
+### Champion facts that cost runs to learn (2026-09-03, runs 14-17)
+
+- The dungeon clock is 10 minutes. The fight is ~7 s of ability uptime at
+  30-40 studs (11-15 % of boss health per second there, nothing past 40); every
+  death costs ~25 s. Deaths are the whole problem.
+- **Arena leash.** Past ~128 studs from the Champion the character dies with
+  nothing near it; the respawn point is 131-137 out. The field treats ground
+  past `leashRadius` (122) as lethal so a respawn walks in immediately.
+- **Beams** are 8 x 250 through the boss's position, fired 8-10 a second for
+  most of the fight with scattered yaws; they hurt from ~0.3 s after the Model
+  appears (seed `first` 0.3) and for ~2 s. Retreating past their reach is the
+  leash - do not.
+- **Aimed criss cross**: 15-stud mesh spawned 2-17 studs from the player,
+  start time = announcement, 30 studs/s along its LookVector; a moving
+  character survives most of them, a parked one does not.
+- **Big spike**: 40-wide front, announced 1.4 s before it leaves the boss at
+  100 studs/s. Needs 23 studs of sidestep at the burst speed, so the burst
+  keys off dwell-aware danger, not danger at this instant.
+- **Jump slam**: `First Boss Jump Down` (Vector3) is the landing point; the
+  67-stud slam Model appears at landing and hits 1.8 s later.
