@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.70 - 2026-09-03 - "Remembered"
+
+- Reader tick: a record whose Model is gone is kept on `lastCFrame` until `untilAt`.
+
 ## 5.1.69 - 2026-09-03 - "Two bosses, two profiles"
 
 - Core: `BOSS_PROFILES` / `S.bossProfile`. Field: arena pull gated on the profile. Brain: fan standoff gated on the profile.
