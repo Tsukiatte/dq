@@ -2407,7 +2407,9 @@ local function decide(root, hum)
             local dot = (ox * hx + oz * hz) / dist
             cost = cost + 0.05 * (1 - dot) * 0.5
         end
-        if ap then
+        -- The band pull shapes only the last stretch: far out, the brain
+        -- travels on its own path and the field just keeps it out of harm.
+        if ap and adist < ap.standoff + 30 then
             local cx, cz = rx + ox, rz + oz
             local dxa, dza = cx - ap.x, cz - ap.z
             local dd = sqrt(dxa * dxa + dza * dza)
