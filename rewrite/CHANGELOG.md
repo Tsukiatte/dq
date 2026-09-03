@@ -1,5 +1,10 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.59 - 2026-09-03 - "No thanks, bonus boss"
+
+- Lobby: answers `bonusBossPlayerVote` (`bonusBoss`, `bonusVoteDelay`); `S.runComplete()`.
+- Brain: `run complete` idle instead of re-walking rooms. UI: "Stay for the bonus boss" toggle (persisted).
+
 ## 5.1.58 - 2026-09-03 - "Range, measured"
 
 - Reader: `noteGeyser` sets `RD.abilityRange` (cap) / `RD.abilityReach`. Brain: `RT.lastCastAt` / `RT.lastCastTargetDist`; `S.abilityReach()`; `standoffFor` uses `abilityRange + autoStandoffOffset` when `autoStandoff`.

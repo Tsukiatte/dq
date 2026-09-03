@@ -384,7 +384,12 @@ local function brainTick(now)
         return
     end
 
-    -- 3. Nothing to fight: on to the next room.
+    -- 3. Nothing to fight: on to the next room, unless the run is over.
+    if S.runComplete and S.runComplete() then
+        releaseMover(hum, root)
+        setMovementState("run complete")
+        return
+    end
     local room = nextRoom(root.Position)
     if room then
         travel(hum, root, room.position, walkSpeed(), "to " .. room.name)

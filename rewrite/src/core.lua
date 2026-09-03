@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.58"
+local SCRIPT_VERSION = "5.1.59"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.59", date = "2026-09-03", notes = "After the last boss the game asks whether to stay for the bonus boss; run 29 sat on that vote with the timer frozen for ten minutes. The vote is now answered two seconds in, no by default (its arena is not mapped), yes with the new Queue toggle. Once a run is complete the bot stands still instead of walking the rooms again." },
     { version = "5.1.58", date = "2026-09-03", notes = "The ability's range is measured from where its geyser lands when the target is further away (the client script carries no range; the server caps the placement), and the boss is fought from two studs inside it (Chris). Shown in the Standing section. The blink is limited to the Champion, Bob and mob fights until the third boss is mapped: it teleported all over that arena. Margins: 2.5 studs of reach and a 4-stud shoulder, so spots on a box's edge cost and the bot stops further out (it was grazed on an edge). Every drawn hitbox now carries a faint second outline at the size the bot treats as unsafe." },
     { version = "5.1.57", date = "2026-09-03", notes = "Champion (Chris): boss-fight spots are pulled back inside the arena - beyond the standoff band plus twenty studs costs, past forty-five it is out of the question - because the aimed attacks spawn on you at the mouth with nowhere to step. The blink now fires for a box that will cover you within 0.6 s, moving bodies included (the criss cross gave no warning before), 5 s apart, four a minute, up to 8 studs. Slam counts as live from 1.5 s and five studs wider (a death landed 3.3 studs outside it). Passive beams hold 2.6 s with slim padding so the fan has gaps past 80 studs. A respawn outside the leash is pulled back in by a gradient instead of wandering out (run 28)." },
     { version = "5.1.56", date = "2026-09-03", notes = "Champion: back to the 5.1.51 beam window (3.5 s, normal padding) and standoff during the fan; the 95-stud fan standoff added in 5.1.53 left the bot twenty studs from the arena edge and the leash killed it twice. The jump slam lands where the player stood at Jump Up, so a slam zone is placed there at Jump Up: three seconds to leave instead of two." },
@@ -102,6 +103,8 @@ local CFG = {
     mobStandoff = 34,             -- from any mob, melee or ranged: abilities only, never within weapon reach (Chris)
     meleeBuffer = 10,             -- soft band past a melee mob's swing where spots are merely disfavoured
     leashRadius = 122,            -- Champion arena: death past ~128 studs from the boss; the respawn point is 131-137 out
+    bonusBoss = false,            -- after the last boss: stay for the bonus boss? Its arena is not mapped; off
+    bonusVoteDelay = 2.0,         -- seconds after the vote appears before answering
     autoStandoff = true,          -- boss standoff from the measured ability range (Chris); the slider is the fallback until a cast has measured it
     autoStandoffOffset = 2,       -- studs inside the measured range
     bossStandoff = 38,            -- ability damage 11-15%/s at 30-40 studs, ~0 past 45 (48 measured 0.35%/s)
