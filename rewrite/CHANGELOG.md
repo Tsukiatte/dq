@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.20 - 2026-09-03 - "Burst early"
+
+- `RT.moveBoost` follows `DG.dangerHere` (dwell-aware) instead of `here0`.
+
 ## 5.1.19 - 2026-09-03 - "Leash"
 
 - Reader sets `RD.leash` for the Midgardian Champion; the field scores everything past `leashRadius` (122) as lethal.

@@ -199,7 +199,10 @@ local function decide(root, hum)
     local here0 = dangerAt(rx, ry, rz, 0)
     DG.here0 = here0
     DG.dangerHere = max(here0, dangerAt(rx, ry, rz, dwell * 0.5), dangerAt(rx, ry, rz, dwell))
-    RT.moveBoost = here0 >= CFG.dodgeMoveAt
+    -- The burst is for anything arriving within the dwell, not only what is
+    -- already here: the big spike front is announced ~2 s out and needs 23
+    -- studs of sidestep, which 16 studs/s does not give.
+    RT.moveBoost = DG.dangerHere >= CFG.dodgeMoveAt
     local speed = RT.moveBoost and CFG.tweenEscape or (RT.walkSpeed or CFG.tweenWalk)
     local grace = here0 > 0 and graceHere(rx, ry, rz) or math.huge
     DG.grace = grace
