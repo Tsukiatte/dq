@@ -11,6 +11,48 @@ file and that table in sync on every edit.
 
 ---
 
+## 5.0.0 - 2026-09-02 - "Northern Lands" - the rewrite
+
+The internals are new: `core`, `reader`, `field`, `bosses`, `mover`, `dodge`,
+`pursuit`, `draw`, `tools`, `config`, `main`. Kept as they were: `uikit`,
+`ui` (every panel, control and string), `path` (the waypoint editor),
+`streamer`, `gamedata`. The 4.11 code is frozen under `legacy/4.11.3`.
+
+- **Reader.** Every attack Model under workspace is tracked from
+  `ChildAdded` and its precast read every frame. From Chris's real Northern
+  Lands capture (6 deaths, 136 s, 422 attacks): the precast is visible from
+  spawn, flashes to 0.17 at the instant the hit lands, and fades to 1.0 about
+  0.2 s later; the invisible hitBox that lingers for seven seconds afterwards
+  is floor. The flash age per attack is in `bosses.lua` (beam 0.92, mage shot
+  0.98, spearman strike 0.86, warrior line strike 0.66, warrior circle strike
+  0.65 / 0.37, jump slam 1.8). An attack hurts from `Lead` before its flash
+  until 0.25 s after; unknown names hurt for their whole visible life plus a
+  linger; a precast that is never visible is floor. No timing is learned
+  from being hit.
+- **Projectiles** come from the boss remote with their exact path (240
+  studs over 8 s for the criss cross, from the arena walls; spawned on a
+  player standing outside the arena). Parts without an event are tracked by
+  their measured velocity.
+- **The sweep.** From two consecutive beams (20 degrees, 0.5 s apart) the
+  next three are placed in the field before they exist. Bosses are stood off
+  at 26 studs, 45 while a sweep is firing.
+- **Field.** One function: danger at a point and a time, the worst of every
+  attack whose window contains that time plus every enemy's body, with a
+  hard margin and a soft ring.
+- **Dodge.** Rings of candidates scored along the line at the moments they
+  are crossed and at arrival for the dwell, distance, turn and approach
+  terms; the best few checked against the floor and the walls. No target
+  when here is fine and pursuit is free.
+- **Mover.** A tween along the floor at walking speed: root stepped toward
+  the target each frame, floor from a downward raycast, walls from a chest
+  raycast, never airborne, never faster than 16. Or `Humanoid:MoveTo`.
+- **Pursuit.** Straight at the standoff point when clear, PathfindingService
+  when a wall says otherwise, every step asked of the field first.
+- **Capture.** `Record what spawns` + `Save capture` now write the probe's
+  report (summary by name, hits, traces, events) from the reader's records.
+- The Attack Book lists every attack name the reader meets with its measured
+  flash time; switching one off makes the reader ignore it.
+
 ## 4.11.6 - 2026-09-02 - probe.lua 0.2
 
 - `probe.lua` 0.2: attack lines carry the hitBox position and yaw, part
