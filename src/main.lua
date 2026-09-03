@@ -240,13 +240,16 @@ local function attackEnemy(enemy)
     local flatOffset = Vector3.new(root.Position.X - enemyRoot.Position.X, 0, root.Position.Z - enemyRoot.Position.Z)
     -- Reach has to cover the stand-off distance, otherwise the bot would walk
     -- back into melee purely so it could swing.
-    local reach = math.max(CFG.attackRange, S.getEnemyStandoff(enemy) + 1.5)
+    -- A boss is fought from ability range; the swing only goes if we happen
+    -- to be inside our own reach anyway.
+    local reach = S.isBossModel(enemy) and CFG.attackRange or math.max(CFG.attackRange, S.getEnemyStandoff(enemy) + 1.5)
     if flatOffset.Magnitude <= reach and RT.farmEnabled and not RT.destroyed and RT.gameSpecificAttackMethod then
         RT.gameSpecificAttackMethod(enemy)
     end
 end
 
 local function pressAbilityKey(keyCode)
+    if RT.abilityHook then pcall(RT.abilityHook, keyCode) end
     pcall(function()
         VirtualInputManager:SendKeyEvent(true, keyCode, false, game)
     end)
@@ -668,7 +671,11 @@ local function startAutofarm()
             -- holding still inside a telegraph's clearance is the escape logic
             -- working, not a trap, and blacklisting there would fight it.
             pruneBlockedAreas(tickClock)
-            if inHazard then
+            -- And not while the dodge is holding on purpose - waiting for a
+            -- gap, off a hub, or with pursuit stopped at the edge of
+            -- something. Blacklisting there jumped the character into the
+            -- pattern it was waiting out.
+            if inHazard or DG.gapWait or DG.hubHold or DG.pursuitBlocked then
                 NAV.spotAnchor = nil
             elseif not NAV.spotAnchor
                 or (root.Position - NAV.spotAnchor).Magnitude >= CFG.stuckAreaMoveThreshold then

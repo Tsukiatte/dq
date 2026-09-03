@@ -11,6 +11,26 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.10.4 - 2026-09-02 - "Fight from range"
+
+- The game's enemy Models carry their own numbers (`enemyStyle` "boss1",
+  `meleeDistance` 4, `aggroRange` 50, `moveSpeed` 16, `level`, `damage`) and
+  the script reads them (`isBossModel`, `getEnemyMeleeReach`).
+- A boss (style says boss, or line attacks pass through it) is fought from
+  ability range: `bossStandoff` 26 studs, inside the `abilityRadius` (now 30)
+  and outside its melee. The swing only goes if we are inside our own reach
+  anyway. A mob's standoff is its body plus the melee distance the game gives
+  it.
+- The dodge's danger ring round an enemy is its melee reach, not where we
+  stand. The approach arrives half a stud inside the standoff, so a swing or an
+  ability is in range on arrival.
+- The stuck detector leaves the dodge's deliberate holds alone (gap wait, hub
+  hold, blocked pursuit): it had been jumping the character into the pattern
+  it was waiting out.
+- Harness: `RT.abilityHook` (the Loader tells the simulator about Q/E),
+  simulator boss carries `enemyStyle`/`meleeDistance`, abilities damage it from
+  `DQSimAbilityReach` (30) every `DQSimAbilityCooldown` (1 s).
+
 ## 4.10.3 - 2026-09-02
 
 - A scripted projectile (`PC.paths`) is a hit candidate: where the game's own

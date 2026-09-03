@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 4.10.3
+    VERSION : 4.10.4
     BUILD   : 2026-09-02
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "4.10.3"
+local SCRIPT_VERSION = "4.10.4"
 local SCRIPT_BUILD_DATE = "2026-09-02"
-local SCRIPT_CODENAME = "Read the sweep"
+local SCRIPT_CODENAME = "Fight from range"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "4.10.4", date = "2026-09-02", notes = "Fight from range. The enemy Models carry their own numbers - enemyStyle boss1, meleeDistance 4, aggroRange 50, moveSpeed 16 - and the script now reads them instead of guessing. An enemy whose style says boss, or that line attacks pass through, is a boss, and a boss is fought from ability range: the standoff is twenty-six studs, inside the thirty-stud ability radius and outside its melee, and the swing only goes if we happen to be in our own reach anyway. A mob's standoff is its body plus the melee distance the game gives it. The dodge's danger ring round an enemy is its melee, not where we stand, so standing at range no longer reads as danger. The stuck detector leaves the dodge's deliberate holds alone: it had been jumping the character into the pattern it was waiting out." },
     { version = "4.10.3", date = "2026-09-02", notes = "Two more from the harness. A scripted projectile is a hit candidate: where the game's own numbers put a spike right now. A hit while one rolled over us was pinned on whatever floor line we stood in, and that line learned a six-second window. And the Midgardian Champion's beams carry a window from the start - a pulse, 0.3 to 1.2 seconds after each appears - because nothing on them ever shows, and with no window every beam was a wall for its whole seven seconds: a burst of thirteen was a wall everywhere, the character froze at the arena edge, and the projectiles took it. The window is a hypothesis the game corrects: a certain hit at a later age widens it on the spot." },
     { version = "4.10.2", date = "2026-09-02", notes = "Read the sweep. Two things from the harness. First, a hit teaches an attack's window only when the blame is certain - the attack encloses us and no other does. An ambiguous guess used to stretch the window for the rest of the fight: the mage shot's 0.9 to 1.2 seconds became 0.9 to 6.9 from being blamed for beams, and every red line on the floor was a wall for eight seconds. That was the hitboxes that stayed longer than the attack. Second, the Midgardian Champion's beams are a sweep: the fight save parks them twenty degrees apart and the capture saw them every half second in bursts of four and thirteen, ten seconds apart. The hub now records each line's heading, and when the last two steps agree the next lines are placed before they exist - floor until their time, a line for as long as such lines have been seen to hurt. A hub whose expected volley is a whole period overdue is quiet, and the approach is allowed; before, an expected time in the past held the character out forever." },
     { version = "4.10.1", date = "2026-09-02", notes = "What the harness and the captures taught, written into the script. While a hub's gate is closed the character waits on a twenty-stud ring instead of drifting out to fifty-five, so the dash in and out fits inside a volley gap. Blame for a hit goes only to an attack that encloses us when any does - a mage line five studs away with a matching window was outscoring the beam we stood in. And the Northern Lands timings are seeded: mage shot and strikes arm at 0.85 to 0.9 seconds and are over by 1.2, and the passive beams keep burning after their warning fades - so the first cast of each is already handled, before anything is learned." },
@@ -373,7 +374,7 @@ CFG.recoveryArriveRadius = 6.0
 
 -- Abilities (2.2.0). Q/E can be limited to when an enemy is within abilityRadius.
 CFG.abilityRadiusEnabled = false
-CFG.abilityRadius = 20
+CFG.abilityRadius = 30
 CFG.minAbilityRadius = 5
 CFG.maxAbilityRadius = 60
 CFG.showAbilityRadius = false
@@ -492,6 +493,7 @@ CFG.dodgeHubLineWidth = 8      -- typical beam width, for the coverage estimate
 CFG.dodgeHubExit = 0.8         -- seconds needed to get back out after going in
 CFG.dodgeHubFireGuess = 1.2    -- arming delay assumed for a hub's lines until one is learned
 CFG.dodgeHubStandoff = 20      -- where to wait, off the hub, while the gate is closed
+CFG.bossStandoff = 26          -- where to stand against a boss: inside ability range, outside its melee
 CFG.dodgePredictSteps = 2      -- how many of a sweeping hub's next lines to predict
 CFG.dodgePredictedLive = 1.0   -- how long a predicted line hurts when nothing has been learned
 -- A precast that has brightened back by this much from its darkest is fading:
@@ -645,6 +647,7 @@ local MAP_LABELS = {
 
 -- Runtime Variables
 RT.gameSpecificAttackMethod = nil
+RT.abilityHook = nil             -- harness: called with the KeyCode whenever an ability is pressed
 RT.detectedAttackRemote = nil
 RT.lastClickTime = -math.huge
 RT.mainConnection = nil

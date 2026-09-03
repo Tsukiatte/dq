@@ -206,6 +206,25 @@ query.OnInvoke = function(what, arg)
             local n, out = #S.HZ.lifeLog, {}
             for i = math.max(1, n - (arg or 10)), n do out[#out + 1] = S.HZ.lifeLog[i] end
             return table.concat(out, "\n")
+        elseif what == "hubs" then
+            -- Every hub: cadence, sweep step, the last headings, the predicted lines.
+            local out = {}
+            local nowc = os.clock()
+            for model, hub in pairs(S.DG.hubs) do
+                local angs = {}
+                for i = math.max(1, #hub.angles - 3), #hub.angles do
+                    local e = hub.angles[i]
+                    angs[#angs + 1] = string.format("%.0fdeg@%.1fs", math.deg(e.a), e.t - nowc)
+                end
+                local preds = {}
+                for i = 1, #(hub.pred or {}) do
+                    local L = hub.pred[i]
+                    preds[#preds + 1] = string.format("%.0fdeg from %.2f to %.2f", math.deg(L.a), L.from - nowc, L.untilAt - nowc)
+                end
+                out[#out + 1] = string.format("%s rate=%.2f period=%s fire=%s step=%s name=%s lastSpawn=%.1fs angles=[%s] pred=[%s]",
+                    model.Name, hub.rate, tostring(hub.period), tostring(hub.fire), hub.step and string.format("%.0fdeg", math.deg(hub.step)) or "nil", tostring(hub.name), hub.lastSpawn - nowc, table.concat(angs, " "), table.concat(preds, " | "))
+            end
+            return #out > 0 and table.concat(out, "\n") or "no hubs"
         elseif what == "delays" then
             return describe(S.RT.armDelays) .. " spans=" .. describe(S.RT.armSpans)
         elseif what == "set" then
@@ -233,6 +252,9 @@ task.spawn(function()
     task.wait(2)
     if S.setMode then S.setMode("clone") end
     if S.RT then S.RT.farmEnabled = true end
+    -- Abilities win boss fights: Q/E on, gated to the ability radius.
+    if S.RT then S.RT.autoQEnabled = true S.RT.autoEEnabled = true end
+    if S.CFG then S.CFG.abilityRadiusEnabled = true S.CFG.abilityRadius = 30 end
     print("[DQHarness] farm enabled")
 end)
 -- Swings: the real swing needs the executor's input injection, so the sim
@@ -249,8 +271,11 @@ task.spawn(function()
         pcall(orig, enemy)
         if os.clock() - last >= 0.1 then
             last = os.clock()
-            remote:FireServer()
+            remote:FireServer("swing")
         end
+    end
+    S.RT.abilityHook = function(key)
+        remote:FireServer("ability", tostring(key))
     end
     print("[DQHarness] swing hook installed")
 end)

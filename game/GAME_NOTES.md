@@ -231,3 +231,13 @@ a Studio recreation of the Midgardian Champion room (`tools/studio_install.lua`,
   spawned through you a moment ago is nearer than the one burning you.
 - **`StreamingEnabled` is on.** The saved place has no camera controller and
   loads characters itself.
+
+- **Enemy Models carry their own numbers.** `Midgardian Champion` in the fight
+  save: `StringValue enemyStyle = "boss1"`, `IntValue meleeDistance = 4`,
+  `aggroRange = 50`, `moveSpeed = 16`, `level = 185`, `damage`, `exp`,
+  `NumberValue attackSpeed = 1`, a `Script`, `hitSound`, `enemyNameplate`
+  BillboardGui, HumanoidRootPart 5.1 x 60 x 2.6. The script reads style and
+  melee distance (4.10.4).
+- **Bosses are fought from ability range** (Chris, 2026-09-02): the bot must
+  not close to melee - the boss has a melee too - and the abilities, radius
+  about 30, are what win. `bossStandoff` 26.
