@@ -11,6 +11,19 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.11.5 - 2026-09-02 - probe.lua
+
+- `probe.lua` (repo root): the standalone attack probe HANDOFF section 4
+  asks for. Not the bot: it moves nothing and presses nothing. It tracks
+  every attack Model under workspace from `ChildAdded` for its whole life at
+  20 Hz (precast transparency trace, the age spans during which the root was
+  inside the hitBox, removal), every BasePart parented straight to workspace
+  (the boss projectiles) with the remote event that made it, every boss
+  remote event on the game's clock, and on every health drop what enclosed
+  the root, what was near, the live projectiles with their scripted position
+  and the enemies in reach. Writes `DQProbe_<map>_<stamp>.txt` every 5 s and
+  on every hit. No change to the script itself.
+
 ## 4.11.4 - 2026-09-02 - probe build
 
 - Every change (>= 0.05) of a precast transparency is noted in the attack

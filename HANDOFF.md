@@ -261,6 +261,13 @@ near 60 s: keep in-code waits under 50 s.
    how it stands, how far from the boss, what it dodges, what it ignores.
 2. Build the standalone probe (section 4) and have him run one NL fight with
    it. Fill the table. Only then write the reader.
+   **Done 2026-09-02 (4.11.5):** `probe.lua` at the repo root, tested in the
+   Studio harness. Load in Potassium:
+   `loadstring(game:HttpGet("https://raw.githubusercontent.com/Tsukiatte/dq/main/probe.lua?t=" .. tick()))()`.
+   It writes `DQProbe_NorthernLands_<MMDD_HHMMSS>.txt` to the Potassium
+   workspace every 5 s and on every hit; the SUMMARY section (per attack
+   name: seconds inside by age vs hits by age) is the table. Waiting on:
+   that capture, and the 750-line bot video.
 3. Write the new internals (`core`, `reader`, `field`, `dodge`, `mover`,
    `pursuit`, `bosses`, `main`); reuse `uikit.lua` and adapt `ui.lua`.
    Budget: under 5,000 lines total including the UI; the internals under
