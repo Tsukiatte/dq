@@ -8,7 +8,7 @@ return function(S)
 ================================================================================
     DUNGEON QUEST REBORN - ADVANCED AUTOFARM
 ================================================================================
-    VERSION : 4.10.8
+    VERSION : 4.10.9
     BUILD   : 2026-09-02
 
     VERSIONING RULES (semantic):
@@ -20,12 +20,13 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "4.10.8"
+local SCRIPT_VERSION = "4.10.9"
 local SCRIPT_BUILD_DATE = "2026-09-02"
 local SCRIPT_CODENAME = "Fight from range"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "4.10.9", date = "2026-09-02", notes = "The stronger pull applies whenever the box is the approach - pursuit stopped at the edge of something - not only on the ring. Otherwise the quiet gap went by safe here at fifty studs, out of ability range, and the fight took four minutes that could take two." },
     { version = "4.10.8", date = "2026-09-02", notes = "The ring pull is three times the ordinary approach weight: at the ordinary weight the distance cost of an eighteen-stud move beat it and the character sat at thirty studs, safe here, while the sweep came round. And a target within eight studs with no path is walked to directly: the path to the standoff point a stud or two away was failing, which read as stuck, which blacklisted the spot and fled from it." },
     { version = "4.10.7", date = "2026-09-02", notes = "The ring is the box's to hold from wherever the last dodge left the character, not only from within a box-length of the boss: a dodge that ended eighty studs out during a burst left it standing there." },
     { version = "4.10.6", date = "2026-09-02", notes = "The hub's rhythm sets where to stand. While it fires, and for the last seconds of the gap before it fires again, the character holds a ring fifty studs out - far enough that a sweep's lines have gaps between them, which at twenty-seven studs they do not - and the ring is held from both sides. In the quiet it comes in to the ability standoff and casts. The radial cost applies only while the hub is actually firing: the rate stays up for ten seconds after a burst, and a cost that stayed with it kept the character out through the whole quiet gap, the one time it could have been casting. Pursuit does not walk in while the ring is held." },

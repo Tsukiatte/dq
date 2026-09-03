@@ -11,6 +11,13 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.10.9 - 2026-09-02
+
+- The stronger (`dodgeHubRingWeight`) pull applies whenever the dodge box is
+  the approach - pursuit stopped at the edge of something - not only on the
+  ring. Otherwise the quiet gap went by "safe here" at 50 studs, out of
+  ability range.
+
 ## 4.10.8 - 2026-09-02
 
 - The hub ring pull is `dodgeHubRingWeight` (3) times the ordinary approach
