@@ -289,6 +289,71 @@ end
 
 -- Shared by every map.
 local SHARED = {}
+-- ------------------------------------------------------------ Aquatic Temple
+-- From the place file's client handler (2026-09-02). The boss's attack
+-- Models are renamed "Model" on the client, so their timing has to come from
+-- the events, not the names.
+local AQ = {}
+REMOTES["aquaticBossSpecficEvents"] = AQ
+
+local function osAt(gameTime)
+    return os.clock() + (gameTime - gameClock())
+end
+
+-- Laser: {startTime, endTime, cframe, distance, boss, topIndex}. A precast
+-- line Model (renamed "Model") is placed at the cframe; the beam runs along
+-- it from startTime to endTime. Stamp that window on the Model, and keep a
+-- zone as the belt to its braces.
+AQ["first boss laser shot"] = function(a)
+    if not isArgs(a, 4) or typeof(a[3]) ~= "CFrame" then return end
+    local startT, endT, cf, distance = a[1], a[2], a[3], a[4]
+    local stamped = S.stampAttackWindow and S.stampAttackWindow(cf.Position, 24, osAt(startT), osAt(endT))
+    -- The line itself, as the event describes it: from the cframe, along
+    -- its look, for the distance, for the whole of the sweep.
+    local centre = cf + cf.LookVector * (distance * 0.5)
+    cubeZone("laser", centre, Vector3.new(4.4, 8, math.max(distance, 4)), startT, math.max(endT - startT, 0.2))
+    log(string.format("Laser: %d studs, %.1fs to %.1fs from now (%s)", math.floor(distance), startT - gameClock(), endT - gameClock(), stamped and "Model stamped" or "stamp held"))
+end
+-- Orbs: {cframe, startTime, endTime, distance, duration}: a Part renamed
+-- "Model" (no hitBox, so the index never sees it) rolling along the look
+-- vector. The path is the whole of the hazard.
+local function movingOrb(name)
+    return function(a)
+        if not isArgs(a, 5) or typeof(a[1]) ~= "CFrame" then return end
+        local r = CFG.aquaticOrbRadius
+        addPath(name, a[1], a[4], a[5], a[2], a[3], r, r, r)
+        log(string.format("%s: %d studs over %.1fs", name, math.floor(a[4]), a[5]))
+    end
+end
+AQ["first boss moving orb"] = movingOrb("moving orb")
+AQ["last boss moving orb"] = movingOrb("last boss orb")
+-- Smite: a position; particles and a beam for 0.3 s.
+AQ["third boss smite"] = function(a)
+    local pos = typeof(a) == "CFrame" and a.Position or (typeof(a) == "Instance" and a:IsA("BasePart") and a.Position) or (typeof(a) == "Vector3" and a) or nil
+    if not pos then return end
+    circleZone("smite", pos, CFG.aquaticSmiteRadius, gameClock() + 0.1, 0.6)
+    log("Smite")
+end
+-- The second boss shows workspace.secondBossDamageParts: each becomes a
+-- zone for a few seconds.
+AQ["second boss show damage parts"] = function()
+    local folder = Workspace:FindFirstChild("secondBossDamageParts")
+    if not folder then return end
+    local n = 0
+    for _, part in ipairs(folder:GetChildren()) do
+        if part:IsA("BasePart") then
+            cubeZone("damage part", part.CFrame, part.Size, gameClock() + 0.2, CFG.aquaticDamagePartHold)
+            n = n + 1
+        end
+    end
+    log(string.format("Second boss damage parts: %d zones", n))
+end
+AQ["last boss mark character"] = function(character)
+    if typeof(character) == "Instance" and character == LocalPlayer.Character then
+        log("Marked by the last boss")
+    end
+end
+
 REMOTES["mapSpecificEvent"] = SHARED
 
 SHARED["Steampunk Back Flames"] = function(model)

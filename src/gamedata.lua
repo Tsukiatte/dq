@@ -356,6 +356,11 @@ local DEFAULT_ARM_DELAYS = {
     -- The Midgardian Champion's jump slam (67-stud cube round its landing,
     -- precast shown): a certain hit at 1.8 s in Chris's capture of 2026-09-02.
     firstbossjumpslam = 1.8,
+    -- Aquatic Temple (capture of 2026-09-02): the cube pylon shot, certain
+    -- hit at 0.8 s; the boss's laser lines ("Model", 4x8x35), certain hits
+    -- at 0.9 and 3.5 s - the event stamps the exact window when it is heard.
+    cubepylonshot = 0.8,
+    ["model:4x8x35"] = 0.9,
 }
 -- Windows: first and last age at which an attack has been seen to hurt. A
 -- window makes the attack floor before its lead and floor again after
@@ -374,6 +379,8 @@ local DEFAULT_ARM_SPANS = {
     northernwarriorlinestrike = { first = 0.85, last = 1.2 },
     northernwarriorcirclestrike = { first = 0.85, last = 1.2 },
     firstbossjumpslam = { first = 1.8, last = 2.3 },
+    cubepylonshot = { first = 0.8, last = 1.1 },
+    ["model:4x8x35"] = { first = 0.9, last = 3.6 },
 }
 -- Attacks that keep hurting after their warning fades: the fade does not
 -- end them. The Midgardian Champion's passive beams burn for seconds after

@@ -2708,6 +2708,68 @@ local function refreshChannels(st, model)
     end
 end
 
+-- The Aquatic Temple's client code renames the boss's attack Models to
+-- "Model" (the laser precast, the orbs). Learning by that name pooled every
+-- one of them - and everything else so named - into one window. A generic
+-- name is keyed with the hitBox's rounded size instead: "model:4x8x35".
+local GENERIC_MODEL_NAMES = { model = true, part = true, meshpart = true, union = true, unionoperation = true }
+local function attackKey(model, hb)
+    local name = string.lower(model.Name)
+    if GENERIC_MODEL_NAMES[name] and hb then
+        local s = hb.Size
+        return string.format("%s:%dx%dx%d", name, math.floor(s.X + 0.5), math.floor(s.Y + 0.5), math.floor(s.Z + 0.5))
+    end
+    return name
+end
+
+-- A window an event has announced for an attack Model at a place: the
+-- Aquatic Temple's laser shot says exactly when its line hurts. Stamped
+-- straight onto the Model if it is already tracked, kept for a few seconds
+-- otherwise and applied when the Model turns up.
+local function modelPivot(model, st)
+    local anchor = (st and (st.hitBox or st.precast)) or model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
+    return anchor and anchor.Position or nil
+end
+
+local function applyStamp(st, model, stamp, now)
+    st.impactAt = stamp.first
+    st.liveUntil = stamp.last + CFG.armAssumedLinger
+    st.armedAt, st.armedBy, st.doneAt = nil, nil, nil
+    note(st, now - st.spawn, string.format("window:event %.1f-%.1f", stamp.first - st.spawn, stamp.last - st.spawn))
+end
+
+local function applyWindowStamps(st, model, now)
+    local stamps = HZ.windowStamps
+    if #stamps == 0 then return end
+    local pos = modelPivot(model, st)
+    if not pos then return end
+    for i = #stamps, 1, -1 do
+        local stamp = stamps[i]
+        if now > stamp.expires then
+            table.remove(stamps, i)
+        elseif (pos - stamp.pos).Magnitude <= stamp.radius then
+            applyStamp(st, model, stamp, now)
+            table.remove(stamps, i)
+            return
+        end
+    end
+end
+
+local function stampAttackWindow(position, radius, firstOs, lastOs)
+    local now = os.clock()
+    for model, st in pairs(HZ.arming) do
+        if model.Parent and not st.doneAt then
+            local pos = modelPivot(model, st)
+            if pos and (pos - position).Magnitude <= radius then
+                applyStamp(st, model, { first = firstOs, last = lastOs }, now)
+                return true
+            end
+        end
+    end
+    HZ.windowStamps[#HZ.windowStamps + 1] = { pos = position, radius = radius, first = firstOs, last = lastOs, expires = now + 6 }
+    return false
+end
+
 local function updateArming(now)
     for _, part in ipairs(HZ.detected) do
         local st = nil
@@ -2715,9 +2777,9 @@ local function updateArming(now)
             local model = part:FindFirstAncestorOfClass("Model")
             st = model and HZ.arming[model] or nil
             if model and not st then
-                local name = string.lower(model.Name)
                 local pc = model:FindFirstChild("precast")
                 local hb = model:FindFirstChild("hitBox") or model:FindFirstChild("hitbox")
+                local name = attackKey(model, hb)
                 local spawn = HZ.seenAt[part] or HZ.spawnTimes[part] or now
                 st = { name = name, spawn = spawn, precast = pc or false, hitBox = hb or false,
                        channels = {}, events = {}, minT = math.huge, visMinEver = math.huge,
@@ -2738,7 +2800,9 @@ local function updateArming(now)
                 elseif delay and delay > 0 then
                     st.impactAt = spawn + delay
                 end
-                if not st.precast or delay == 0 then
+                -- An event that announced this attack's window beats both.
+                applyWindowStamps(st, model, now)
+                if st.impactAt == nil and (not st.precast or delay == 0) then
                     st.armedAt = now
                     st.armedBy = st.precast and "known live" or "no precast"
                 end
@@ -3313,6 +3377,7 @@ S.updateWallHighlights = updateWallHighlights
 S.noteOwnAction = noteOwnAction
 S.getHazardMotion = getHazardMotion
 S.noteAttackHit = noteAttackHit
+S.stampAttackWindow = stampAttackWindow
 S.findAttackRecord = findAttackRecord
 S.invalidateAttackBook = invalidateAttackBook
 S.describeRecord = describeRecord
