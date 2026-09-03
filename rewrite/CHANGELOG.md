@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.5 - 2026-09-03 - "Pull"
+
+- The field's pull toward the target band applies at every distance (0.6x beyond the last 30 studs); the strafe bias only inside. Restores the 5.1.0 approach.
+
 ## 5.1.4 - 2026-09-03 - "Travel"
 
 - Travel goes straight when the swept line is clear; otherwise paths, replanned at most every 4 s or when the target moved 20 studs, resuming past waypoints behind the character. A moving boss had caused a replan every half second and a shuffle on the spot.
