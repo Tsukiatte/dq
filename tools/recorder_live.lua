@@ -196,6 +196,22 @@ local function hookHumanoid(c)
                     end
                     return list
                 end)(),
+                -- How much of the field was open: candidates by danger band, and the safest few.
+                field = (function()
+                    if not (S and S.DG and S.DG.cands) then return nil end
+                    local bands, safest = { safe = 0, warm = 0, hot = 0, invalid = 0 }, {}
+                    for _, c in ipairs(S.DG.cands) do
+                        if c.danger then
+                            if c.valid == false or c.valid == nil then bands.invalid = bands.invalid + 1 end
+                            if c.danger < 0.15 then bands.safe = bands.safe + 1 elseif c.danger < 0.6 then bands.warm = bands.warm + 1 else bands.hot = bands.hot + 1 end
+                            safest[#safest + 1] = c
+                        end
+                    end
+                    table.sort(safest, function(a, b) return (a.danger or 1) < (b.danger or 1) end)
+                    local top = {}
+                    for i = 1, math.min(4, #safest) do local c = safest[i]; top[i] = { dist = r1(c.dist or 0), danger = r1(c.danger or 0), valid = c.valid == true, dx = rt and r1(c.x - rt.Position.X) or nil, dz = rt and r1(c.z - rt.Position.Z) or nil } end
+                    return { bands = bands, safest = top }
+                end)(),
                 dangerHere = S and S.DG and S.DG.dangerHere and r1(S.DG.dangerHere) or nil,
                 bossDist = (function()
                     local e = S and S.NAV and S.NAV.cachedEnemy
