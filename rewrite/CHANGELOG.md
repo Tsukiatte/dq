@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.22 - 2026-09-03 - "Further out"
+
+- `bossStandoff` 48.
+
 ## 5.1.21 - 2026-09-03 - "Band"
 
 - Leash danger only within 40 studs outside `leashRadius`.

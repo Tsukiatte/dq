@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.21"
+local SCRIPT_VERSION = "5.1.22"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.22", date = "2026-09-03", notes = "Boss standoff 48: the abilities reach about 53 studs and measured the same damage per second at 40-50 as at 30-40, and the beam lanes are wider further out." },
     { version = "5.1.21", date = "2026-09-03", notes = "The leash is a 40-stud band outside the arena, not everything beyond it: the walk in from room 2 was being scored as lethal. Ranged mobs are fought from 22 studs; at 7-11 a mage shot leaves no time." },
     { version = "5.1.20", date = "2026-09-03", notes = "The escape burst keys off danger within the dwell window, not only danger at this instant. Five big-spike deaths in one fight: the field saw the front coming and walked away from it at 16." },
     { version = "5.1.19", date = "2026-09-03", notes = "The Champion's arena has a leash: every unexplained death sat 129-137 studs from the boss with nothing tracked nearby, three of them while strafing at 135. The field now treats the ground past 122 studs from him as danger, so a respawn walks in at once and no spot is chosen out there." },
@@ -64,7 +65,7 @@ local CFG = {
     meleeBuffer = 4,              -- the field treats a melee mob as dangerous this far past its swing
     rangedStandoff = 22,          -- studs from a ranged mob
     leashRadius = 122,            -- Champion arena: death past ~128 studs from the boss; the respawn point is 131-137 out
-    bossStandoff = 35,            -- the abilities' best band: 11-15%/s of boss health at 30-40 studs, nothing past 40
+    bossStandoff = 48,            -- abilities reach ~53 and hit as hard at 40-50 as at 30-40; beam lanes are wider out here
     meleeMobMaxReach = 8,         -- a mob whose meleeDistance is at most this is melee
     strafe = true,                -- circle the target at standoff instead of standing
     strafeSpeedFraction = 0.6,    -- of tweenWalk
