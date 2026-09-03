@@ -119,15 +119,41 @@ local function computePath(from, to)
     return wps
 end
 
--- Walk toward `to`, replanning when it moves or the plan goes stale.
-local function travel(hum, root, to, speed, label)
+-- Is the straight line to `to` walkable? A slab the character's size swept
+-- along it, against everything solid.
+local function lineClear(rp, to, exclude)
+    local params = raycastParams(exclude)
+    local from = rp
+    local dest = Vector3.new(to.X, rp.Y, to.Z)
+    local hit = Workspace:Blockcast(CFrame.new(from), Vector3.new(2.5, 4.5, 2.5), dest - from, params)
+    return hit == nil
+end
+
+-- Walk toward `to`. A moving target must not mean a new plan every frame: the
+-- Champion walks, and replanning from scratch each half second reset the
+-- index to the waypoint under the character, which shuffled on the spot for
+-- a whole fight. Straight when the line is clear; otherwise a path, replanned
+-- rarely, resumed past the waypoints already behind.
+local function travel(hum, root, to, speed, label, exclude)
     local rp = root.Position
     local now = os.clock()
-    if not BR.waypoints or not BR.pathTo or flat(BR.pathTo, to) > 8 or now - BR.pathAt > 3 or BR.index > #BR.waypoints then
+    if flat(rp, to) < 70 and lineClear(rp, to, exclude) then
+        BR.waypoints = nil
+        driveTo(hum, root, to, speed, 1.5)
+        setMovementState(label .. " straight")
+        return
+    end
+    if not BR.waypoints or not BR.pathTo or flat(BR.pathTo, to) > 20 or now - BR.pathAt > 4 or BR.index > #BR.waypoints then
         BR.waypoints = computePath(rp, to)
-        BR.index = 1
         BR.pathAt = now
         BR.pathTo = to
+        -- Resume past whatever is already behind us.
+        BR.index = 1
+        for i, w in ipairs(BR.waypoints) do
+            local dx, dz = w.X - rp.X, w.Z - rp.Z
+            local nx, nz = to.X - rp.X, to.Z - rp.Z
+            if dx * nx + dz * nz > 0 and flat(rp, w) > 2.5 then BR.index = i break end
+        end
     end
     local wp = BR.waypoints[BR.index]
     while wp and flat(rp, wp) < 3 and BR.index < #BR.waypoints do
@@ -237,7 +263,7 @@ local function brainTick(now)
         local d = flat(root.Position, target.root.Position)
         if d > standoff + 3 then
             local speed = (target.isBoss and d > 45) and CFG.tweenEscape or CFG.tweenWalk
-            travel(hum, root, target.root.Position, speed, "approach")
+            travel(hum, root, target.root.Position, speed, "approach", target.model)
             if d <= CFG.abilityRadius then fight(hum, root, target, now) end
             return
         end

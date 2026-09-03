@@ -1,5 +1,10 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.4 - 2026-09-03 - "Travel"
+
+- Travel goes straight when the swept line is clear; otherwise paths, replanned at most every 4 s or when the target moved 20 studs, resuming past waypoints behind the character. A moving boss had caused a replan every half second and a shuffle on the spot.
+- Mover counts its exit branches (`MV.counts`).
+
 ## 5.1.3 - 2026-09-03 - "Room first"
 
 - Target picker: mobs within 150 studs before any boss; a boss only when nothing is nearer. Travel with no progress for 2.5 s skips a waypoint.
