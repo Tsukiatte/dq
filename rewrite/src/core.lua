@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.48"
+local SCRIPT_VERSION = "5.1.49"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.49", date = "2026-09-03", notes = "Danger weighs three times as much as before in a spot's cost. At every death in the beam fan the cheapest spots were all lethal while clean ones 75 studs out lost on the pull toward the boss and the distance term; that is why it stood in the red." },
     { version = "5.1.48", date = "2026-09-03", notes = "Bob's circles: seeded to fire 0.6 s after the Model appears (deaths came 0.2-0.5 s before the old 1.2) and padded 3 studs wider than their precast cylinder (deaths at 1.5 studs outside it). Seeds may carry a pad the reader applies to the box." },
     { version = "5.1.47", date = "2026-09-03", notes = "A moving projectile's whole remaining lane (spirals, saw discs, the big spike) is soft danger ahead of the body, so the bot never sits where one is going to pass, and the lane is drawn to its end." },
     { version = "5.1.46", date = "2026-09-03", notes = "The armed leash survives a reload of the script (mirrored in _G per boss); a reload at the respawn point left the character standing outside the arena and dead." },
@@ -124,6 +125,7 @@ local CFG = {
     pathLaneDanger = 0.5,         -- standing anywhere on a projectile's remaining lane counts this much: relocate, never sit there
     dodgeMoveAt = 0.15,           -- danger here at or above this: relocate
     dodgeHysteresis = 0.1,
+    dodgeDangerWeight = 3.0,      -- the danger term is worth this much against pulls and distance: a lethal spot never beats a clean one
     dodgeDistanceCost = 0.008,
     dodgeFarScale = 1.6,          -- second look this many times further when nothing near is safe
     dodgeFarScale2 = 2.5,         -- and a third, further still

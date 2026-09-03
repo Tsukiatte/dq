@@ -377,7 +377,10 @@ local function decide(root, hum)
     end
 
     local function costOf(ox, oz, dist, graded)
-        local cost = graded + dist * CFG.dodgeDistanceCost
+        -- Danger dominates: a lethal spot near the boss used to out-score a
+        -- clean spot far out because the band pull and the distance term
+        -- together exceeded the danger term. Now no pull can buy a death.
+        local cost = graded * CFG.dodgeDangerWeight + dist * CFG.dodgeDistanceCost
         if (hx ~= 0 or hz ~= 0) and here0 < 1 then
             local dot = (ox * hx + oz * hz) / dist
             cost = cost + 0.05 * (1 - dot) * 0.5
