@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.54"
+local SCRIPT_VERSION = "5.1.55"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.55", date = "2026-09-03", notes = "Interface: the HUD is the old build's again - title chip with the build number and fps, a Playtime / Status / Ping card, the open-GUI hint and the Autofarm pill. Window corners: the header now shares the frame's rounding and the accent is an inset pill, so nothing square shows past the corners; the body stops short of the bottom corners." },
     { version = "5.1.54", date = "2026-09-03", notes = "The spot marker never sits on a box about to fire (Chris): a spot whose own ground is lethal on arrival or during the dwell sorts last, and a kept spot is dropped the moment its ground closes. Bob\'s chain line is a soft band the bot will not stand in but may cross; the circles are predicted both ways from the first one and pruned by the second. Against mobs, dodges prefer straight back over sideways." },
     { version = "5.1.53", date = "2026-09-03", notes = "Mob attacks (Chris): they hit about a quarter second after they look finished, so their windows run to 1.5 s and a fading precast no longer ends them early. Champion: a passive beam is held 2.0 s instead of 3.5 and padded 1.5 studs, so the fan's gaps exist in the model; during the fan the bot backs to 95 studs at escape speed instead of walking toward 135. The big spike kills 4-6 studs outside its 40-stud body, so it is 52 wide now. Visuals: a stopped projectile is a hazard for one second, not for as long as it lies there, and only announced paths draw their sweep strip - the yellow strips that stayed on the floor were thrown spears." },
     { version = "5.1.52", date = "2026-09-03", notes = "Bob (Chris): the floating beam fans are padded by the body radius only instead of 4.5 studs a side, so the gaps between spokes exist again. The circle chain's whole line through Bob is a zone from the first circle, so the escape is sideways, never along the line toward the next circle." },
