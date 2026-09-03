@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.37 - 2026-09-03 - "No jumping"
+
+- Mover: stall no longer jumps; `RT.stalledFor` exposed.
+
 ## 5.1.36 - 2026-09-03 - "Land"
 
 - Blink: standing height from HipHeight, refuse when mid-air, downward nudge after the write, rings 4/6, `blinkMax` 6.

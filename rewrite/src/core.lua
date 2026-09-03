@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.36"
+local SCRIPT_VERSION = "5.1.37"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.37", date = "2026-09-03", notes = "No more jumping: the mover's stall hop fired in place whenever walking did nothing (a hovering character after a hop), which read as jump spam and helped nothing. Stalls are recorded for the brain instead." },
     { version = "5.1.36", date = "2026-09-03", notes = "Blink lands at the Humanoid's standing height with a small downward velocity, and never fires mid-jump; a hop that inherited a mid-stride height left the character hovering until the anti-hover yanked it down. Hop is 4 or 6 studs, no longer 8." },
     { version = "5.1.35", date = "2026-09-03", notes = "Fifth kick with hops 3 s apart and two per ten seconds. The blink is now 8 s apart and at most three a minute; everything else about it is unchanged." },
     { version = "5.1.34", date = "2026-09-03", notes = "The bot walked onto beam lanes while gaps stood empty: a lane about to 'expire' in the model scored better than a gap padded by two neighbours' shoulders, but in the burst every lane re-fires every 1.1 s. Passive beams now hold 3.5 s and the shoulder is 1.5 studs, so gaps read clean and lanes read lethal for as long as the burst lasts." },
