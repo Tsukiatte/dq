@@ -230,18 +230,22 @@ local function decide(root, hum)
             local toward = (ox * ax + oz * az) / dist
             cost = cost + CFG.dodgeOutwardWeight * (toward + 1) * 0.5
         end
-        -- The band pull shapes only the last stretch: far out, the brain
-        -- travels on its own path and the field just keeps it out of harm.
-        if ap and adist < ap.standoff + 30 then
+        -- The pull toward the target's band applies at every distance: in a
+        -- field of attacks the spot outranks travel, so the spots themselves
+        -- must carry the approach (5.1.0 reached the Champion this way; a pull
+        -- limited to the last thirty studs left it hopping at the entrance).
+        -- Weaker far out, so a safe spot still beats a closer risky one.
+        if ap then
             local cx, cz = rx + ox, rz + oz
             local dxa, dza = cx - ap.x, cz - ap.z
             local dd = sqrt(dxa * dxa + dza * dza)
-            -- Out of the band round the target costs; inside it, moving across
-            -- the line to the target is preferred to moving along it.
             local band = ap.standoff
             local outBy = max(dd - (band + 3), (band - 3) - dd, 0)
-            cost = cost + CFG.dodgeApproachWeight * outBy
-            if CFG.strafe and adist > 1 then
+            local near = adist < band + 30
+            cost = cost + CFG.dodgeApproachWeight * (near and 1 or 0.6) * outBy
+            -- Inside the last stretch, moving across the line to the target is
+            -- preferred to moving along it.
+            if near and CFG.strafe and adist > 1 then
                 local radial = abs((ox * ax + oz * az) / dist)
                 cost = cost + CFG.dodgeStrafeWeight * radial
             end
