@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.59"
+local SCRIPT_VERSION = "5.1.60"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.60", date = "2026-09-03", notes = "Ability range: measured against where the character and target stood at the cast, not half a second later when the geyser appears; the first reading was a 30-stud cap beside a 56-stud reach. A reach beyond a supposed cap discards the cap. Auto standoff only ever moves the bot further out than the slider, never closer, and never past 45. Beam padding and margins back to the 5.1.51 values: the slim passive beam and the 4-stud shoulder came in together and the Champion deaths went up. The take-off ring is not an attack (Chris): the zone placed at Jump Up is gone; only the landing ring at Jump Down is fled." },
     { version = "5.1.59", date = "2026-09-03", notes = "After the last boss the game asks whether to stay for the bonus boss; run 29 sat on that vote with the timer frozen for ten minutes. The vote is now answered two seconds in, no by default (its arena is not mapped), yes with the new Queue toggle. Once a run is complete the bot stands still instead of walking the rooms again." },
     { version = "5.1.58", date = "2026-09-03", notes = "The ability's range is measured from where its geyser lands when the target is further away (the client script carries no range; the server caps the placement), and the boss is fought from two studs inside it (Chris). Shown in the Standing section. The blink is limited to the Champion, Bob and mob fights until the third boss is mapped: it teleported all over that arena. Margins: 2.5 studs of reach and a 4-stud shoulder, so spots on a box's edge cost and the bot stops further out (it was grazed on an edge). Every drawn hitbox now carries a faint second outline at the size the bot treats as unsafe." },
     { version = "5.1.57", date = "2026-09-03", notes = "Champion (Chris): boss-fight spots are pulled back inside the arena - beyond the standoff band plus twenty studs costs, past forty-five it is out of the question - because the aimed attacks spawn on you at the mouth with nowhere to step. The blink now fires for a box that will cover you within 0.6 s, moving bodies included (the criss cross gave no warning before), 5 s apart, four a minute, up to 8 studs. Slam counts as live from 1.5 s and five studs wider (a death landed 3.3 studs outside it). Passive beams hold 2.6 s with slim padding so the fan has gaps past 80 studs. A respawn outside the leash is pulled back in by a gradient instead of wandering out (run 28)." },
@@ -107,6 +108,7 @@ local CFG = {
     bonusVoteDelay = 2.0,         -- seconds after the vote appears before answering
     autoStandoff = true,          -- boss standoff from the measured ability range (Chris); the slider is the fallback until a cast has measured it
     autoStandoffOffset = 2,       -- studs inside the measured range
+    autoStandoffMax = 45,         -- never further than this: the geyser's damage fell to nothing past 45 in the runs measured
     bossStandoff = 38,            -- ability damage 11-15%/s at 30-40 studs, ~0 past 45 (48 measured 0.35%/s)
     meleeMobMaxReach = 16,        -- a mob whose meleeDistance is at most this is melee (warriors sit above 8)
     strafe = true,                -- circle the target at standoff instead of standing
@@ -126,8 +128,8 @@ local CFG = {
     dodgeReach = 30,              -- rings at 10/20/30: a 40-wide body needs 23 studs of sidestep
     dodgeRings = 3,
     dodgeRays = 16,
-    dodgeMargin = 2.5,            -- studs of clearance round the character; hits landed 1.5-3.3 studs outside their boxes            -- studs of clearance round the character
-    dodgeShoulder = 4.0,          -- spots within this of a box edge cost: the bot stopped on the edge and was grazed (Chris)
+    dodgeMargin = 2.0,            -- studs of clearance round the character; hits landed 1.5-3.3 studs outside their boxes            -- studs of clearance round the character
+    dodgeShoulder = 2.5,          -- spots within this of a box edge cost a little: the bot stopped on an edge and was grazed (5.1.51 had 1.5; 4.0 kept it in dodge mode near everything)
     slimShoulder = 0.3,           -- shoulder for `slim` hazards (a seed's slim value is their reach): the beam fans need their gaps            -- studs of warm edge outside a hazard
     dodgeLead = 1.2,              -- a standing telegraph counts as live this long before it fires
     dodgePathLead = 0.4,          -- a moving projectile's line: the time to sidestep
@@ -199,7 +201,7 @@ local TIMING = {
     spearmanstrikehitbox        = { first = 0.6, last = 1.5, holdFull = true },
     northernwarriorlinestrike   = { first = 0.6, last = 1.5, holdFull = true },
     northernwarriorcirclestrike = { first = 0.6, last = 1.5, holdFull = true },
-    firstbosspassivebeam        = { first = 0.3, last = 2.6, holdFull = true, slim = 1.5 },   -- lethal 0.3-2.1 s after appearing (run 29: killers had fired 0-1.8 s before); slim so the fan's gaps exist past 80 studs   -- hurts 0.3-2.2 s after appearing, and in the burst its lane re-fires every 1.1 s: a lane never expires while the burst lasts
+    firstbosspassivebeam        = { first = 0.3, last = 3.5, holdFull = true },   -- lethal 0.3-2.1 s after appearing, held longer because a lane re-fires in the burst; the 5.1.51 window that killed the Champion in two minutes   -- hurts 0.3-2.2 s after appearing, and in the burst its lane re-fires every 1.1 s: a lane never expires while the burst lasts
     firstbossjumpslam           = { first = 1.5, last = 5.0, pad = 5 },   -- the Model appears at landing; deaths inside from ~1.8 s and 3.3 studs outside the 67-wide box
     secondbosscriclehitbox      = { first = 0.6, last = 1.6, pad = 3 },   -- precast-only cylinder (22/28/34 wide, growing with distance); hits 0.7-1.0 s after it appears, a body wider than the cylinder
     secondbosshorizontalbeam    = { first = 1.1, last = 5.0, slim = 0.8 },   -- 10x64x400 beams 23.5 studs apart marching across the arena
