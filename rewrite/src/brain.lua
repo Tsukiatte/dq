@@ -1,0 +1,254 @@
+-- brain.lua - What to do this frame: dodge, fight, or travel.
+-- Module contract: receives the shared table S; imports from core, reader,
+-- field and mover.
+--
+-- Priority is fixed: the field's spot outranks everything; then fight the
+-- target from its standoff, strafing round it; then travel to the next room.
+return function(S)
+local CFG = S.CFG
+local RT = S.RT
+local RD = S.RD
+local DG = S.DG
+local decide = S.decide
+local dangerAt = S.dangerAt
+local driveTo = S.driveTo
+local faceToward = S.faceToward
+local releaseMover = S.releaseMover
+local Workspace = S.Workspace
+local LocalPlayer = S.LocalPlayer
+local PathfindingService = S.PathfindingService
+local VirtualInputManager = S.VirtualInputManager
+local raycastParams = S.raycastParams
+local floorY = S.floorY
+local setMovementState = S.setMovementState
+local heavyDebug = S.heavyDebug
+local heavyDebugThrottled = S.heavyDebugThrottled
+
+local BR = {
+    target = nil,
+    waypoints = nil, index = 1, pathAt = -math.huge, pathTo = nil,
+    strafeDir = 1, strafeFlipAt = -math.huge,
+    visitedRooms = {},
+    lastDecision = -math.huge,
+}
+
+local sqrt, abs, max, min = math.sqrt, math.abs, math.max, math.min
+
+local function flat(a, b) local dx, dz = a.X - b.X, a.Z - b.Z return sqrt(dx * dx + dz * dz) end
+
+local function standoffFor(e)
+    if e.isBoss then return CFG.bossStandoff end
+    if e.melee then return e.extent + CFG.meleeStandoff end
+    return e.extent + CFG.rangedStandoff
+end
+
+local function pickTarget(rp)
+    local best, bestScore = nil, math.huge
+    for _, e in ipairs(RD.enemies) do
+        if e.humanoid.Health > 0 and e.model.Parent then
+            local d = flat(rp, e.root.Position)
+            if d < 400 then
+                local score = e.isBoss and d * 0.5 or d
+                if score < bestScore then best, bestScore = e, score end
+            end
+        end
+    end
+    return best
+end
+
+-- ------------------------------------------------------------ travel
+local function roomTargets()
+    local out = {}
+    local dungeon = Workspace:FindFirstChild("dungeon")
+    if not dungeon then return out end
+    for _, room in ipairs(dungeon:GetChildren()) do
+        local order = room:FindFirstChild("order")
+        local ord = order and type(order.Value) == "number" and order.Value or (room.Name == "bossRoom" and 99 or nil)
+        if ord then
+            local anchor
+            local ef = room:FindFirstChild("enemyFolder")
+            if ef then
+                for _, s in ipairs(ef:GetChildren()) do
+                    if s:IsA("BasePart") then anchor = s.Position break end
+                    if s:IsA("Model") and s.PrimaryPart then anchor = s.PrimaryPart.Position break end
+                end
+            end
+            if not anchor then
+                local p = room:FindFirstChildWhichIsA("BasePart", true)
+                anchor = p and p.Position
+            end
+            if anchor then out[#out + 1] = { order = ord, position = anchor, name = room.Name } end
+        end
+    end
+    table.sort(out, function(a, b) return a.order < b.order end)
+    return out
+end
+
+local function nextRoom(rp)
+    for _, r in ipairs(roomTargets()) do
+        if not BR.visitedRooms[r.name] then
+            if flat(rp, r.position) < 25 then
+                BR.visitedRooms[r.name] = true
+            else
+                return r
+            end
+        end
+    end
+    return nil
+end
+
+local function computePath(from, to)
+    local path = PathfindingService:CreatePath({ AgentRadius = 2.5, AgentHeight = 5, AgentCanJump = true, WaypointSpacing = 4 })
+    local ok = pcall(function() path:ComputeAsync(from, to) end)
+    if ok and path.Status == Enum.PathStatus.Success then
+        local wps = {}
+        for _, w in ipairs(path:GetWaypoints()) do wps[#wps + 1] = w.Position end
+        if #wps >= 2 then return wps end
+    end
+    -- Straight line, in steps, when the navmesh has no answer.
+    local wps = {}
+    local d = flat(from, to)
+    local n = max(1, min(24, math.floor(d / 8)))
+    for i = 1, n do wps[#wps + 1] = from:Lerp(to, i / n) end
+    return wps
+end
+
+-- Walk toward `to`, replanning when it moves or the plan goes stale.
+local function travel(hum, root, to, speed, label)
+    local rp = root.Position
+    local now = os.clock()
+    if not BR.waypoints or not BR.pathTo or flat(BR.pathTo, to) > 8 or now - BR.pathAt > 3 or BR.index > #BR.waypoints then
+        BR.waypoints = computePath(rp, to)
+        BR.index = 1
+        BR.pathAt = now
+        BR.pathTo = to
+    end
+    local wp = BR.waypoints[BR.index]
+    while wp and flat(rp, wp) < 3 and BR.index < #BR.waypoints do
+        BR.index = BR.index + 1
+        wp = BR.waypoints[BR.index]
+    end
+    if not wp then return end
+    driveTo(hum, root, wp, speed, 1.5)
+    setMovementState(string.format("%s %d/%d", label, BR.index, #BR.waypoints))
+end
+
+-- ------------------------------------------------------------ fighting
+local function pressKey(key)
+    pcall(function() VirtualInputManager:SendKeyEvent(true, key, false, game) end)
+    task.delay(0.05, function() pcall(function() VirtualInputManager:SendKeyEvent(false, key, false, game) end) end)
+end
+
+local function fight(hum, root, e, now)
+    local ep = e.root.Position
+    local d = flat(root.Position, ep)
+    faceToward(root, hum, ep)
+    if d <= CFG.abilityRadius then
+        if CFG.autoQ and now - RT.lastQ >= CFG.abilityInterval then RT.lastQ = now pressKey(Enum.KeyCode.Q) end
+        if CFG.autoE and now - RT.lastE >= CFG.abilityInterval then RT.lastE = now pressKey(Enum.KeyCode.E) end
+    end
+    if CFG.autoAttack and d <= CFG.attackRange + e.extent and now - RT.lastClick >= CFG.clickInterval then
+        RT.lastClick = now
+        local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+        if tool then pcall(function() tool:Activate() end) end
+    end
+end
+
+-- A point a few studs along the tangent round the target, flipped when the
+-- way ahead is dangerous or blocked or every few seconds for variety.
+local function strafePoint(root, e, standoff, now)
+    local rp = root.Position
+    local ep = e.root.Position
+    local rx, rz = rp.X - ep.X, rp.Z - ep.Z
+    local d = sqrt(rx * rx + rz * rz)
+    if d < 0.5 then return nil end
+    local ux, uz = rx / d, rz / d
+    local tx, tz = -uz * BR.strafeDir, ux * BR.strafeDir
+    local stepLen = 6
+    -- Pull toward the band as we go round.
+    local radial = standoff - d
+    local px, pz = rp.X + tx * stepLen + ux * max(min(radial, 4), -4), rp.Z + tz * stepLen + uz * max(min(radial, 4), -4)
+    local params = raycastParams(e.model)
+    local y = floorY(px, rp.Y, pz, params)
+    local blocked = (not y) or abs(y - rp.Y) > CFG.maxStepHeight + 3 or dangerAt(px, rp.Y, pz, stepLen / CFG.tweenWalk) >= CFG.dodgeMoveAt
+    if blocked or now - BR.strafeFlipAt > 4 then
+        BR.strafeDir = -BR.strafeDir
+        BR.strafeFlipAt = now
+        if blocked then return nil end
+    end
+    return Vector3.new(px, y or rp.Y, pz)
+end
+
+-- ------------------------------------------------------------ tick
+local function brainTick(now)
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not hum or not root or hum.Health <= 0 then
+        setMovementState("no character")
+        BR.waypoints = nil
+        return
+    end
+
+    local target = pickTarget(root.Position)
+    BR.target = target
+    if target then
+        DG.approach = { x = target.root.Position.X, z = target.root.Position.Z, standoff = standoffFor(target) }
+    else
+        DG.approach = nil
+    end
+
+    if now - DG.lastDecision >= CFG.dodgeInterval then
+        DG.lastDecision = now
+        local ok, err = pcall(decide, root, hum)
+        if not ok then heavyDebugThrottled("decide_err", 2, "Field", tostring(err)) end
+    end
+
+    -- 1. The field's spot outranks everything.
+    if DG.target then
+        local speed = RT.moveBoost and CFG.tweenEscape or CFG.tweenWalk
+        driveTo(hum, root, DG.target, speed, 1.2)
+        setMovementState("dodge " .. DG.reason)
+        if target then fight(hum, root, target, now) end
+        return
+    end
+
+    -- 2. A target: close to standoff, then fight and strafe.
+    if target then
+        local standoff = standoffFor(target)
+        local d = flat(root.Position, target.root.Position)
+        if d > standoff + 3 then
+            local speed = target.isBoss and d > 45 and CFG.tweenEscape or CFG.tweenWalk
+            travel(hum, root, target.root.Position, speed, "approach")
+            if d <= CFG.abilityRadius then fight(hum, root, target, now) end
+            return
+        end
+        BR.waypoints = nil
+        fight(hum, root, target, now)
+        if CFG.strafe then
+            local p = strafePoint(root, target, standoff, now)
+            if p then
+                driveTo(hum, root, p, CFG.tweenWalk * CFG.strafeSpeedFraction, 1.0)
+                setMovementState("strafe")
+                return
+            end
+        end
+        releaseMover(hum, root)
+        setMovementState("in range")
+        return
+    end
+
+    -- 3. Nothing to fight: on to the next room.
+    local room = nextRoom(root.Position)
+    if room then
+        travel(hum, root, room.position, CFG.tweenWalk, "to " .. room.name)
+        return
+    end
+    releaseMover(hum, root)
+    setMovementState("idle")
+end
+
+S.BR = BR
+S.brainTick = brainTick
+S.standoffFor = standoffFor
+end
