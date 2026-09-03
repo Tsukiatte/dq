@@ -113,6 +113,8 @@ local function buildUI()
     combat.setOpen(true)
 
     local standing = K.section(body, "Standing", next(), "How far from each kind of enemy to fight.")
+    track(K.toggle(standing.content, "Standoff from ability range", function() return CFG.autoStandoff end, function(v) CFG.autoStandoff = v end, 0, "Measure how far your ability reaches from where it lands, and fight bosses from just inside that. The slider below is used until it has been measured, or when this is off."))
+    local rangeCaption = K.caption(standing.content, "Ability range: not measured yet", 0)
     track(K.slider(standing.content, "Boss standoff", "studs", 10, 60, false, function() return CFG.bossStandoff end, function(v) CFG.bossStandoff = v end, 1, "Inside ability range, outside its melee."))
     track(K.slider(standing.content, "Mob standoff", "studs", 15, 50, false, function() return CFG.mobStandoff end, function(v) CFG.mobStandoff = v end, 2, "From any mob, past its body. Abilities reach about 40; at high level one swing or shot kills, so never inside weapon reach."))
     track(K.toggle(standing.content, "Strafe at standoff", function() return CFG.strafe end, function(v) CFG.strafe = v end, 4, "Circle the target instead of standing still."))
@@ -339,6 +341,11 @@ local function buildUI()
         local seconds = os.clock() - playStart
         playtimeValue.Text = string.format("%02d:%02d", math.floor(seconds / 60), math.floor(seconds % 60))
         statusValue.Text = tostring(RT.movementState or "idle")
+        if rangeCaption and rangeCaption.Parent then
+            local r = RD.abilityRange
+            rangeCaption.Text = r and string.format("Ability range measured: %d studs (fighting bosses from %d)", r, r + CFG.autoStandoffOffset)
+                or (RD.abilityReach and string.format("Ability reached a target from %d studs; cap not seen yet", RD.abilityReach) or "Ability range: not measured yet (cast at a far target)")
+        end
         local ping = 0
         pcall(function() ping = Stats.Network.ServerStatsItem["Data Ping"]:GetValue() end)
         pingValue.Text = string.format("%d", math.floor(ping + 0.5))

@@ -1,5 +1,11 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.58 - 2026-09-03 - "Range, measured"
+
+- Reader: `noteGeyser` sets `RD.abilityRange` (cap) / `RD.abilityReach`. Brain: `RT.lastCastAt` / `RT.lastCastTargetDist`; `S.abilityReach()`; `standoffFor` uses `abilityRange + autoStandoffOffset` when `autoStandoff`.
+- Field: `BLINK_BOSSES` whitelist (Champion, Bob) plus mob fights.
+- Core: `autoStandoff` true, `autoStandoffOffset` 2. Config persists `autoStandoff`. UI: toggle and a live caption in Standing.
+
 ## 5.1.57 - 2026-09-03 - "Inside the arena, hop sooner"
 
 - Field: `graceHere` includes moving bodies; grace computed every tick; blink gate is `grace <= blinkWindow`; walk margin 0.35; destination clear for 1.0 s; `dodgeArenaWeight` 0.04 (+2 past band+45) for boss targets.
