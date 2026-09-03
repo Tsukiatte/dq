@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.12"
+local SCRIPT_VERSION = "5.1.13"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.13", date = "2026-09-03", notes = "Body margin 2.0: a mage shot killed 3.3 studs outside its box and a circle 1.5 outside; the game reaches past the visible hitBox." },
     { version = "5.1.12", date = "2026-09-03", notes = "The config file keeps only the settings the UI exposes. It used to snapshot every tuning constant, so each new default (margin, melee buffer, walk speed) was overridden by the old saved value on load." },
     { version = "5.1.11", date = "2026-09-03", notes = "Melee mobs are a soft zone (danger at most 0.5, buffer 4) instead of a lethal 19-stud circle; their strikes are tracked as boxes anyway, and the hard circle left the field with no spot in room 1 while mage shots landed. The body margin is 1.5 studs: a beam killed at 1.5 studs outside its box." },
     { version = "5.1.10", date = "2026-09-03", notes = "The next room is the first past the furthest room stood in; rooms passed at range no longer pull the character back (it walked toward room 2 after the Champion died)." },
@@ -73,7 +74,7 @@ local CFG = {
     dodgeReach = 18,
     dodgeRings = 3,
     dodgeRays = 16,
-    dodgeMargin = 1.5,            -- studs of clearance round the character
+    dodgeMargin = 2.0,            -- studs of clearance round the character; hits landed 1.5-3.3 studs outside their boxes            -- studs of clearance round the character
     dodgeShoulder = 3,            -- studs of warm edge outside a hazard
     dodgeLead = 1.2,              -- a standing telegraph counts as live this long before it fires
     dodgePathLead = 0.4,          -- a moving projectile's line: the time to sidestep
