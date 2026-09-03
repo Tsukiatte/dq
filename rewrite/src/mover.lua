@@ -13,7 +13,9 @@ local LocalPlayer = S.LocalPlayer
 local raycastParams = S.raycastParams
 local heavyDebug = S.heavyDebug
 
-local MV = { driving = false, controlsOff = false, lastTarget = nil }
+local MV = { driving = false, controlsOff = false, lastTarget = nil,
+    counts = { arrive = 0, spike = 0, noUnder = 0, wallSlide = 0, noFloor = 0, jump = 0, stepped = 0 } }
+local function count(k) MV.counts[k] = MV.counts[k] + 1 end
 local PROBE_HEIGHTS = { 1.2, 2.6 }
 
 local function setControls(enabled)
@@ -38,6 +40,7 @@ local function driveTo(hum, root, target, speed, arrive)
     MV.driving = true
     MV.lastTarget = target
     if distance <= arrive then
+        count("arrive")
         root.AssemblyLinearVelocity = Vector3.new(0, root.AssemblyLinearVelocity.Y, 0)
         return true
     end
@@ -47,7 +50,7 @@ local function driveTo(hum, root, target, speed, arrive)
     -- frame allows, and a spike frame writes nothing at all. A kick followed
     -- exactly this shape once - lag, a fall through the floor, a jump.
     local dt = RT.frameDelta
-    if dt > 0.12 then return false end
+    if dt > 0.12 then count("spike") return false end
     local step = math.min(speed * math.min(dt, 1 / 30), distance)
     local params = raycastParams(nil)
 
@@ -57,6 +60,7 @@ local function driveTo(hum, root, target, speed, arrive)
     if not under then
         -- Nothing under us: falling, or the floor did not answer. Hold; never
         -- write a position while airborne.
+        count("noUnder")
         return false
     end
     above = pos.Y - under.Position.Y
@@ -72,6 +76,8 @@ local function driveTo(hum, root, target, speed, arrive)
                 local room = Vector3.new(hit.Position.X - pos.X, 0, hit.Position.Z - pos.Z).Magnitude - 0.6
                 if room <= 0.05 then
                     -- Flat against it: the Humanoid knows how to slide along a wall.
+                    count("wallSlide")
+                    MV.lastWall = hit.Instance:GetFullName()
                     hum:MoveTo(target)
                     return false
                 end
@@ -86,14 +92,17 @@ local function driveTo(hum, root, target, speed, arrive)
     if not floorHit then
         -- No floor there: hold rather than step off. The Humanoid is not asked
         -- to walk either; a ledge is a decision for the field, not the mover.
+        count("noFloor")
         return false
     end
     local rise = floorHit.Position.Y - feetY
     if rise > CFG.maxStepHeight then
+        count("jump")
         hum.Jump = true
         hum:MoveTo(target)
         return false
     end
+    count("stepped")
     root.CFrame = CFrame.new(Vector3.new(nx, floorHit.Position.Y + above, nz)) * (root.CFrame - root.CFrame.Position)
     root.AssemblyLinearVelocity = Vector3.zero
     return false
