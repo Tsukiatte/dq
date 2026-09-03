@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.32 - 2026-09-03 - "Outlines"
+
+- Draw: SelectionBox outline per hazard part, coloured by stage; `hazardTransparency` 0.6.
+
 ## 5.1.31 - 2026-09-03 - "Hold the beam, hop last"
 
 - Reader: seeds may set `holdFull`; the passive beam holds its 2.4 s window through the precast fade.
