@@ -216,8 +216,15 @@ local function blinkTarget(root, hum, rx, ry, rz)
             local x, z = rx + math.cos(a) * dist, rz + math.sin(a) * dist
             -- Outside every box now and half a second on, body radius only: the
             -- graded metric's six studs of padding rejected every spot within 8.
-            if dangerAt(x, ry, z, 0, 1.2, 0) < 0.5 and dangerAt(x, ry, z, 0.5, 1.2, 0) < 0.5 then
-                local d1 = dangerAt(x, ry, z, 0.6)
+            -- Clear of every box for the next second (body radius, no shoulder),
+            -- including where projectiles will be; a spot clear now but hit at
+            -- 0.7 s was a teleport into the attack.
+            local clear = true
+            for _, tt in ipairs({ 0, 0.25, 0.5, 0.75, 1.0 }) do
+                if dangerAt(x, ry, z, tt, 1.2, 0) >= 0.5 then clear = false break end
+            end
+            if clear then
+                local d1 = math.max(dangerAt(x, ry, z, 0.6), dangerAt(x, ry, z, 1.2))
                 do
                     local hit = Workspace:Raycast(Vector3.new(x, ry + 2, z), Vector3.new(0, -(above + 6), 0), params)
                     if hit and hit.Normal.Y > 0.7 and abs(hit.Position.Y - feetY) <= 1.5 then

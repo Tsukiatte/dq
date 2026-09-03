@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.29"
+local SCRIPT_VERSION = "5.1.30"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.30", date = "2026-09-03", notes = "A blink destination must stay clear of every box for a full second (five samples), moving bodies included; it was checked only now and at 0.5 s, and Chris watched the character land where the next shot arrived." },
     { version = "5.1.29", date = "2026-09-03", notes = "Blink destinations only have to be outside the boxes themselves (body radius, no shoulder): with the field's padded metric a spot 8 studs beside a 7-wide mage shot still read as danger and the reflex never found anywhere to go. Three room-1 deaths inside live shots with no blink." },
     { version = "5.1.28", date = "2026-09-03", notes = "Blink reflex, asked for by Chris after the second script's video: when a lethal box covers the character and fires within 0.45 s, hop at most 8 studs to the nearest clear floor. Runs every frame outside the movement logic. The destination's floor is raycast and must match the current feet within 1.5 studs; the sweep there must be clear and there must be headroom; never while airborne; rotation, velocity and WalkSpeed untouched; 1.2 s between hops. Off switch and size in the Dodge window." },
     { version = "5.1.27", date = "2026-09-03", notes = "Ability radius 42: with the 34-stud mob standoff a 30-stud cast radius would never fire at a mob." },
