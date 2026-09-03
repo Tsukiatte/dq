@@ -20,7 +20,7 @@ if R then
         for j = 1, math.min(4, #h.near) do local n = h.near[j]; near[j] = string.format("%s d%.1f f%.1f%s", n.name, n.dist, n.firesIn or 0, n.live and " live" or "") end
         local cands = {}
         if h.cands then for j, cd in ipairs(h.cands) do cands[j] = string.format("%.0fst dg%.1f c%.2f %s", cd.dist, cd.danger, cd.cost, cd.valid and "ok" or "x") end end
-        out.hits[#out.hits + 1] = { t = h.t, fatal = h.fatal, bossDist = h.bossDist, state = h.state, here = h.dangerHere, grace = h.grace, near = near, cands = cands }
+        out.hits[#out.hits + 1] = { t = h.t, fatal = h.fatal, bossDist = h.bossDist, state = h.state, here = h.dangerHere, grace = h.grace, near = near, cands = cands, spawns = h.spawns }
     end
     out.totalHits = #R.hits
     local first = R.samples[1]
