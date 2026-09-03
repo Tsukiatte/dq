@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.12 - 2026-09-03 - "Settings, not constants"
+
+- `config.lua` persists a whitelist of UI-exposed keys; tuning constants follow the code defaults.
+
 ## 5.1.11 - 2026-09-03 - "Soft zone"
 
 - Melee-mob proximity is a soft preference (max 0.5), `meleeBuffer` 4; attack boxes decide.
