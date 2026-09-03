@@ -110,7 +110,7 @@ local function trackModel(model)
     RD.models[model] = {
         model = model, hb = hb, pc = pc, name = name, spawn = now,
         from = now + first, untilAt = now + last, long = seed ~= nil and seed.long == true, holdFull = seed ~= nil and seed.holdFull == true,
-        minT = pc and pc.Transparency or 1, fired = false, pad = seed and seed.pad or 0, slim = seed ~= nil and seed.slim == true,
+        minT = pc and pc.Transparency or 1, fired = false, pad = seed and seed.pad or 0, slim = seed and seed.slim or nil,
     }
     RD.count = RD.count + 1
     if hb and name:find("passivebeam", 1, true) then noteBeam(hb, now) end
@@ -301,7 +301,7 @@ local HANDLERS = {
     ["First Boss Jump Down"] = function(a) if typeof(a) == "Vector3" then circleZone("slam soon", a, 33.5, gameClock() + 2.5, 1.5) end end,
     ["First Boss Criss Cross Projectile"] = function(a) if args(a, 5) then addPath("criss cross", a[5], a[1], a[2], a[3], a[4], 7.5, 7.5, 8) end end,
     ["First Boss Seeking Spike"] = function(a) if args(a, 5) then addPath("seeking spike", a[5], a[1], a[2], a[3], a[4], 10, 10, 4) end end,
-    ["First Boss Big Spike"] = function(a) if args(a, 5) then addPath("big spike", a[5], a[1], a[2], a[3], a[4], 20, 20, 6) end end,
+    ["First Boss Big Spike"] = function(a) if args(a, 5) then addPath("big spike", a[5], a[1], a[2], a[3], a[4], 28, 28, 6) end end,
     ["Second Boss Big Hitting Ground Spikes"] = function(a)
         if args(a, 3) and typeof(a[2]) == "CFrame" then circleZone("ground spikes", a[2].Position, SPIKE_RADIUS[a[1]] or 25, a[3], 0.7) end
     end,
@@ -518,12 +518,19 @@ local function hazards(now)
         local speed = math.sqrt(r.vx * r.vx + r.vz * r.vz)
         local size = part.Size
         local half = math.max(size.X, size.Z) * 0.5
+        if lower(part.Name):find("bigspike", 1, true) then half = half + 8 end   -- kills 4-7 studs outside its mesh
         if speed > 2 then
+            r.stillSince = nil
             out[#out + 1] = { moving = true, ox = part.Position.X, oy = part.Position.Y, oz = part.Position.Z,
                 dx = r.vx / speed, dz = r.vz / speed, speed = speed, offset = 0, halfW = half, halfL = half, halfH = math.max(size.Y * 0.5, 6),
                 from = now, untilAt = now + CFG.projectileLookahead, pathStart = now, name = part.Name, kind = "part" }
         else
-            out[#out + 1] = { cframe = part.CFrame, size = Vector3.new(size.X, math.max(size.Y, 8), size.Z), from = now, untilAt = huge, name = part.Name, kind = "part" }
+            -- A projectile that has stopped is a hazard for one more second, not
+            -- for as long as it lies in the ground (a spear blocked a lane for 5 s).
+            r.stillSince = r.stillSince or now
+            if now - r.stillSince < 1.0 then
+                out[#out + 1] = { cframe = part.CFrame, size = Vector3.new(size.X, math.max(size.Y, 8), size.Z), from = now, untilAt = now + 1.0, name = part.Name, kind = "part" }
+            end
         end
     end
     for _, w in pairs(RD.walls) do

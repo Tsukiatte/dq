@@ -37,7 +37,6 @@ end
 
 local function stageColor(b, now)
     if now >= b.from then return CFG.colorLive end
-    if b.moving then return CFG.colorSoon end
     if b.from - now <= CFG.dodgeLead then return CFG.colorSoon end
     return CFG.colorFloor
 end
@@ -84,6 +83,11 @@ local function drawTick(now)
                 p.CFrame = CFrame.lookAt(Vector3.new(cx, y, cz), Vector3.new(cx + b.dx, y, cz + b.dz))
                 p.Shape = Enum.PartType.Block
                 local sweep = p:FindFirstChild("sweep")
+                -- Only announced paths show where they are going; a bare
+                -- projectile's strip was the yellow that stayed on the floor.
+                if b.kind == "part" then
+                    if sweep then sweep:Destroy() end
+                else
                 if not sweep then
                     sweep = Instance.new("Part")
                     sweep.Name = "sweep"
@@ -97,6 +101,7 @@ local function drawTick(now)
                 sweep.CFrame = CFrame.lookAt(Vector3.new(cx + b.dx * (b.halfL + len * 0.5), y, cz + b.dz * (b.halfL + len * 0.5)), Vector3.new(cx + b.dx * (b.halfL + len), y, cz + b.dz * (b.halfL + len)))
                 sweep.Transparency = 0.88
                 sweep.Color = CFG.colorSoon
+                end
             elseif b.round then
                 local sw = p:FindFirstChild("sweep") if sw then sw:Destroy() end
                 p.Shape = Enum.PartType.Cylinder

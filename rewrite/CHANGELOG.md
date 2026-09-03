@@ -1,5 +1,12 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.53 - 2026-09-03 - "A quarter second"
+
+- Mob seeds: `last` 1.5 with `holdFull`; `fadeLinger` 0.55.
+- `firstbosspassivebeam` last 2.0, `slim` 1.5; `slim` is now the reach in studs (0.8 for Bob's beams). `secondbossspreadbeam` 0.9-2.5. Fan standoff 95 (the standoff override had been lost in 5.1.26).
+- Big spike path and mesh half sizes +8. Stopped bare projectiles are hazards for 1 s (`stillSince`).
+- Draw: moving bodies coloured by stage; sweep strips only for non-`part` kinds.
+
 ## 5.1.52 - 2026-09-03 - "Sideways"
 
 - Seeds may set `slim`; `slimReach` 0.8 / `slimShoulder` 0.3 replace the 3 + 1.5 padding for `secondbosshorizontalbeam` and `secondbossspreadbeam`.
