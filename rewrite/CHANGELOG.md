@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.48 - 2026-09-03 - "Bob's circles"
+
+- `secondbosscriclehitbox` seed first 0.6, last 1.6, pad 3; reader applies seed pads to box sizes.
+
 ## 5.1.47 - 2026-09-03 - "The whole lane"
 
 - Field: `pathLaneDanger` (0.5) along the remaining path ahead of a moving body.

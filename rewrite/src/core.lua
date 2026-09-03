@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.47"
+local SCRIPT_VERSION = "5.1.48"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.48", date = "2026-09-03", notes = "Bob's circles: seeded to fire 0.6 s after the Model appears (deaths came 0.2-0.5 s before the old 1.2) and padded 3 studs wider than their precast cylinder (deaths at 1.5 studs outside it). Seeds may carry a pad the reader applies to the box." },
     { version = "5.1.47", date = "2026-09-03", notes = "A moving projectile's whole remaining lane (spirals, saw discs, the big spike) is soft danger ahead of the body, so the bot never sits where one is going to pass, and the lane is drawn to its end." },
     { version = "5.1.46", date = "2026-09-03", notes = "The armed leash survives a reload of the script (mirrored in _G per boss); a reload at the respawn point left the character standing outside the arena and dead." },
     { version = "5.1.45", date = "2026-09-03", notes = "Leftover drawings from the older build that the autoexec loads first (its PrecastZones and Dodge folders) froze in place as yellow slabs; the draw module now removes anything under the visuals root that is not its own, every three seconds." },
@@ -180,7 +181,7 @@ local TIMING = {
     northernwarriorcirclestrike = { first = 0.6, last = 1.2 },
     firstbosspassivebeam        = { first = 0.3, last = 3.5, holdFull = true },   -- hurts 0.3-2.2 s after appearing, and in the burst its lane re-fires every 1.1 s: a lane never expires while the burst lasts
     firstbossjumpslam           = { first = 1.8, last = 5.0 },
-    secondbosscriclehitbox      = { first = 1.2, last = 2.5 },
+    secondbosscriclehitbox      = { first = 0.6, last = 1.6, pad = 3 },   -- precast-only cylinder (22/28/34 wide, growing with distance); hits 0.7-1.0 s after it appears, a body wider than the cylinder
     secondbosshorizontalbeam    = { first = 1.1, last = 5.0 },
     cubepylonshot               = { first = 0.8, last = 1.1 },
 }
