@@ -110,7 +110,7 @@ local function trackModel(model)
     RD.models[model] = {
         model = model, hb = hb, pc = pc, name = name, spawn = now,
         from = now + first, untilAt = now + last, long = seed ~= nil and seed.long == true, holdFull = seed ~= nil and seed.holdFull == true,
-        minT = pc and pc.Transparency or 1, fired = false, pad = seed and seed.pad or 0,
+        minT = pc and pc.Transparency or 1, fired = false, pad = seed and seed.pad or 0, slim = seed ~= nil and seed.slim == true,
     }
     RD.count = RD.count + 1
     if hb and name:find("passivebeam", 1, true) then noteBeam(hb, now) end
@@ -175,27 +175,38 @@ noteCircle = function(pc, now)
     RD.lastCircle = { t = now, pos = pos, size = size }
     local bob = nil
     for _, e in ipairs(RD.enemies) do if e.isBoss then bob = e break end end
-    local dir, spacing, growth, dt
+    local dir, spacing, growth, dt, measured
     if prev and now - prev.t < 0.6 then
         local step = Vector3.new(pos.X - prev.pos.X, 0, pos.Z - prev.pos.Z)
-        if step.Magnitude < 8 or step.Magnitude > 45 then return end
-        dir, spacing, growth, dt = step.Unit, step.Magnitude, size - prev.size, math.max(now - prev.t, 0.15)
-    elseif bob then
-        local out = Vector3.new(pos.X - bob.x, 0, pos.Z - bob.z)
-        if out.Magnitude < 5 then return end
-        dir, spacing, growth, dt = out.Unit, 22, 6, 0.27
-    else
-        return
+        if step.Magnitude >= 8 and step.Magnitude <= 45 then
+            dir, spacing, growth, dt, measured = step.Unit, step.Magnitude, size - prev.size, math.max(now - prev.t, 0.15), true
+        end
     end
+    if not dir and bob then
+        -- First circle: the chain runs along the line through Bob, inward or
+        -- outward; the line itself is the zone until the second circle says which.
+        local out = Vector3.new(pos.X - bob.x, 0, pos.Z - bob.z)
+        if out.Magnitude >= 5 then dir = out.Unit end
+    end
+    if not dir then return end
     for i = #RD.zones, 1, -1 do
         local z = RD.zones[i]
-        if z.name == "circle next" and z.madeAt < now - 0.2 then table.remove(RD.zones, i) end
+        if (z.name == "circle next" or z.name == "circle line") and z.madeAt < now - 0.2 then table.remove(RD.zones, i) end
     end
-    for k = 1, 9 do
-        local c = pos + dir * (spacing * k)
-        local diam = size + growth * k + 6
-        local at = now + dt * k + 0.6
-        addZone({ name = "circle next", cframe = CFrame.new(c.X, pos.Y, c.Z), size = Vector3.new(diam, 12, diam), round = true, from = at, untilAt = at + 1.0, telegraphed = true, madeAt = now })
+    -- The whole line is the attack: every circle of the chain lands on it, so
+    -- the way out is sideways, never along it (Chris: left or right, not
+    -- toward the smaller circle). Width is the widest circle still to come.
+    local width = size + 6
+    if measured and growth > 0 then width = size + growth * 9 + 6 end
+    addZone({ name = "circle line", cframe = CFrame.lookAt(pos, pos + dir), size = Vector3.new(width, 12, 400), from = now, untilAt = now + 3.0, telegraphed = true, madeAt = now })
+    if measured then
+        for k = 1, 9 do
+            local c = pos + dir * (spacing * k)
+            local diam = size + growth * k + 6
+            if diam < 16 then break end
+            local at = now + dt * k + 0.6
+            addZone({ name = "circle next", cframe = CFrame.new(c.X, pos.Y, c.Z), size = Vector3.new(diam, 12, diam), round = true, from = at, untilAt = at + 1.0, telegraphed = true, madeAt = now })
+        end
     end
 end
 
@@ -500,7 +511,7 @@ local function hazards(now)
                 else size = Vector3.new(size.X + r.pad * 2, size.Y, size.Z + r.pad * 2) end
             end
             out[#out + 1] = { cframe = anchor.CFrame, size = size, round = isCyl and anchor.Size.Y == anchor.Size.Z, cyl = isCyl,
-                from = r.from, untilAt = r.long and huge or r.untilAt, name = r.name, kind = "model" }
+                from = r.from, untilAt = r.long and huge or r.untilAt, name = r.name, kind = "model", slim = r.slim }
         end
     end
     for part, r in pairs(RD.parts) do

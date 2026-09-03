@@ -144,7 +144,11 @@ local function dangerAt(px, py, pz, t, reachO, shoulderO)
             else
                 depth = boxDepth(b.cframe, b.size, px, py, pz, halfHeight)
             end
-            local d = dangerFromDepth(depth, reach, shoulder)
+            -- Slim boxes (Bob's beam fans) get the body radius and little else:
+            -- padded to 21 studs wide, the nine spokes left no gap to stand in.
+            local d
+            if b.slim then d = dangerFromDepth(depth, math.min(reach, CFG.slimReach), math.min(shoulder, CFG.slimShoulder))
+            else d = dangerFromDepth(depth, reach, shoulder) end
             if d > worst then worst = d if worst >= 1 then return 1 end end
         end
     end
