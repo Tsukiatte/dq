@@ -145,9 +145,15 @@ local function dangerAt(px, py, pz, t)
         if e.melee and not e.isBoss then
             local tt = min(t, 0.6)
             local dx, dz = px - (e.x + e.vx * tt), pz - (e.z + e.vz * tt)
-            local d = sqrt(dx * dx + dz * dz) - (e.extent + e.meleeDistance + CFG.meleeBuffer)
-            local v = dangerFromDepth(-d, reach, shoulder * 2) * 0.5
-            if v > worst then worst = v end
+            local d = sqrt(dx * dx + dz * dz)
+            local swing = e.extent + (e.meleeDistance or 8) + 2
+            local v
+            if d <= swing + reach then
+                v = 1   -- inside the swing: the one hit
+            else
+                v = dangerFromDepth(-(d - swing - CFG.meleeBuffer), reach, shoulder * 2) * 0.5
+            end
+            if v > worst then worst = v if worst >= 1 then return 1 end end
         end
     end
     return worst

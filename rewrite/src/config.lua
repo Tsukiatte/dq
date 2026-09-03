@@ -19,7 +19,7 @@ end
 local PERSIST = {
     "abilityRadius", "attackRange", "autoAttack", "autoE", "autoQ", "autoFarmByPlace",
     "autoQueue", "autoQueueDelay", "autoQueueDifficulty", "autoQueueHardcore", "autoQueueMap", "autoQueuePrivate", "autoQueueReplay", "autoStartDungeon",
-    "bossStandoff", "meleeStandoff", "rangedStandoff", "strafe", "strafeSpeedFraction", "tweenEscape", "tweenWalk",
+    "bossStandoff", "mobStandoff", "strafe", "strafeSpeedFraction", "tweenEscape", "tweenWalk",
     "colorFloor", "colorLive", "colorSoon", "drawHazards", "drawTarget", "hazardTransparency",
     "debugPrints",
     "menuKey",
@@ -77,7 +77,7 @@ local function loadConfig()
     local ok, data = pcall(function() return game:GetService("HttpService"):JSONDecode(readfile(FILE)) end)
     if not ok or type(data) ~= "table" then return false end
     apply(data)
-    RT.configTrace = { loadedAt = os.clock(), fileVersion = data.__version, standoff = data.bossStandoff, ranged = data.rangedStandoff, saves = 0 }
+    RT.configTrace = { loadedAt = os.clock(), fileVersion = data.__version, standoff = data.bossStandoff, mob = data.mobStandoff, saves = 0 }
     heavyDebug("Config", "loaded " .. FILE)
     return true
 end
