@@ -23,6 +23,13 @@ local function newBox()
     p.Anchored, p.CanCollide, p.CanQuery, p.CanTouch, p.CastShadow = true, false, false, false, false
     p.Material = Enum.Material.Neon
     p.Transparency = CFG.hazardTransparency
+    -- A thin outline so each hitbox reads as a shape, not a wash of colour.
+    local edge = Instance.new("SelectionBox")
+    edge.Name = "edge"
+    edge.LineThickness = 0.05
+    edge.SurfaceTransparency = 1
+    edge.Adornee = p
+    edge.Parent = p
     p.Parent = folder()
     return p
 end
@@ -78,7 +85,11 @@ local function drawTick(now)
                 p.CFrame = b.cframe - Vector3.new(0, b.size.Y * 0.5 - 0.8, 0)
             end
             local c = stageColor(b, now)
-            if p.Color ~= c then p.Color = c end
+            if p.Color ~= c then
+                p.Color = c
+                local edge = p:FindFirstChild("edge")
+                if edge then edge.Color3 = c end
+            end
             p.Transparency = CFG.hazardTransparency
             end
         end
