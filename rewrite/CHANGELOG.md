@@ -1,5 +1,10 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.8 - 2026-09-03 - "On its own legs"
+
+- Third kick, server-side, during ordinary driving. The mover writes no positions: every move is a Humanoid walk; the escape burst is a temporary WalkSpeed of `tweenEscape`, restored after. Stalls against a wall for half a second hop.
+- `tweenWalk` is now the planning speed only (default 16).
+
 ## 5.1.7 - 2026-09-03 - "Not a wall"
 
 - The target's model is excluded from the spot walkability sweep; the boss's body was blocking every far escape from the slam.

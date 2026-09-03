@@ -120,7 +120,7 @@ local function buildUI()
     track(K.slider(standing.content, "Strafe speed", "of walk", 0.2, 1.0, true, function() return CFG.strafeSpeedFraction end, function(v) CFG.strafeSpeedFraction = v end, 5, "Fraction of the walking speed used while circling."))
 
     local moving = K.section(body, "Moving", next(), "The tween along the floor.")
-    track(K.slider(moving.content, "Walk", "studs/s", 12, 30, false, function() return CFG.tweenWalk end, function(v) CFG.tweenWalk = v end, 1, "Approach and strafe speed. The game resets WalkSpeed above 45; this never touches WalkSpeed."))
+    track(K.slider(moving.content, "Walk", "studs/s", 12, 30, false, function() return CFG.tweenWalk end, function(v) CFG.tweenWalk = v end, 1, "Speed assumed when planning a walk. The character walks at its own WalkSpeed; only the escape burst changes it."))
     track(K.slider(moving.content, "Escape", "studs/s", 12, 34, false, function() return CFG.tweenEscape end, function(v) CFG.tweenEscape = v end, 2, "Speed while leaving danger."))
 
     -- ---------------------------------------------------------------- Dodge

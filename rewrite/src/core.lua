@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.7"
+local SCRIPT_VERSION = "5.1.8"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.8", date = "2026-09-03", notes = "Third anti-cheat kick, from the server, during ordinary driving. The mover no longer writes positions at all: every move is a Humanoid walk, and leaving danger raises WalkSpeed to the escape value for the burst and restores it after. Real collisions, real falls, legal speed. Half a second against a wall is a hop." },
     { version = "5.1.7", date = "2026-09-03", notes = "The target is not a wall. The swept walkability check that validates a spot treated the boss's own sixty-stud body as solid, so with the jump slam centred on the character every spot outside the ball lay behind him and failed, and the field kept a six-stud spot at danger 1.0. The target's model is excluded from that check." },
     { version = "5.1.6", date = "2026-09-03", notes = "Walk when the walk is clean. The field's spot outranked travel whenever anything was about to arrive within the dwell, which at the arena entrance is always, so the character hopped in place for a whole run. The spot now outranks travel only while the ground here is dangerous now, or while the brain's own next step would be unsafe at the moment it is crossed." },
     { version = "5.1.5", date = "2026-09-03", notes = "The spots carry the approach again. At the arena entrance something is always about to arrive, so the field always has a spot and the spot outranks travel; with the pull toward the target limited to the last thirty studs, those spots led nowhere and the character hopped at the entrance until the aimed shot came. The pull now applies at every distance, weaker far out." },
@@ -39,8 +40,8 @@ local CFG = {
     -- client's own checker resets WalkSpeed above 45 and watches Freefall, and
     -- neither is touched. 22 studs/s ran whole fights without a kick; a
     -- position hop got one in five minutes and is not offered.
-    tweenWalk = 18,               -- studs/s while approaching or strafing
-    tweenEscape = 22,             -- studs/s while leaving danger
+    tweenWalk = 16,               -- studs/s assumed for planning; the character walks at its own WalkSpeed
+    tweenEscape = 22,             -- WalkSpeed while leaving danger (a burst)
     approachWalkSpeed = 22,       -- WalkSpeed while closing on a boss from far out (0 = leave it)
     maxStepHeight = 2.4,
     maxDropHeight = 30,
