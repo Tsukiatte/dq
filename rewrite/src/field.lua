@@ -177,7 +177,7 @@ local function decide(root, hum)
     DG.here0 = here0
     DG.dangerHere = max(here0, dangerAt(rx, ry, rz, dwell * 0.5), dangerAt(rx, ry, rz, dwell))
     RT.moveBoost = here0 >= CFG.dodgeMoveAt
-    local speed = RT.moveBoost and CFG.tweenEscape or CFG.tweenWalk
+    local speed = RT.moveBoost and CFG.tweenEscape or (RT.walkSpeed or CFG.tweenWalk)
     local grace = here0 > 0 and graceHere(rx, ry, rz) or math.huge
     DG.grace = grace
     local moveAt = CFG.dodgeMoveAt

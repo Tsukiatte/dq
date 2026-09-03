@@ -1,22 +1,21 @@
--- mover.lua - The character goes where it is told: a tween along the floor.
+-- mover.lua - The character goes where it is told, on its own legs.
 -- Module contract: receives the shared table S; imports from core.
 --
--- Writes the root's CFrame each frame, never further than `speed * dt`, along
--- the floor (a raycast under the next point), stopping short of anything
--- solid at knee or chest height. The Humanoid's WalkSpeed is untouched; the
--- default control module is disabled while we drive and handed back after.
+-- Every move is a Humanoid walk (hum:Move), so the server sees a body that
+-- walks: legal speed, real collisions, real falls. The 4.12 tween and the
+-- 5.1.0 per-frame CFrame write both ended in anti-cheat kicks (an instant hop,
+-- a lag-spike jump, a ledge snapped down in one frame). Leaving danger raises
+-- WalkSpeed to CFG.tweenEscape for the burst - the client checker only resets
+-- values above 45, and 4.12.14 ran the boss approach at 22 for whole runs -
+-- and puts it back the moment the burst ends.
 return function(S)
 local CFG = S.CFG
 local RT = S.RT
-local Workspace = S.Workspace
 local LocalPlayer = S.LocalPlayer
-local raycastParams = S.raycastParams
-local heavyDebug = S.heavyDebug
 
-local MV = { driving = false, controlsOff = false, lastTarget = nil,
-    counts = { arrive = 0, spike = 0, noUnder = 0, wallSlide = 0, noFloor = 0, jump = 0, stepped = 0 } }
-local function count(k) MV.counts[k] = MV.counts[k] + 1 end
-local PROBE_HEIGHTS = { 1.2, 2.6 }
+local MV = { driving = false, controlsOff = false, lastTarget = nil, facedAt = -math.huge, stallSince = nil, lastPos = nil,
+    counts = { arrive = 0, walked = 0, jump = 0, boost = 0 } }
+local function count(k) MV.counts[k] = (MV.counts[k] or 0) + 1 end
 
 local function setControls(enabled)
     if MV.controlsOff == (not enabled) then return end
@@ -30,7 +29,23 @@ local function setControls(enabled)
     if ok then MV.controlsOff = not enabled end
 end
 
--- Step toward `target` at `speed` studs/s. Returns true when within `arrive`.
+-- The burst: WalkSpeed raised while leaving danger, restored after. The value
+-- it had is remembered once per burst, so the game's own changes survive.
+local function setBoost(hum, on)
+    if on then
+        if not RT.walkSpeedBefore then
+            RT.walkSpeedBefore = hum.WalkSpeed
+            count("boost")
+        end
+        if hum.WalkSpeed ~= CFG.tweenEscape then hum.WalkSpeed = CFG.tweenEscape end
+    elseif RT.walkSpeedBefore then
+        pcall(function() hum.WalkSpeed = RT.walkSpeedBefore end)
+        RT.walkSpeedBefore = nil
+    end
+end
+
+-- Walk toward `target`. A `speed` above the Humanoid's own WalkSpeed is a
+-- burst; one below it walks proportionally slower. Returns true within `arrive`.
 local function driveTo(hum, root, target, speed, arrive)
     if not hum or not root then return false end
     arrive = arrive or 1.0
@@ -39,72 +54,35 @@ local function driveTo(hum, root, target, speed, arrive)
     local distance = flat.Magnitude
     MV.driving = true
     MV.lastTarget = target
+    setControls(false)
+    local walk = RT.walkSpeedBefore or hum.WalkSpeed
+    if not RT.walkSpeedBefore then RT.walkSpeed = walk end
+    setBoost(hum, speed > walk + 0.5)
     if distance <= arrive then
         count("arrive")
-        root.AssemblyLinearVelocity = Vector3.new(0, root.AssemblyLinearVelocity.Y, 0)
+        hum:Move(Vector3.zero, false)
+        MV.stallSince = nil
         return true
     end
-    setControls(false)
-    local direction = flat.Unit
-    -- A lag spike must never become a jump: the step is capped at what a 30 fps
-    -- frame allows, and a spike frame writes nothing at all. A kick followed
-    -- exactly this shape once - lag, a fall through the floor, a jump.
-    local dt = RT.frameDelta
-    if dt > 0.12 then count("spike") return false end
-    local step = math.min(speed * math.min(dt, 1 / 30), distance)
-    local params = raycastParams(nil)
-
-    -- The root rides above the floor by a measured amount, not an assumed one.
-    local above = hum.HipHeight + root.Size.Y * 0.5
-    local under = Workspace:Raycast(pos, Vector3.new(0, -(above + 4), 0), params)
-    if not under then
-        -- Nothing under us: falling, or the floor did not answer. Hold; never
-        -- write a position while airborne.
-        count("noUnder")
-        return false
-    end
-    above = pos.Y - under.Position.Y
-    local feetY = pos.Y - above
-
-    -- Anything wall-like across the step, at knee and at chest.
-    for _, h in ipairs(PROBE_HEIGHTS) do
-        local hit = Workspace:Raycast(Vector3.new(pos.X, feetY + h, pos.Z), direction * (step + 0.6), params)
-        if hit then
-            local rise = hit.Position.Y - feetY
-            local wall = h > 2.0 or rise > CFG.maxStepHeight or hit.Normal.Y < 0.5
-            if wall then
-                local room = Vector3.new(hit.Position.X - pos.X, 0, hit.Position.Z - pos.Z).Magnitude - 0.6
-                if room <= 0.05 then
-                    -- Flat against it: the Humanoid knows how to slide along a wall.
-                    count("wallSlide")
-                    MV.lastWall = hit.Instance:GetFullName()
-                    hum:MoveTo(target)
-                    return false
-                end
-                step = math.min(step, room)
-            end
+    count("walked")
+    -- Face where we go unless the brain aimed us this frame.
+    local aimed = os.clock() - MV.facedAt < 0.25
+    if hum.AutoRotate == aimed then hum.AutoRotate = not aimed end
+    local scale = math.clamp(speed / math.max(hum.WalkSpeed, 1), 0.15, 1)
+    hum:Move(flat.Unit * scale, false)
+    -- Standing against something for half a second: a hop.
+    local now = os.clock()
+    if MV.lastPos and (pos - MV.lastPos).Magnitude < 0.05 then
+        MV.stallSince = MV.stallSince or now
+        if now - MV.stallSince > 0.5 then
+            count("jump")
+            hum.Jump = true
+            MV.stallSince = now
         end
+    else
+        MV.stallSince = nil
     end
-
-    local nx, nz = pos.X + direction.X * step, pos.Z + direction.Z * step
-    local floorHit = Workspace:Raycast(Vector3.new(nx, feetY + CFG.maxStepHeight + 0.5, nz),
-        Vector3.new(0, -(CFG.maxStepHeight + 0.5 + CFG.maxDropHeight), 0), params)
-    if not floorHit then
-        -- No floor there: hold rather than step off. The Humanoid is not asked
-        -- to walk either; a ledge is a decision for the field, not the mover.
-        count("noFloor")
-        return false
-    end
-    local rise = floorHit.Position.Y - feetY
-    if rise > CFG.maxStepHeight then
-        count("jump")
-        hum.Jump = true
-        hum:MoveTo(target)
-        return false
-    end
-    count("stepped")
-    root.CFrame = CFrame.new(Vector3.new(nx, floorHit.Position.Y + above, nz)) * (root.CFrame - root.CFrame.Position)
-    root.AssemblyLinearVelocity = Vector3.zero
+    MV.lastPos = pos
     return false
 end
 
@@ -113,23 +91,26 @@ local function face(root, hum, point)
     local p = root.Position
     local look = Vector3.new(point.X - p.X, 0, point.Z - p.Z)
     if look.Magnitude < 0.5 then return end
+    MV.facedAt = os.clock()
+    if hum and hum.AutoRotate then hum.AutoRotate = false end
     root.CFrame = CFrame.lookAt(p, p + look.Unit)
 end
 
 local function release(hum, root)
     if MV.driving then
         MV.driving = false
-        if root then root.AssemblyLinearVelocity = Vector3.new(0, root.AssemblyLinearVelocity.Y, 0) end
+        if hum then hum:Move(Vector3.zero, false) end
     end
-    if hum then hum:Move(Vector3.zero, false) end
+    if hum then
+        setBoost(hum, false)
+        if not hum.AutoRotate then hum.AutoRotate = true end
+    end
+    MV.stallSince, MV.lastPos = nil, nil
     setControls(true)
 end
 
 local function restoreWalkSpeed(hum)
-    if RT.walkSpeedBefore and hum then
-        pcall(function() hum.WalkSpeed = RT.walkSpeedBefore end)
-        RT.walkSpeedBefore = nil
-    end
+    if hum then setBoost(hum, false) end
 end
 
 S.MV = MV
