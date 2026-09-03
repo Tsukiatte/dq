@@ -156,21 +156,34 @@ noteBeam = function(hb, now)
     local yaw = math.deg(math.atan2(look.X, look.Z)) % 180
     local beams = RD.beams
     beams[#beams + 1] = { t = now, yaw = yaw, hub = hb.Position, size = hb.Size }
-    if #beams > 8 then table.remove(beams, 1) end
+    if #beams > 24 then table.remove(beams, 1) end
     local recent = 0
     for i = #beams, 1, -1 do if now - beams[i].t <= 0.5 then recent = recent + 1 else break end end
     if recent >= 4 then RD.fanUntil = now + 1.5 end
-    for i = #RD.zones, 1, -1 do if RD.zones[i].name == "beam next" then table.remove(RD.zones, i) end end
-    if now < RD.fanUntil or #beams < 2 then return end
-    local a, b = beams[#beams - 1], beams[#beams]
-    local dt = b.t - a.t
-    local step = wrap180(b.yaw - a.yaw)
-    if dt < 0.3 or dt > 0.8 or math.abs(step) < 15 or math.abs(step) > 25 then return end
-    for k = 1, 2 do
-        local yaw = math.rad(b.yaw + step * k)
-        local at = now + dt * k
-        local cf = CFrame.lookAt(b.hub, b.hub + Vector3.new(math.sin(yaw), 0, math.cos(yaw)))
-        addZone({ name = "beam next", cframe = cf, size = b.size, from = at, untilAt = at + 2.0, telegraphed = true })
+    -- Predictions older than half a second are stale, whatever came of them.
+    for i = #RD.zones, 1, -1 do
+        local z = RD.zones[i]
+        if z.name == "beam next" and z.madeAt < now - 0.5 then table.remove(RD.zones, i) end
+    end
+    -- Several sweeps run at once, interleaved: each new beam is matched to any
+    -- recent beam 20 degrees away, and that chain's next two lanes are zones.
+    local b = beams[#beams]
+    local chains = 0
+    for i = #beams - 1, 1, -1 do
+        local a = beams[i]
+        local dt = b.t - a.t
+        if dt > 0.8 then break end
+        local step = wrap180(b.yaw - a.yaw)
+        if dt >= 0.08 and math.abs(step) >= 15 and math.abs(step) <= 25 then
+            chains = chains + 1
+            for k = 1, 2 do
+                local yawK = math.rad(b.yaw + step * k)
+                local at = now + dt * k
+                local cf = CFrame.lookAt(b.hub, b.hub + Vector3.new(math.sin(yawK), 0, math.cos(yawK)))
+                addZone({ name = "beam next", cframe = cf, size = b.size, from = at, untilAt = at + 2.0, telegraphed = true, madeAt = now })
+            end
+            if chains >= 2 then break end
+        end
     end
 end
 -- A body rolling along a line: origin, direction, distance over duration from
