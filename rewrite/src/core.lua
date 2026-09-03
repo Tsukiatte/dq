@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.43"
+local SCRIPT_VERSION = "5.1.44"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.44", date = "2026-09-03", notes = "Seventh kick came while simply walking toward Bob at 22. Every kick so far shares speed above 16 held for seconds. The burst now runs at most 1.5 s before 1.2 s at walking speed, and approaches walk at 16." },
     { version = "5.1.43", date = "2026-09-03", notes = "Box footprints follow the part's orientation: whichever local axis points up is the height. At Bob a hitbox stood on end read as a 63-stud floor box, the whole arena counted as lethal, and the blink fired on every cooldown with nothing there." },
     { version = "5.1.42", date = "2026-09-03", notes = "Mage volleys are predicted: two aligned shots within 0.4 s reveal the line, and the next 70 studs of it become a zone firing from 0.3 s, so the field leaves the line instead of standing where the last shot lands. A lone mage killed the character by walking it down that line." },
     { version = "5.1.41", date = "2026-09-03", notes = "Room progress is kept in _G so a reload inside the dungeon no longer sends the character back toward room 1." },
@@ -77,6 +78,8 @@ local CFG = {
     -- position hop got one in five minutes and is not offered.
     tweenWalk = 16,               -- studs/s assumed for planning; the character walks at its own WalkSpeed
     tweenEscape = 22,             -- WalkSpeed while leaving danger (a burst)
+    boostMaxRun = 1.5,            -- seconds the burst may run before it must rest
+    boostRest = 1.2,              -- seconds at walking speed after a full burst
     approachWalkSpeed = 22,       -- WalkSpeed while closing on a boss from far out (0 = leave it)
     maxStepHeight = 2.4,
     maxDropHeight = 30,

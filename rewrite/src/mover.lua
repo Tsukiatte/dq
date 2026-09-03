@@ -31,14 +31,27 @@ end
 
 -- The burst: WalkSpeed raised while leaving danger, restored after. The value
 -- it had is remembered once per burst, so the game's own changes survive.
+-- The burst is short by construction: at most CFG.boostMaxRun seconds in a
+-- row, then CFG.boostRest seconds at walking speed whatever the field wants.
+-- Every kick so far had speed above 16 held for longer than that.
 local function setBoost(hum, on)
+    local now = os.clock()
+    if on and (MV.boostBlockedUntil or 0) > now then on = false end
     if on then
         if not RT.walkSpeedBefore then
             RT.walkSpeedBefore = hum.WalkSpeed
+            MV.boostSince = now
             count("boost")
         end
-        if hum.WalkSpeed ~= CFG.tweenEscape then hum.WalkSpeed = CFG.tweenEscape end
-    elseif RT.walkSpeedBefore then
+        if now - (MV.boostSince or now) > CFG.boostMaxRun then
+            MV.boostBlockedUntil = now + CFG.boostRest
+            on = false
+        else
+            if hum.WalkSpeed ~= CFG.tweenEscape then hum.WalkSpeed = CFG.tweenEscape end
+            return
+        end
+    end
+    if RT.walkSpeedBefore then
         pcall(function() hum.WalkSpeed = RT.walkSpeedBefore end)
         RT.walkSpeedBefore = nil
     end

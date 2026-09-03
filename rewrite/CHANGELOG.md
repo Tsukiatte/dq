@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.44 - 2026-09-03 - "Short bursts"
+
+- Mover: `boostMaxRun` 1.5 s then `boostRest` 1.2 s; brain approaches at walking speed.
+
 ## 5.1.43 - 2026-09-03 - "Which way is up"
 
 - Field: `boxDepth` picks the vertical axis from the CFrame.
