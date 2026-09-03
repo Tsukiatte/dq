@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.68"
+local SCRIPT_VERSION = "5.1.69"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.69", date = "2026-09-03", notes = "Per-boss profiles (Chris: keep the Champion and Bob apart). The arena pull, the fan reflex and the slam reflex are the Champion only; Bob keeps the chain line, the wall and the orb bubble. Attack windows stay keyed by attack name; the blink, the measured range and the mob rules are shared." },
     { version = "5.1.68", date = "2026-09-03", notes = "From the death verdicts at Bob: the horizontal beam fires 0.6 s after it appears, not 1.1 (a death 0.4 s before the model said so); the spread beam hits four studs outside its box; the following orbs get a 14-stud bubble (one killed at 1.2 studs with no box round it). No ability is cast while the ground here goes hot within 1.2 s: the cast animation roots the character, and the trace showed it commanded to run and not moving in the second before a death." },
     { version = "5.1.67", date = "2026-09-03", notes = "Into the arena, every time (Chris): boss-fight spots beyond the arena edge cost during the fan as well (the edge is the fan radius then), and the approach to a boss runs at escape speed while it is more than twenty-five studs outside the band, so the bot does not linger at the mouth where the aimed attacks spawn on it." },
     { version = "5.1.66", date = "2026-09-03", notes = "Champion fan: out to 85 studs, not 100, which was against the rocks (the trace showed 4 studs a second while commanded 22), and the reflex no longer re-arms once the bot is near that radius. A spot counts as clean only under 0.2 path danger, and a spot under eight studs costs extra while the ground here is hot. The blink may hop a second time inside its cooldown, two seconds on and once per twenty seconds, when a box is already on the character (the aimed criss cross spawns on you)." },
@@ -212,6 +213,24 @@ local CFG = {
 -- Per attack Model name (lowercased): when it first hurts and when it stops,
 -- in seconds after the Model appears. Measured in the recorded runs of
 -- 2026-09-02/03 (game/captures). `long` = it burns until the Model goes.
+-- Per-boss behaviour, kept apart on purpose (Chris: the Champion and Bob
+-- are separate; never mix the two). Everything attack-specific is keyed by
+-- the attack name in TIMING and the reader; everything boss-specific is
+-- switched here. Shared by every fight: the field, the blink, the measured
+-- ability range, the mob rules.
+--   Champion: arena pull (spots stay inside the arena), the beam fan reflex
+--             (out to fanRadius between the lanes), the slam reflex, the leash.
+--   Bob:      the circle chain line and per-step circles, the sweeping wall
+--             from its model, the orb bubble; no arena pull.
+local BOSS_PROFILES = {
+    ["midgardian champion"] = { arenaPull = true, fan = true, slam = true },
+    ["bob the frost giant"] = { arenaPull = false, fan = false, slam = false },
+}
+local DEFAULT_PROFILE = { arenaPull = false, fan = false, slam = false }
+local function bossProfile(name)
+    return BOSS_PROFILES[string.lower(name or "")] or DEFAULT_PROFILE
+end
+
 local TIMING = {
     northernmageshot            = { first = 0.5, last = 1.5, holdFull = true },   -- mob attacks hit ~0.25 s after their visual looks finished; the fade must not end them
     spearmanstrikehitbox        = { first = 0.6, last = 1.5, holdFull = true },
@@ -330,6 +349,7 @@ S.RT = RT
 S.UI = UI
 S.sliderConnections = {}   -- the kit tracks widget connections here; the interface tears them down
 S.TIMING = TIMING
+S.bossProfile = bossProfile
 S.PROJECTILE_HINTS = PROJECTILE_HINTS
 S.heavyDebug = heavyDebug
 S.heavyDebugThrottled = heavyDebugThrottled

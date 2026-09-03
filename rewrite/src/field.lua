@@ -461,7 +461,7 @@ local function decide(root, hum)
             -- Always inside the arena (Chris): the edge is the band plus twenty,
             -- or the fan radius while the fan lasts; past it costs, twenty-five
             -- further it is out of the question.
-            if ap.isBoss then
+            if ap.isBoss and S.bossProfile(ap.model and ap.model.Name).arenaPull then
                 local fan = now < (RD.fanUntil or -math.huge) + 1.0
                 local far = dd - (fan and CFG.fanRadius or (band + 20))
                 if far > 0 then cost = cost + CFG.dodgeArenaWeight * far end
