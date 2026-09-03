@@ -11,6 +11,16 @@ file and that table in sync on every edit.
 
 ---
 
+## 4.12.3 - 2026-09-02 - "Champion"
+
+Live capture through the Potassium bridge (`game/captures/nl_midgardian_2026-09-02_a.json`): 14 deaths in 220 s against the Midgardian Champion.
+
+- **Every death** was a `firstBossCrissCross` whose origin was the character's own position (20 "aimed" shots at 8 s intervals among 234 criss-cross events; the other 214 are the lattice fired from the arena edges). All landed 106-137 studs from the boss. Nothing spawned on you is dodgeable; being parked out there is the mistake.
+- **Passive beam seed corrected**: precast is 0.6 at spawn and at 0.6 s, gone by 2.0 s, Model deleted at 7.0 s (1242 beams). Seeded window is now 1.3-1.9 s (was 0.3-1.2 s, learned from a criss-cross hit blamed on a beam) and the beam is no longer "long-lived", so beams stop being seven-second walls and gaps exist.
+- **Hub ring-hold off by default** (`dodgeHubHold = false`): the hub never went quiet, so the hold kept pursuit out for the whole fight and the character never reached ability range. Pursuit now goes to `bossStandoff` and the dodge handles lines by timing.
+- **Timing is no longer learned from hits** (`learnTimingFromHits = false`) and saved windows are not loaded: blame went to the nearest part and rewrote the seeds.
+- Recorder attributes hits by distance to a part's body, not its centre, so a 250-stud beam can be blamed correctly.
+
 ## 4.12.2 - 2026-09-02 - "Window"
 
 - The shared state table is published as `_G.DungeonAutofarmState` while the script runs and cleared on destruct, so a live inspection tool (the Potassium bridge) can read what the reader classifies, which spot the dodge holds and what the mover is doing, without a rebuild for every question.

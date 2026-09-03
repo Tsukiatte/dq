@@ -143,8 +143,16 @@ local function hookHumanoid(c)
             if rt then
                 for p, e in pairs(R.byPart) do
                     if p.Parent and not e.gone then
-                        local d = (p.Position - rt.Position).Magnitude
-                        if d <= 40 then near[#near + 1] = { name = e.name, model = e.model, dist = r1(d), t = r1(p.Transparency),
+                        -- Distance to the part's BODY, not its centre: a 250-stud
+                        -- beam's centre is far away while its body is on top of us.
+                        local lpos = p.CFrame:PointToObjectSpace(rt.Position)
+                        local hx, hy, hz = p.Size.X * 0.5, p.Size.Y * 0.5, p.Size.Z * 0.5
+                        local ex = math.max(0, math.abs(lpos.X) - hx)
+                        local ey = math.max(0, math.abs(lpos.Y) - hy)
+                        local ez = math.max(0, math.abs(lpos.Z) - hz)
+                        local d = math.sqrt(ex * ex + ey * ey + ez * ez)
+                        if d <= 25 then near[#near + 1] = { name = e.name, model = e.model, dist = r1(d), inside = d == 0,
+                            centre = r1((p.Position - rt.Position).Magnitude), t = r1(p.Transparency),
                             age = r1(now() - e.t), v = verdict(p) } end
                     end
                 end

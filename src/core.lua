@@ -20,7 +20,7 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "4.12.2"
+local SCRIPT_VERSION = "4.12.3"
 -- Bump to throw away every learned attack timing in every save, once.
 local LEARN_EPOCH = 2
 local SCRIPT_BUILD_DATE = "2026-09-02"
@@ -28,6 +28,7 @@ local SCRIPT_CODENAME = "Aquatic Temple"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "4.12.3", date = "2026-09-02", notes = "Midgardian Champion, from a live capture of fourteen deaths in 220 seconds. Every death was a projectile spawned at the character's own position, fired every eight seconds at a character parked 106-137 studs from the boss; nothing spawned there is dodgeable, so being there is the mistake. Three causes, all fixed: the passive beam was seeded as hurting from 0.3 s and as long-lived, so every beam was a seven-second wall and the arena never had a gap (the precast actually fades at 1.3-2.0 s; the seed now says 1.3-1.9 s and nothing is long-lived until a capture proves it); the ring held off a firing hub kept pursuit out for as long as the hub fired, which was the whole fight, so the character never reached ability range (the ring is now off by default, dodgeHubHold); and attack windows were learned from hits blamed on the nearest part, which is how the wrong seed was written in the first place (learnTimingFromHits, off, and saved windows are no longer loaded)." },
     { version = "4.12.2", date = "2026-09-02", notes = "Window. The shared state table is published as _G.DungeonAutofarmState while the script runs and cleared on destruct, so a live inspection tool can read what the reader classifies, which spot the dodge holds and what the mover is doing without a rebuild for every question. No behaviour change." },
     { version = "4.12.1", date = "2026-09-02", notes = "Stairs and walls. The tween mover stepped horizontally and never re-sampled the floor, and its single wall ray left the root centre three studs up and missed every riser beneath it - up a staircase it drove the legs into each step and physics fought back, and a flight that turns ninety degrees was hopeless. It follows the floor now: the floor under the next point is raycast each frame, the root is placed at its own measured height above it, a rise within the step height is climbed, and walls are read at knee and chest with the steerer's own step-versus-wall classifier. The dodge judged candidate heights against the root with abs(), which rejected any spot even a fraction of a stud downhill while allowing six studs up; heights are judged from the feet, asymmetric, and the walk sweep keeps the root's height above the destination floor so it clears stair risers. Pursuit no longer passes a waypoint until the one after it is in clear sight - with four-stud spacing and a four-stud advance radius it was passing every corner early and aiming through the inside wall - and a wall stall now goes round to the roomier side and keeps going that way, where it used to alternate sides and shuffle on the spot against a wall it could simply have walked along." },
     { version = "4.12.0", date = "2026-09-02", notes = "Restored from 4.11.3 as the base going forward. The 5.0.x rewrite is shelved under legacy/5.0.1 - it never ran in the real game and Chris judged 4.11.3 the one that was working decently. Nothing else changed in this version; the strip and the pathfinding fixes follow on top of it." },
@@ -508,7 +509,8 @@ CFG.dodgeHubWeight = 1.0       -- radial cost scale
 CFG.dodgeHubLineWidth = 8      -- typical beam width, for the coverage estimate
 CFG.dodgeHubExit = 0.8         -- seconds needed to get back out after going in
 CFG.dodgeHubFireGuess = 1.2    -- arming delay assumed for a hub's lines until one is learned
-CFG.dodgeHubStandoff = 50      -- the ring to hold while a hub fires: out where a sweep's lines have gaps between them
+CFG.dodgeHubHold = false       -- hold a ring off a firing hub instead of fighting at standoff (4.12.3: off; the hub never went quiet and the ring is where the aimed shots land)
+CFG.dodgeHubStandoff = 50      -- the ring to hold while a hub fires, when dodgeHubHold is on
 CFG.dodgeHubLeave = 2.5        -- seconds before the next burst is due to be back on the ring
 CFG.dodgeHubRingWeight = 3     -- the ring pull, as a multiple of the ordinary approach weight
 CFG.bossStandoff = 26          -- where to stand against a boss: inside ability range, outside its melee
@@ -520,6 +522,7 @@ CFG.dodgePredictedLive = 1.0   -- how long a predicted line hurts when nothing h
 -- appears is never treated as a telegraph again.
 CFG.armFadeStep = 0.08
 CFG.armMinDelay = 0.3
+CFG.learnTimingFromHits = false  -- learn an attack's window from being hit by it (4.12.3: off; blame went to the nearest part and rewrote the seeds)
 -- Seconds after a precast has fully faded before the attack counts as over.
 CFG.armDoneLinger = 0.3
 -- Seconds past the last learned hit age before an attack counts as over.

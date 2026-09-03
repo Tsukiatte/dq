@@ -373,7 +373,11 @@ local DEFAULT_ARM_SPANS = {
     -- arena edge and the projectiles took it. A sweeping laser that hurts
     -- for a pulse as it passes is the reading that makes the fight playable
     -- by anyone; a certain hit at a later age corrects it on the spot.
-    firstbosspassivebeam = { first = 0.3, last = 1.2 },
+    -- Measured live (2026-09-02, 1242 beams): precast 0.6 at spawn and at
+    -- 0.6 s, gone by 2.0 s; the Model is deleted at 7.0 s. The old 0.3 s
+    -- came from a criss cross hit blamed on the nearest beam, and made
+    -- every beam a wall from birth.
+    firstbosspassivebeam = { first = 1.3, last = 1.9 },
     northernmageshot = { first = 0.9, last = 1.2 },
     spearmanstrikehitbox = { first = 0.85, last = 1.2 },
     northernwarriorlinestrike = { first = 0.85, last = 1.2 },
@@ -385,9 +389,10 @@ local DEFAULT_ARM_SPANS = {
 -- Attacks that keep hurting after their warning fades: the fade does not
 -- end them. The Midgardian Champion's passive beams burn for seconds after
 -- their precast goes (Studio recreation, 2026-09-02).
-local DEFAULT_LONG_LIVED = {
-    firstbosspassivebeam = true,
-}
+-- The passive beams were listed here from a Studio recreation; no real
+-- capture has shown a beam hit after its fade, and listing them made the
+-- arena a solid wall. Empty until a capture proves one.
+local DEFAULT_LONG_LIVED = {}
 S.DEFAULT_ARM_DELAYS = DEFAULT_ARM_DELAYS
 S.DEFAULT_ARM_SPANS = DEFAULT_ARM_SPANS
 S.DEFAULT_LONG_LIVED = DEFAULT_LONG_LIVED
