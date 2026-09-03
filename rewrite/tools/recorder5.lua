@@ -93,6 +93,7 @@ local function hookHumanoid(c)
                 state = S and S.RT.movementState, reason = S and S.DG and S.DG.reason, dangerHere = S and S.DG and r1(S.DG.dangerHere or 0),
                 grace = S and S.DG and S.DG.grace ~= math.huge and r1(S.DG.grace) or nil,
                 target = S and S.BR and S.BR.target and S.BR.target.model.Name or nil,
+                blinks = S and S.RT.blinks or 0, lastBlinkAgo = (S and S.RT.lastBlinkAt) and r1(os.clock() - S.RT.lastBlinkAt) or nil,
                 cands = (function()
                     if not (S and S.DG and S.DG.cands) then return nil end
                     local list = {}

@@ -20,7 +20,7 @@ if R then
         for j = 1, math.min(4, #h.near) do local n = h.near[j]; near[j] = string.format("%s d%.1f f%.1f%s", n.name, n.dist, n.firesIn or 0, n.live and " live" or "") end
         local cands = {}
         if h.cands then for j, cd in ipairs(h.cands) do cands[j] = string.format("%.0fst dg%.1f c%.2f %s", cd.dist, cd.danger, cd.cost, cd.valid and "ok" or "x") end end
-        out.hits[#out.hits + 1] = { t = h.t, fatal = h.fatal, bossDist = h.bossDist, state = h.state, here = h.dangerHere, grace = h.grace, near = near, cands = cands, spawns = h.spawns }
+        out.hits[#out.hits + 1] = { t = h.t, fatal = h.fatal, bossDist = h.bossDist, state = h.state, here = h.dangerHere, grace = h.grace, near = near, cands = cands, spawns = h.spawns, blinks = h.blinks, lastBlinkAgo = h.lastBlinkAgo }
     end
     out.totalHits = #R.hits
     -- Effective ability range: the largest distance at which the boss lost
@@ -50,6 +50,8 @@ if R then
     out.states = st
 end
 out.counts = S and S.MV and S.MV.counts
+out.blinks = S and S.RT.blinks or 0
+out.lastBlink = S and S.RT.lastBlink and { dist = S.RT.lastBlink.dist, grace = S.RT.lastBlink.grace, ago = os.clock() - S.RT.lastBlink.at } or nil
 out.enemies = {}
 if S and rt then for _, e in ipairs(S.RD.enemies) do out.enemies[#out.enemies + 1] = e.model.Name .. (e.isBoss and "[B]" or e.melee and "[M]" or "[R]") .. " d" .. math.floor(S.flatDistance(Vector3.new(e.x, 0, e.z), rt.Position)) end end
 return H:JSONEncode(out)

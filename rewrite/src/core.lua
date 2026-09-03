@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.27"
+local SCRIPT_VERSION = "5.1.28"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.28", date = "2026-09-03", notes = "Blink reflex, asked for by Chris after the second script's video: when a lethal box covers the character and fires within 0.45 s, hop at most 8 studs to the nearest clear floor. Runs every frame outside the movement logic. The destination's floor is raycast and must match the current feet within 1.5 studs; the sweep there must be clear and there must be headroom; never while airborne; rotation, velocity and WalkSpeed untouched; 1.2 s between hops. Off switch and size in the Dodge window." },
     { version = "5.1.27", date = "2026-09-03", notes = "Ability radius 42: with the 34-stud mob standoff a 30-stud cast radius would never fire at a mob." },
     { version = "5.1.26", date = "2026-09-03", notes = "Mobs are fought from 34 studs whatever their type, with abilities only (auto attack off by default): at high level any mob's one swing kills, and the warriors were counted as ranged because their melee distance is above 8. Any target that closes to within standoff minus six is backed away from in a straight line at the burst speed. A melee mob's swing reach is a hard zone, the ten studs past it a soft one." },
     { version = "5.1.25", date = "2026-09-03", notes = "The leash arms only after the character has been within 110 studs of the Champion and stays armed for that boss. As a band it was a wall from the outside: run 19 hopped at its outer edge for six minutes without entering." },
@@ -93,6 +94,10 @@ local CFG = {
     dodgeLead = 1.2,              -- a standing telegraph counts as live this long before it fires
     dodgePathLead = 0.4,          -- a moving projectile's line: the time to sidestep
     dodgeDwell = 1.5,             -- a spot must stay clear this long after arrival (the big spike front: 100 studs/s, announced 1.4 s ahead)
+    blink = true,                 -- reflex hop out of a lethal box that fires before a walk could clear it
+    blinkMax = 8,                 -- studs, at most; the other script's hop is barely visible
+    blinkWindow = 0.45,           -- hop when the box on us fires within this many seconds (0 = already live)
+    blinkCooldown = 1.2,          -- seconds between hops
     dodgeMoveAt = 0.15,           -- danger here at or above this: relocate
     dodgeHysteresis = 0.1,
     dodgeDistanceCost = 0.008,

@@ -191,6 +191,47 @@ local function walkable(fromPos, x, y, z, params)
     return hit == nil
 end
 
+
+-- The blink's destination: the nearest clear spot on the same floor, at most
+-- CFG.blinkMax studs away. Every candidate is checked for a floor at the
+-- destination (raycast there, within 1.5 studs of the current feet, facing
+-- up), a clear sweep from here to there, and headroom. The character is
+-- never placed where the floor is not, and never while airborne.
+local function blinkTarget(root, hum, rx, ry, rz)
+    local params = raycastParams(DG.approach and DG.approach.model or nil)
+    local rp = root.Position
+    local above = hum.HipHeight + root.Size.Y * 0.5
+    local under = Workspace:Raycast(rp, Vector3.new(0, -(above + 3), 0), params)
+    if not under or under.Normal.Y < 0.7 then return nil end
+    above = rp.Y - under.Position.Y
+    if above < 1 or above > 6 then return nil end
+    local feetY = under.Position.Y
+    for _, dist in ipairs({ 4, 6, 8 }) do
+        if dist > CFG.blinkMax + 0.01 then break end
+        local best, bestScore = nil, math.huge
+        for i = 0, 15 do
+            local a = i / 16 * 2 * math.pi
+            local x, z = rx + math.cos(a) * dist, rz + math.sin(a) * dist
+            local d0 = dangerAt(x, ry, z, 0)
+            if d0 < CFG.dodgeMoveAt then
+                local d1 = dangerAt(x, ry, z, 0.6)
+                if d1 < 0.5 then
+                    local hit = Workspace:Raycast(Vector3.new(x, ry + 2, z), Vector3.new(0, -(above + 6), 0), params)
+                    if hit and hit.Normal.Y > 0.7 and abs(hit.Position.Y - feetY) <= 1.5 then
+                        local dest = Vector3.new(x, hit.Position.Y + above, z)
+                        if walkable(rp, x, hit.Position.Y, z, params) and not Workspace:Raycast(dest, Vector3.new(0, 3.5, 0), params) then
+                            local score = d1
+                            if score < bestScore then best, bestScore = dest, score end
+                        end
+                    end
+                end
+            end
+        end
+        if best then return best end
+    end
+    return nil
+end
+
 local function decide(root, hum)
     local now = os.clock()
     DG.now = now
@@ -215,6 +256,25 @@ local function decide(root, hum)
     local grace = here0 > 0 and graceHere(rx, ry, rz) or math.huge
     DG.grace = grace
     local moveAt = CFG.dodgeMoveAt
+
+    -- Reflex, outside the movement logic: a lethal box on the character that
+    -- fires before a walk could clear it. A hop of at most CFG.blinkMax studs
+    -- to the nearest clear floor, no more often than CFG.blinkCooldown.
+    -- Rotation, velocity and WalkSpeed are untouched; the height comes from
+    -- the floor at the destination.
+    if CFG.blink and here0 >= 0.999 and grace <= CFG.blinkWindow and now - (RT.lastBlinkAt or -math.huge) >= CFG.blinkCooldown then
+        local dest = blinkTarget(root, hum, rx, ry, rz)
+        if dest then
+            RT.lastBlinkAt = now
+            RT.blinks = (RT.blinks or 0) + 1
+            RT.lastBlink = { at = now, from = rp, to = dest, dist = (Vector3.new(dest.X, 0, dest.Z) - Vector3.new(rx, 0, rz)).Magnitude, grace = grace }
+            root.CFrame = CFrame.new(dest) * (root.CFrame - root.CFrame.Position)
+            DG.target = nil
+            DG.reason = string.format("blink %.0f studs", RT.lastBlink.dist)
+            heavyDebugThrottled("blink", 0.5, "Field", DG.reason)
+            return
+        end
+    end
 
     -- Preferences: keep the heading we last took (no left-right shuffle), move
     -- across the target's line rather than along it (strafe), and stay in the
