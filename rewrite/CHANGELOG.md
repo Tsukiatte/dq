@@ -1,5 +1,9 @@
 # Dungeon Autofarm 5.1 (rewrite) — Changelog
 
+## 5.1.67 - 2026-09-03 - "In, every time"
+
+- Field: arena pull applies during the fan with `fanRadius` as the edge. Brain: boss approach at `tweenEscape` beyond band+25.
+
 ## 5.1.66 - 2026-09-03 - "Off the rocks"
 
 - Core: `fanRadius` 85, `dodgeSafeWorst` 0.2, `blinkDoubleGap` 2.0. Reader: fan reflex only from inside radius-12. Field: small-spot penalty on hot ground; second blink inside the cooldown (`RT.lastBlinkDouble`).

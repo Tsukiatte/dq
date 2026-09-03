@@ -2,9 +2,10 @@
 -- Module contract: receives the shared table S. Every later module pulls what it
 -- needs from S; this one defines the vocabulary. See REWRITE.md.
 return function(S)
-local SCRIPT_VERSION = "5.1.66"
+local SCRIPT_VERSION = "5.1.67"
 local SCRIPT_BUILD_DATE = "2026-09-03"
 local SCRIPT_CHANGELOG = {
+    { version = "5.1.67", date = "2026-09-03", notes = "Into the arena, every time (Chris): boss-fight spots beyond the arena edge cost during the fan as well (the edge is the fan radius then), and the approach to a boss runs at escape speed while it is more than twenty-five studs outside the band, so the bot does not linger at the mouth where the aimed attacks spawn on it." },
     { version = "5.1.66", date = "2026-09-03", notes = "Champion fan: out to 85 studs, not 100, which was against the rocks (the trace showed 4 studs a second while commanded 22), and the reflex no longer re-arms once the bot is near that radius. A spot counts as clean only under 0.2 path danger, and a spot under eight studs costs extra while the ground here is hot. The blink may hop a second time inside its cooldown, two seconds on and once per twenty seconds, when a box is already on the character (the aimed criss cross spawns on you)." },
     { version = "5.1.65", date = "2026-09-03", notes = "Ability range per slot (Chris): every cast is queued with its slot, and the projectile that appears takes the measurement, so Q and E are measured separately and the least ranged one sets the fight distance - two studs inside a known cap, one past a reach that is only a lower bound. The Ability radius and Boss standoff sliders go to 80; auto standoff can go to 70. Bob: a circle whose precast is destroyed when it fires vanished from the field at that moment (three deaths just outside circles the model no longer had); the last geometry is kept while the window is open, and the circles are padded ten studs. A blocked travel step takes the spot instead of standing still beside the box." },
     { version = "5.1.64", date = "2026-09-03", notes = "Bob: the spread and horizontal beams kill at least 2.2 studs outside their 12-wide hitbox (the recorder saw a death there right after a blink to a spot the model called clear), so their padding is 2.5 studs with a 1-stud shoulder, and a blink destination must be 2.5 studs clear of every box." },

@@ -458,8 +458,12 @@ local function decide(root, hum)
             cost = cost + CFG.dodgeApproachWeight * (near and 1 or 0.6) * outBy
             -- Boss fights stay inside the arena (Chris): the mouth and the corners
             -- are where the aimed attacks spawn on you with nowhere to step.
-            if ap.isBoss and now >= (RD.fanUntil or -math.huge) + 1.0 then
-                local far = dd - (band + 20)
+            -- Always inside the arena (Chris): the edge is the band plus twenty,
+            -- or the fan radius while the fan lasts; past it costs, twenty-five
+            -- further it is out of the question.
+            if ap.isBoss then
+                local fan = now < (RD.fanUntil or -math.huge) + 1.0
+                local far = dd - (fan and CFG.fanRadius or (band + 20))
                 if far > 0 then cost = cost + CFG.dodgeArenaWeight * far end
                 if far > 25 then cost = cost + 2 end
             end
