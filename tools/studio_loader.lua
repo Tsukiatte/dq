@@ -18,6 +18,8 @@
       "paths" [secs]      scripted projectile prediction vs sim body vs mesh
       "hitlog" [n]        HZ.hitLog tail
       "lifelog" [n]       HZ.lifeLog tail
+      "hubs"              every hub: cadence, sweep step, headings, predicted lines
+      "status"            the HUD movement line, nav route, benched targets
       "delays"            learned arming delays and windows
       "set" {path,value}  assign any dotted S path (e.g. CFG.attackRange)
       "<dotted.path>"     describe any S value
@@ -206,6 +208,14 @@ query.OnInvoke = function(what, arg)
             local n, out = #S.HZ.lifeLog, {}
             for i = math.max(1, n - (arg or 10)), n do out[#out + 1] = S.HZ.lifeLog[i] end
             return table.concat(out, "\n")
+        elseif what == "status" then
+            -- What pursuit is doing: the HUD's movement line, the nav route, benched targets.
+            local label = S.UI and S.UI.movementStateLabel
+            local benched = 0
+            for _ in pairs(S.NAV.benched or {}) do benched = benched + 1 end
+            return string.format("move=%s | wps=%d idx=%d needsRecompute=%s benched=%d blockedAreas=%d | hubHold=%s gapWait=%s pursuitBlocked=%s",
+                tostring(label and label.Text), #(S.NAV.waypoints or {}), tonumber(S.NAV.index) or -1, tostring(S.NAV.needsRecompute), benched, #(S.NAV.blockedAreas or {}),
+                tostring(S.DG.hubHold), tostring(S.DG.gapWait), tostring(S.DG.pursuitBlocked))
         elseif what == "hubs" then
             -- Every hub: cadence, sweep step, the last headings, the predicted lines.
             local out = {}

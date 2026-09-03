@@ -585,7 +585,13 @@ local function decide(root, humanoid)
             local p = er.Position
             local ax, az = p.X - rx, p.Z - rz
             local near = CFG.dodgeReach * 1.5
-            if ax * ax + az * az <= near * near or DG.pursuitBlocked then
+            -- Also whenever a hub is firing or about to: the ring is the
+            -- box's to hold from wherever the last dodge left the character,
+            -- not only from within a box-length of the boss. Without this,
+            -- a dodge that ended eighty studs out left it there.
+            local hub = DG.hubs[NAV.cachedEnemy]
+            local hubRing = hub and hub.rate >= CFG.dodgeHubMinRate and (hub.active or hub.imminent)
+            if ax * ax + az * az <= near * near or DG.pursuitBlocked or hubRing then
                 approach = p
                 preferred = getEnemyStandoff(NAV.cachedEnemy) - 0.5
             end
