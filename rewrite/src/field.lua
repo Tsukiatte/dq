@@ -194,7 +194,19 @@ local function graceHere(px, py, pz)
     local grace = math.huge
     for i = 1, #DG.boxes do
         local b = DG.boxes[i]
-        if not b.moving and now <= b.untilAt then
+        if b.moving and now <= b.untilAt and (b.ground or abs(py - b.oy) <= b.halfH + DG.halfHeight) then
+            -- When does the body reach this point? Stepped a tenth of a second
+            -- at a time over the next second.
+            for k = 0, 10 do
+                local t = k * 0.1
+                if t >= grace then break end
+                local along = b.offset + b.speed * max(now + t - b.pathStart, 0)
+                local qx, qz = px - (b.ox + b.dx * along), pz - (b.oz + b.dz * along)
+                local a = abs(qx * b.dx + qz * b.dz) - b.halfL
+                local s = abs(-qx * b.dz + qz * b.dx) - b.halfW
+                if a <= DG.reach and s <= DG.reach then grace = t break end
+            end
+        elseif not b.moving and now <= b.untilAt then
             local depth
             if b.cyl then depth = cylDepth(b.cframe, b.size, px, py, pz, DG.halfHeight)
             elseif b.round then
@@ -238,7 +250,7 @@ local function blinkTarget(root, hum, rx, ry, rz)
     if math.abs(measured - standard) > 0.8 then return nil end   -- mid-jump or mid-fall: no hop
     local above = standard + 0.05
     local feetY = under.Position.Y
-    for _, dist in ipairs({ 4, 6 }) do
+    for _, dist in ipairs({ 4, 6, 8 }) do   -- eight is what a 15-wide criss cross lane needs from its centre
         if dist > CFG.blinkMax + 0.01 then break end
         local best, bestScore = nil, math.huge
         for i = 0, 15 do
@@ -250,7 +262,7 @@ local function blinkTarget(root, hum, rx, ry, rz)
             -- including where projectiles will be; a spot clear now but hit at
             -- 0.7 s was a teleport into the attack.
             local clear = true
-            for _, tt in ipairs({ 0, 0.25, 0.5, 0.75, 1.0, 1.5 }) do
+            for _, tt in ipairs({ 0, 0.25, 0.5, 0.75, 1.0 }) do
                 if dangerAt(x, ry, z, tt, 1.2, 0) >= 0.5 then clear = false break end
             end
             -- Never land beside a mob: its strike is centred on it.
@@ -302,7 +314,9 @@ local function decide(root, hum)
     -- studs of sidestep, which 16 studs/s does not give.
     RT.moveBoost = DG.dangerHere >= CFG.dodgeMoveAt
     local speed = RT.moveBoost and CFG.tweenEscape or (RT.walkSpeed or CFG.tweenWalk)
-    local grace = here0 > 0 and graceHere(rx, ry, rz) or math.huge
+    -- Always, not only when the ground is already hot: a box arriving within
+    -- the blink window is what the blink is for.
+    local grace = graceHere(rx, ry, rz)
     DG.grace = grace
     local moveAt = CFG.dodgeMoveAt
 
@@ -315,14 +329,14 @@ local function decide(root, hum)
     -- between rooms were what the sixth kick was made of.
     local apB = DG.approach
     local inFight = apB ~= nil and sqrt((apB.x - rx) ^ 2 + (apB.z - rz) ^ 2) <= 70
-    if CFG.blink and inFight and here0 >= 0.999 and grace <= CFG.blinkWindow and now - (RT.lastBlinkAt or -math.huge) >= CFG.blinkCooldown then
+    if CFG.blink and inFight and grace <= CFG.blinkWindow and now - (RT.lastBlinkAt or -math.huge) >= CFG.blinkCooldown then
         -- Walk first: if the spot the field already holds is reachable before
         -- the box fires, the legs do it. Only a box that fires sooner than the
         -- walk can clear earns a hop, and no more than blinkPer10s of them.
         local walkOk = false
         if DG.target then
             local tx, tz = DG.target.X - rx, DG.target.Z - rz
-            walkOk = sqrt(tx * tx + tz * tz) / CFG.tweenEscape + 0.2 <= grace
+            walkOk = sqrt(tx * tx + tz * tz) / CFG.tweenEscape + 0.35 <= grace   -- turning and acceleration eat a third of a second
         end
         RT.blinkTimes = RT.blinkTimes or {}
         local recent = 0
@@ -417,6 +431,22 @@ local function decide(root, hum)
             local outBy = max(dd - (band + 3), (band - 3) - dd, 0)
             local near = adist < band + 30
             cost = cost + CFG.dodgeApproachWeight * (near and 1 or 0.6) * outBy
+            -- Boss fights stay inside the arena (Chris): the mouth and the corners
+            -- are where the aimed attacks spawn on you with nowhere to step.
+            if ap.isBoss then
+                local far = dd - (band + 20)
+                if far > 0 then cost = cost + CFG.dodgeArenaWeight * far end
+                if far > 25 then cost = cost + 2 end
+            end
+            -- Outside the arena leash everything reads lethal alike; this gradient
+            -- is what brings a respawn at 135 studs back in instead of out to 150
+            -- (run 28's two leash deaths).
+            local L = RD.leash
+            if L and L.enemy.root.Parent then
+                local lx, lz = cx - L.enemy.root.Position.X, cz - L.enemy.root.Position.Z
+                local outL = sqrt(lx * lx + lz * lz) - (L.radius - 8)
+                if outL > 0 then cost = cost + 0.08 * outL end
+            end
             -- Inside the last stretch, moving across the line to the target is
             -- preferred to moving along it.
             if near and CFG.strafe and adist > 1 then

@@ -309,14 +309,14 @@ local function args(a, n) return type(a) == "table" and #a >= n end
 local HANDLERS = {
     -- The jump's target is where the 67-stud slam lands about 2.5 s later; the
     -- slam Model itself appears only at landing.
-    ["First Boss Jump Down"] = function(a) if typeof(a) == "Vector3" then circleZone("slam soon", a, 33.5, gameClock() + 2.5, 1.5) end end,
+    ["First Boss Jump Down"] = function(a) if typeof(a) == "Vector3" then circleZone("slam soon", a, 38, gameClock() + 2.5, 1.5) end end,
     -- The landing is where the player stood when the boss took off (Jump Down
     -- arrived 27 studs from a moving player), so the zone goes down at Jump Up:
     -- three seconds to leave a 67-stud circle instead of two.
     ["First Boss Jump Up"] = function()
         local c = LocalPlayer.Character
         local rt = c and c:FindFirstChild("HumanoidRootPart")
-        if rt then circleZone("slam soon", rt.Position, 36, gameClock() + 3.0, 2.5) end
+        if rt then circleZone("slam soon", rt.Position, 40, gameClock() + 3.0, 2.5) end
     end,
     ["First Boss Criss Cross Projectile"] = function(a) if args(a, 5) then addPath("criss cross", a[5], a[1], a[2], a[3], a[4], 7.5, 7.5, 8) end end,
     ["First Boss Seeking Spike"] = function(a) if args(a, 5) then addPath("seeking spike", a[5], a[1], a[2], a[3], a[4], 10, 10, 4) end end,
