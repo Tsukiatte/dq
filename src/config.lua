@@ -789,6 +789,41 @@ end
 
 S.loadConfig = loadConfig
 S.saveConfig = saveConfig
+
+-- Autosave (4.12.10). Settings were written only when a Save button was
+-- pressed, and a teleport kills the script before anything is written, so
+-- nothing survived a run. The config is written whenever it has changed,
+-- and again the moment a teleport begins.
+local autosaveLast = nil
+local autosaveAt = -math.huge
+-- Driven from the main heartbeat (no thread of its own to outlive the script).
+local function autosaveTick(now)
+    if not RT.autosaveStarted or RT.destroyed then return end
+    if now - autosaveAt < (CFG.autosaveInterval or 10) then return end
+    autosaveAt = now
+    if not hasFileAccess() then return end
+    local ok, json = pcall(function()
+        return game:GetService("HttpService"):JSONEncode(buildConfigTable())
+    end)
+    if ok and json ~= autosaveLast then
+        local wrote = pcall(writefile, CONFIG_FILE, json)
+        if wrote then autosaveLast = json end
+    end
+end
+local function startAutosave()
+    if RT.autosaveStarted then return end
+    RT.autosaveStarted = true
+    autosaveAt = os.clock()
+    pcall(function()
+        S.LocalPlayer.OnTeleport:Connect(function(state)
+            if state == Enum.TeleportState.Started or state == Enum.TeleportState.RequestedFromServer then
+                saveConfig()
+            end
+        end)
+    end)
+end
+S.startAutosave = startAutosave
+S.autosaveTick = autosaveTick
 -- The game publishes the dungeon it has loaded. Following it means the
 -- waypoints, attack book and drawn zones for that dungeon are already
 -- in place by the time you can move, instead of waiting to be picked.

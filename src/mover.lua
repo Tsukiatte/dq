@@ -81,9 +81,10 @@ local function setControlsEnabled(enabled)
 end
 
 -- How fast the mover actually goes, for whoever estimates travel times.
-local function moverSpeed(humanoid)
+local function moverSpeed(humanoid, boost)
     local walk = humanoid and humanoid.WalkSpeed or 16
-    if CFG.moveMode == "tween" and (CFG.tweenSpeed or 0) > 0 then
+    -- Quick only while escaping danger here (RT.moveBoost, set by the dodge).
+    if boost and CFG.moveMode == "tween" and (CFG.tweenSpeed or 0) > 0 then
         return math.min(CFG.tweenSpeed, CFG.tweenSpeedMax or 40)
     end
     return walk
@@ -143,7 +144,7 @@ local function driveTo(humanoid, root, target, arrive)
         if now < RT.moverFallbackUntil then mode = "walk" else RT.moverFallbackUntil = nil end
     end
     local direction = flat.Unit
-    local speed = mode == "tween" and moverSpeed(humanoid) or humanoid.WalkSpeed
+    local speed = mode == "tween" and moverSpeed(humanoid, RT.moveBoost) or humanoid.WalkSpeed
 
     if mode == "walk" then
         humanoid:MoveTo(target)

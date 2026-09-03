@@ -162,6 +162,7 @@ local function destructScript()
     for _, connection in ipairs(sliderConnections) do connection:Disconnect() end
     table.clear(sliderConnections)
 
+    pcall(saveConfig)
     setTelegraphPickerEnabled(false)
     setPathEditEnabled(false)
     S.setDodgeActive(false)
@@ -372,7 +373,9 @@ local function buildHud(parent)
         else
             text, color = "Disabled", T.StatusBad
         end
-        if statusValueLabel.Text ~= text then
+        -- The dot too, even when the text has not changed: it was created
+        -- green and stayed green beside a red 'Disabled' until the first flip.
+        if statusValueLabel.Text ~= text or dot.BackgroundColor3 ~= color then
             statusValueLabel.Text = text
             statusValueLabel.TextColor3 = color
             dot.BackgroundColor3 = color
@@ -1135,7 +1138,7 @@ local function createControlUI()
         "Dodge only. No target hunting, no pursuit, no waypoints: you drive, and it pulls you out of attacks."))
     track(K.slider(cloneSection.content, "Tween speed", "studs/s", 16, 40, false,
         function() return CFG.tweenSpeed end, function(v) CFG.tweenSpeed = v end, 2.9,
-        "How fast the tween mover steps. The game resets WalkSpeed above 45 and watches for hovering; the tween never touches WalkSpeed and stays on the floor. 22 is a brisk walk."))
+        "How fast the tween mover steps while escaping danger; at other times it walks at the Humanoid's pace. The game resets WalkSpeed above 45 and watches for hovering; the tween never touches WalkSpeed and stays on the floor."))
     track(K.dropdown(cloneSection.content, "Movement", {
         { value = "tween", label = "Tween - exact, walking pace, collision-checked" },
         { value = "walk", label = "Walk - Humanoid:MoveTo" },

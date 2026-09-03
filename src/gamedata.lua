@@ -396,6 +396,11 @@ local DEFAULT_ARM_SPANS = {
     -- Live run 2: killed inside the slam at 1.9 s AND at 3.3 s. It lingers
     -- on the ground after landing; stay out until the Model goes (5 s).
     firstbossjumpslam = { first = 1.8, last = 5.0 },
+    -- Bob the Frost Giant (live run 2): the circle fires at 1.3 s (its sound)
+    -- and the horizontal beam killed at 2.6 and 3.1 s after appearing, so it
+    -- burns until the game deletes it at 5 s.
+    secondbosscriclehitbox = { first = 1.2, last = 2.5 },
+    secondbosshorizontalbeam = { first = 1.1, last = 5.0 },
     cubepylonshot = { first = 0.8, last = 1.1 },
     ["model:4x8x35"] = { first = 0.9, last = 3.6 },
 }

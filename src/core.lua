@@ -20,7 +20,7 @@ return function(S)
 ================================================================================
 ]]
 
-local SCRIPT_VERSION = "4.12.9"
+local SCRIPT_VERSION = "4.12.10"
 -- Bump to throw away every learned attack timing in every save, once.
 local LEARN_EPOCH = 2
 local SCRIPT_BUILD_DATE = "2026-09-02"
@@ -28,6 +28,7 @@ local SCRIPT_CODENAME = "Aquatic Temple"
 
 -- Newest entry first.
 local SCRIPT_CHANGELOG = {
+    { version = "4.12.10", date = "2026-09-03", notes = "Bob the Frost Giant, seven deaths pinned. Five were on the circle line, every one with the box sent 45 studs away and the field reading 'danger 0.00': the scorer discounted danger already on you for every sample along the way, including samples after the moment the circle under you fires, so a long walk through a band that fires in a second scored clean. The discount now stops at the fire time of whatever you are standing in. The circle fires at 1.3 s (its sound); the horizontal beam burns to 5 s, so the default live window is 1.5 s and the beam is seeded to its end. Done attacks no longer keep their red box. The quick tween is used only while escaping danger here, and the dodge estimates travel at whichever speed it will use. Melee mobs (the game's own meleeDistance at most 8) are fought from 14 studs past their body. The config autosaves whenever it changes and as a teleport begins - it was only written by a Save button, and a teleport killed the script first, so nothing survived a run. The HUD dot follows the switch." },
     { version = "4.12.9", date = "2026-09-02", notes = "Seeds from the second live run, thirteen deaths pinned. The Champion's passive beam killed from inside at 0.5 to 1.0 s after it appeared: it is the laser, live from the moment it exists until its line fades, not from 1.3 s. The jump slam killed at 1.9 s and again at 3.3 s: it lingers on the ground, so its window runs to 5 s. A mage shot killed at 0.5 s and a spearman strike at 0.9 s, earlier than their seeds, because the Model appears some time after the server's cast; the earliest seen hit is now the seed. Time spent inside the attack already on you costs more (dodgeInsideWeight 0.85), so a 35-stud line is left sideways in three studs rather than lengthwise in seventeen." },
     { version = "4.12.8", date = "2026-09-02", notes = "Quicker tween. The tween mover steps at tweenSpeed (22 studs a second, capped at 40) instead of the Humanoid's 16, and the dodge estimates its travel times at the same speed so a spot it can reach in time is judged in time. The client's own movement checker resets WalkSpeed above 45 and watches for hovering in Freefall; the tween never touches WalkSpeed and follows the floor, so both are untouched. After a death the character respawns at the arena entrance, 114 studs from the Champion, and the aimed projectile comes every eight seconds - closing that gap before it fires is what this is for." },
     { version = "4.12.7", date = "2026-09-02", notes = "Park in the lobby. The autofarm master switch is turned off on arriving in the lobby and back on on arriving in a dungeon, once per place change so a hand on the switch inside a place is respected. Queueing no longer needs the master switch on, since the switch is now off in the lobby by design. Toggle under Auto queue, saved with the config." },
@@ -533,6 +534,9 @@ CFG.autoQueueRetry = 25               -- seconds between attempts while still in
 CFG.autoQueueStartDelay = 2.0         -- seconds between the party existing and pressing start
 CFG.autoQueueReplay = true            -- when a run ends and we own the party, replay it
 CFG.autoQueueReplayDelay = 6          -- seconds after the run ends before replaying (loot lands first)
+CFG.meleeStandoff = 14           -- a melee mob closes fast and one swing kills: stand this far past its body (4.12.10)
+CFG.meleeMobMaxReach = 8         -- a mob whose own meleeDistance is at most this is a melee mob
+CFG.autosaveInterval = 10        -- seconds between config autosaves when something changed (4.12.10)
 CFG.bossStandoff = 26          -- where to stand against a boss: inside ability range, outside its melee
 CFG.dodgeHubBurstGap = 2.0     -- an interval longer than this between a hub's lines is a gap, not the period
 CFG.dodgePredictSteps = 2      -- how many of a sweeping hub's next lines to predict
@@ -543,7 +547,7 @@ CFG.dodgePredictedLive = 1.0   -- how long a predicted line hurts when nothing h
 CFG.armFadeStep = 0.08
 CFG.armMinDelay = 0.3
 CFG.armDefaultDelay = 1.5        -- a telegraphed attack with unknown timing is assumed to fire this long after it appears (4.12.6)
-CFG.armDefaultLive = 0.6         -- an armed attack with no measured window is over this long after arming (4.12.6)
+CFG.armDefaultLive = 1.5         -- an armed attack with no measured window is over this long after arming (4.12.6; 1.5 since 4.12.10: the Frost Giant's beams killed at 2.6-3.1 s)
 CFG.learnTimingFromHits = false  -- learn an attack's window from being hit by it (4.12.3: off; blame went to the nearest part and rewrote the seeds)
 -- Seconds after a precast has fully faded before the attack counts as over.
 CFG.armDoneLinger = 0.3
