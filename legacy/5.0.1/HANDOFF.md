@@ -1,9 +1,3 @@
-> **STATUS 2026-09-02:** the 5.0.x rewrite this brief describes was built (see
-> `legacy/5.0.1/`) but never ran in the real game. Chris chose to continue from
-> **4.11.3**, restored as 4.12.0. Sections 1-3 (what the game does, the anticheat,
-> what went wrong) are still the best notes in the repo; sections 4-9 describe the
-> shelved code.
-
 # HANDOFF - the rewrite brief (2026-09-02)
 
 Read this first in a new session. It is everything two days of work with Chris

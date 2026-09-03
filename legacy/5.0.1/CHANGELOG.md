@@ -11,14 +11,90 @@ file and that table in sync on every edit.
 
 ---
 
-## 4.12.0 - 2026-09-02 - "Back to the one that worked"
+## 5.0.1 - 2026-09-02
 
-**Restored from 4.11.3.** The 5.0.x rewrite (`reader`, `field`, `bosses`, the
-new `dodge`/`mover`/`pursuit`) is shelved intact under `legacy/5.0.1/` with its
-own changelog and the rewrite brief (`HANDOFF.md`). It never ran in the real
-game; Chris judged 4.11.3 the version that was working decently, so that is the
-base again. Nothing else changes in this version - the strip and the pathfinding
-fixes come on top of it.
+- A part parented to workspace with no boss event behind it and moving
+  faster than 60 studs/s is a visual, not a projectile (`projectileMaxSpeed`).
+  The spearman's `spearmanStrike` part is tweened 65 studs in 0.25 s; read as
+  a projectile it became a 300-stud strip of danger, forty times a run. The
+  hit is the `spearmanStrikeHitbox` Model, read as before.
+- HANDOFF section 9 records the 5.0.0 state.
+
+## 5.0.0 - 2026-09-02 - "Northern Lands" - the rewrite
+
+The internals are new: `core`, `reader`, `field`, `bosses`, `mover`, `dodge`,
+`pursuit`, `draw`, `tools`, `config`, `main`. Kept as they were: `uikit`,
+`ui` (every panel, control and string), `path` (the waypoint editor),
+`streamer`, `gamedata`. The 4.11 code is frozen under `legacy/4.11.3`.
+
+- **Reader.** Every attack Model under workspace is tracked from
+  `ChildAdded` and its precast read every frame. From Chris's real Northern
+  Lands capture (6 deaths, 136 s, 422 attacks): the precast is visible from
+  spawn, flashes to 0.17 at the instant the hit lands, and fades to 1.0 about
+  0.2 s later; the invisible hitBox that lingers for seven seconds afterwards
+  is floor. The flash age per attack is in `bosses.lua` (beam 0.92, mage shot
+  0.98, spearman strike 0.86, warrior line strike 0.66, warrior circle strike
+  0.65 / 0.37, jump slam 1.8). An attack hurts from `Lead` before its flash
+  until 0.25 s after; unknown names hurt for their whole visible life plus a
+  linger; a precast that is never visible is floor. No timing is learned
+  from being hit.
+- **Projectiles** come from the boss remote with their exact path (240
+  studs over 8 s for the criss cross, from the arena walls; spawned on a
+  player standing outside the arena). Parts without an event are tracked by
+  their measured velocity.
+- **The sweep.** From two consecutive beams (20 degrees, 0.5 s apart) the
+  next three are placed in the field before they exist. Bosses are stood off
+  at 26 studs, 45 while a sweep is firing.
+- **Field.** One function: danger at a point and a time, the worst of every
+  attack whose window contains that time plus every enemy's body, with a
+  hard margin and a soft ring.
+- **Dodge.** Rings of candidates scored along the line at the moments they
+  are crossed and at arrival for the dwell, distance, turn and approach
+  terms; the best few checked against the floor and the walls. No target
+  when here is fine and pursuit is free.
+- **Mover.** A tween along the floor at walking speed: root stepped toward
+  the target each frame, floor from a downward raycast, walls from a chest
+  raycast, never airborne, never faster than 16. Or `Humanoid:MoveTo`.
+- **Pursuit.** Straight at the standoff point when clear, PathfindingService
+  when a wall says otherwise, every step asked of the field first.
+- **Capture.** `Record what spawns` + `Save capture` now write the probe's
+  report (summary by name, hits, traces, events) from the reader's records.
+- The Attack Book lists every attack name the reader meets with its measured
+  flash time; switching one off makes the reader ignore it.
+
+## 4.11.6 - 2026-09-02 - probe.lua 0.2
+
+- `probe.lua` 0.2: attack lines carry the hitBox position and yaw, part
+  lines the projectile heading, hit lines the boss position and the player's
+  bearing from it. Chris's first real capture (6 deaths, 136 s) answered the
+  timing table; the one open question is whether the beam sweep's angles sit
+  on a fixed 20-degree grid. No change to the script itself.
+
+## 4.11.5 - 2026-09-02 - probe.lua
+
+- `probe.lua` (repo root): the standalone attack probe HANDOFF section 4
+  asks for. Not the bot: it moves nothing and presses nothing. It tracks
+  every attack Model under workspace from `ChildAdded` for its whole life at
+  20 Hz (precast transparency trace, the age spans during which the root was
+  inside the hitBox, removal), every BasePart parented straight to workspace
+  (the boss projectiles) with the remote event that made it, every boss
+  remote event on the game's clock, and on every health drop what enclosed
+  the root, what was near, the live projectiles with their scripted position
+  and the enemies in reach. Writes `DQProbe_<map>_<stamp>.txt` every 5 s and
+  on every hit. No change to the script itself.
+
+## 4.11.4 - 2026-09-02 - probe build
+
+- Every change (>= 0.05) of a precast transparency is noted in the attack
+  lifecycle line with its age (`tr0.70`, `tr0.35`, `tr1.00`), next to the
+  `HIT` ages. One capture now says, per attack, at what age and transparency
+  the hit lands and when it fades.
+- The 4.11.3 code is frozen under `legacy/4.11.3` (tag `v4.11.3-legacy`,
+  branch `legacy-4.11`) ahead of the rewrite.
+- `HANDOFF.md` rewritten as the rewrite brief (the previous v2.7 handoff is
+  kept as `legacy/4.11.3/HANDOFF_v2.7.md`). Place dumps of the NL fight save
+  and the Aquatic Temple save under `game/dumps/`, the latest NL capture under
+  `game/captures/`.
 
 ## 4.11.3 - 2026-09-02
 
