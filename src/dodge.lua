@@ -215,6 +215,11 @@ local function refreshSources()
             if times[i] < cutoff then table.remove(times, i) else n = n + 1 end
         end
         hub.rate = n / 10
+        -- Active: lines are coming now. Imminent: the gap between bursts is
+        -- nearly used up. Either way the ring is the place to be.
+        local since = clock - hub.lastSpawn
+        hub.active = since <= max((hub.period or 0.5) * 3, 1.5)
+        hub.imminent = hub.gap ~= nil and since >= hub.gap - CFG.dodgeHubLeave and since < hub.gap + 5
 
         -- Prediction: when the last two steps of heading agree, the next
         -- lines are the same step further round, one period apart.
@@ -594,10 +599,13 @@ local function decide(root, humanoid)
     -- distance, times how often lines come, over the time we would stand
     -- there. Melee standoff sits deep inside it; the field pushes the
     -- character out to where a volley is a nuisance rather than a certainty.
+    -- Only while it is firing: the rate stays up for ten seconds after a
+    -- burst, and a radial cost that stays with it kept the character out
+    -- through the whole quiet gap - the one time it could have been casting.
     local hubs = {}
     for i = 1, #DG.enemies do
         local e = DG.enemies[i]
-        if e.hub and e.hub.rate >= CFG.dodgeHubMinRate then hubs[#hubs + 1] = e end
+        if e.hub and e.hub.rate >= CFG.dodgeHubMinRate and e.hub.active then hubs[#hubs + 1] = e end
     end
     local hubWeight, hubWidth = CFG.dodgeHubWeight, CFG.dodgeHubLineWidth
     local function hubCost(x, z)
@@ -615,29 +623,25 @@ local function decide(root, humanoid)
     -- Going in to a hub is allowed only when there is time to get there and
     -- back out before the next volley fires: the last volley's time, the
     -- observed period, and the lines' learned arming delay say when that is.
-    if approach and #hubs > 0 then
-        local target = NAV.cachedEnemy
-        local hub = DG.hubs[target]
-        if hub and hub.rate >= CFG.dodgeHubMinRate and hub.period then
-            local ax, az = approach.X - rx, approach.Z - rz
-            local approachTime = max(sqrt(ax * ax + az * az) - preferred, 0) / speed
-            local nextFire = hub.lastSpawn + hub.period + (hub.fire or CFG.dodgeHubFireGuess)
-            local nowc = os.clock()
-            -- A volley that is overdue by a whole period is not coming: the
-            -- burst is over and the hub is quiet. (Held forever otherwise -
-            -- an expected time in the past can never be got ahead of.)
-            local quiet = nowc > nextFire + hub.period
-            if not quiet and nowc + approachTime + CFG.dodgeHubExit > nextFire then
-                -- No time to go in and get out: wait on the hub ring instead
-                -- of wandering off. With nothing pulling inward the radial
-                -- cost alone had the character fifty-five studs out, from
-                -- where the gate could never open in time to matter.
-                preferred = max(preferred, CFG.dodgeHubStandoff)
-                DG.hubHold = true
-            else
-                DG.hubHold = false
-            end
+    -- The hub's rhythm sets where to stand (4.10.6). While it fires, and
+    -- for the last seconds of the gap before it fires again, the ring at
+    -- dodgeHubStandoff: far enough out that the lines of a sweep have gaps
+    -- between them. In the quiet, the ability standoff, to cast. The ring
+    -- is held from both sides - inside it is as wrong as outside.
+    DG.hubHold = false
+    if approach then
+        local hub = DG.hubs[NAV.cachedEnemy]
+        if hub and hub.rate >= CFG.dodgeHubMinRate and (hub.active or hub.imminent) then
+            preferred = CFG.dodgeHubStandoff
+            DG.hubHold = true
         end
+    end
+    local hold = DG.hubHold
+    local function approachCost(x, z)
+        local ax, az = x - approach.X, z - approach.Z
+        local dd = sqrt(ax * ax + az * az) - preferred
+        if hold then return approachWeight * abs(dd) end
+        return approachWeight * max(0, dd)
     end
 
     -- Five samples along the line from here to (rx+ox, rz+oz): three on the
@@ -719,8 +723,7 @@ local function decide(root, humanoid)
         -- nearest the edge.
         if approach then
             if raw < moveAt then
-                local ax, az = cx - approach.X, cz - approach.Z
-                cost = cost + approachWeight * max(0, sqrt(ax * ax + az * az) - preferred)
+                cost = cost + approachCost(cx, cz)
             else
                 cost = cost + approachWeight * CFG.dodgeReach * 2
             end
@@ -818,10 +821,7 @@ local function decide(root, humanoid)
             DG.targetReason = "line closed"
         elseif best then
             local stillCost = graded + d * distCost + hubCost(target.X, target.Z)
-            if approach then
-                local ax, az = target.X - approach.X, target.Z - approach.Z
-                stillCost = stillCost + approachWeight * max(0, sqrt(ax * ax + az * az) - preferred)
-            end
+            if approach then stillCost = stillCost + approachCost(target.X, target.Z) end
             if (best.adjusted or best.cost) > stillCost - CFG.dodgeHysteresis then
                 best = nil    -- the current box wins
             end
@@ -836,7 +836,8 @@ local function decide(root, humanoid)
         local inRange = true
         if approach then
             local ax, az = rx - approach.X, rz - approach.Z
-            inRange = sqrt(ax * ax + az * az) <= preferred + 1.5
+            local d = sqrt(ax * ax + az * az)
+            inRange = hold and abs(d - preferred) <= 2.5 or (not hold and d <= preferred + 1.5)
         end
         if inRange then
             DG.target = nil
@@ -854,10 +855,7 @@ local function decide(root, humanoid)
         end
         -- Hysteresis for the approach too, or the box creeps a stud at a time.
         local hereCost = hubCost(rx, rz)
-        if approach then
-            local ax, az = rx - approach.X, rz - approach.Z
-            hereCost = approachWeight * max(0, sqrt(ax * ax + az * az) - preferred)
-        end
+        if approach then hereCost = hereCost + approachCost(rx, rz) end
         if (best.adjusted or best.cost) > hereCost - CFG.dodgeHysteresis then
             DG.target = nil
             DG.targetReason = "safe here"

@@ -225,7 +225,10 @@ local function attackEnemy(enemy)
         -- so the bot could no longer cross a room.)
         -- And not while the dodge itself is waiting for a gap: five clear
         -- studs at a time was how it walked into a pattern one step per tick.
-        if not DG.gapWait and dodgeStepClear(root, humanoid, pursuitAhead(enemyRoot)) then
+        -- Nor while the dodge is holding the ring off a hub: pursuit's
+        -- standoff is the ability range, and walking there during a burst
+        -- is walking into the sweep.
+        if not DG.gapWait and not DG.hubHold and dodgeStepClear(root, humanoid, pursuitAhead(enemyRoot)) then
             DG.pursuitBlocked = false
             updatePursuitMovement(enemy, humanoid, root, enemyRoot)
         else
