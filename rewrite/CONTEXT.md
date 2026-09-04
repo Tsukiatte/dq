@@ -258,3 +258,9 @@ crystal with the field's spot leading while an orb is out (a separate orb
 drive fought the dodging and went back and forth); 6.6.12 never stand on
 ground about to go hot (reflex, blocked walk, in-range, orb hold). Runs on
 6.6.7+ killed both bosses.
+6.6.14 one stillness threshold for bare projectiles, owned by the reader tick,
+deleted a second after they stop (two thresholds made spear boxes flash);
+6.6.15 spread beam padding 8 (deaths 2.4 and 7.8 studs outside its box), ice
+spike zones +6 studs and 1.2 s (they slow the character, which is what then
+gets it killed), the blink's walk test on measured speed, exact windows opening
+0.3 s before the earliest measured hit.
