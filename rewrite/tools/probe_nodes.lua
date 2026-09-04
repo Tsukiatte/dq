@@ -8,7 +8,7 @@ local Players, Workspace = game:GetService("Players"), game:GetService("Workspac
 local HttpService = game:GetService("HttpService")
 local lp = Players.LocalPlayer
 if _G.DQNodes and _G.DQNodes.stop then pcall(_G.DQNodes.stop) end
-local N = { started = os.clock(), samples = {}, orphans = {}, stopped = false }
+local N = { started = os.clock(), samples = {}, orphans = {}, why = {}, stopped = false }
 _G.DQNodes = N
 local function r1(v) return math.floor(v * 10 + 0.5) / 10 end
 
@@ -75,7 +75,7 @@ task.spawn(function()
             local now, rp = os.clock(), rt.Position
             local boxes = S.hazards(now)
             local cands = S.DG.cands
-            local refused, blame, total, usable, warm = 0, {}, #cands, 0, 0
+            local refused, blame, total, usable, warm, blameBox = 0, {}, #cands, 0, 0, {}
             for _, cd in ipairs(cands) do
                 if (cd.danger or 0) < 0.999 and (cd.endDanger or 0) < 0.999 then
                     usable = usable + 1                                   -- nothing lethal on the way there or when we arrive
@@ -100,6 +100,7 @@ task.spawn(function()
                     if who and best >= -2 then
                         local key = (who.name or "?") .. when
                         blame[key] = (blame[key] or 0) + 1
+                        blameBox[key] = who
                     else
                         blame["(nothing covers it: check the walk, not the spot)"] = (blame["(nothing covers it: check the walk, not the spot)"] or 0) + 1
                     end
@@ -119,13 +120,34 @@ task.spawn(function()
                 warn(string.format("[DQ nodes] %d live box(es) whose object is GONE: %s", #gone, table.concat(gone, "; ", 1, math.min(#gone, 3))))
             end
             -- The line Chris wants when the ring goes solid red: what refused it, and whether anything was left at all.
+            -- Nearly solid: say what each refusing box IS right now. A window that opened long ago on a part that no
+            -- longer exists is a phantom; a window that has not opened yet is a prediction; a live one is real.
+            if total > 0 and usable <= 10 then
+                local lines = {}
+                for key, cnt in pairs(blame) do
+                    local b = blameBox[key]
+                    if b and cnt >= 3 then
+                        local opened, closes = now - (b.from or 0), (b.untilAt or 0) - now
+                        local src = b.model or b.part or b.hb or b.pc
+                        local there = src == nil and "no source recorded" or (src.Parent and "source present" or "SOURCE GONE")
+                        lines[#lines + 1] = string.format("%s: %d nodes, opened %+.1fs ago, closes in %.1fs, %s%s", key, cnt, opened, closes, there,
+                            (src and src.Parent and src:IsA("BasePart") and (" tr" .. string.format("%.2f", src.Transparency))) or "")
+                    end
+                end
+                table.sort(lines)
+                if #lines > 0 then
+                    N.why[#N.why + 1] = { t = r1(now - N.started), usable = usable, lines = lines }
+                    while #N.why > 60 do table.remove(N.why, 1) end
+                    if now - (N.lastWhy or 0) > 4 then N.lastWhy = now warn("[DQ nodes why] usable " .. usable .. " | " .. table.concat(lines, " || ")) end
+                end
+            end
             if total > 0 and usable == 0 then
                 warn(string.format("[DQ nodes] EVERY node refused (%d of %d), most by %s (%d) | %d boxes live, %d tracked, %d no floor, %d unwalkable",
                     refused, total, tostring(top), topN, #boxes, liveN, st.noFloor or -1, st.notWalkable or -1))
             elseif total > 0 and usable <= 3 then
                 warn(string.format("[DQ nodes] only %d of %d nodes left (%d of them warm), most refused by %s (%d)", usable, total, warm, tostring(top), topN))
             end
-            if (e.t % 10) < 0.5 then pcall(writefile, "dq_nodes.json", HttpService:JSONEncode({ samples = N.samples, orphans = N.orphans })) end
+            if (e.t % 10) < 0.5 then pcall(writefile, "dq_nodes.json", HttpService:JSONEncode({ samples = N.samples, orphans = N.orphans, why = N.why })) end
         end
     end
 end)
