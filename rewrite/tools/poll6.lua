@@ -56,6 +56,7 @@ for i = firstShown, #R.hits do
     local sp = {}
     for k, s in ipairs(h.spawns or {}) do if k <= 8 then sp[#sp + 1] = s end end
     lines[#lines + 1] = "  spawns: " .. table.concat(sp, " | ")
+    if h.beams then lines[#lines + 1] = "  beams: " .. h.beams end
     out.hits[#out.hits + 1] = table.concat(lines, "\n")
 end
 return out

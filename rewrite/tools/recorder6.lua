@@ -224,6 +224,15 @@ local function hookHumanoid(c)
                 grace = S and S.DG and S.DG.grace ~= math.huge and r1(S.DG.grace) or nil,
                 target = S and S.BR and S.BR.target and S.BR.target.model.Name or nil,
                 blinks = S and S.RT.blinks or 0, lastBlinkAgo = (S and S.RT.lastBlinkAt) and r1(t - S.RT.lastBlinkAt) or nil,
+                beams = (function()   -- the Champion's beams: yaw and age of the last twelve, and our bearing from the hub (mod 180, like the yaws)
+                    local bl = S and S.RD and S.RD.beams
+                    if not bl or #bl == 0 or not rt then return nil end
+                    local list = {}
+                    for i = math.max(1, #bl - 11), #bl do local b = bl[i] list[#list + 1] = string.format("%.0f@-%.1f", b.yaw, t - b.t) end
+                    local hub = bl[#bl].hub
+                    local myYaw = math.deg(math.atan2(rt.Position.X - hub.X, rt.Position.Z - hub.Z)) % 180
+                    return string.format("me %.0f at %.0f from hub | %s", myYaw, (Vector3.new(rt.Position.X - hub.X, 0, rt.Position.Z - hub.Z)).Magnitude, table.concat(list, " "))
+                end)(),
                 reflex = S and S.RT.reflex and S.RT.reflex.name or nil,
                 cands = (function()
                     if not (S and S.DG and S.DG.cands) then return nil end
