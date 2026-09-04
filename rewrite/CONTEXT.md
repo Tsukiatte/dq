@@ -388,3 +388,24 @@ is a kick risk (kick nine).
   Orb Explosion zone 20 (the bot stood 7.6 from one and lived).
 - Tools: per-instance dumps dq_rec6_<job>_<time>.json / dq_probe_... /
   dq_odin_...; poll_odin.lua; dq_boot skips the lobby and loads probe_odin.
+6.6.41-6.6.45 (last of the 2026-09-04 session):
+- THE SLAM BOX IS STATIC (recorder `slams` probe: moved 0 in every sample; the
+  earlier "it follows the player" was the recorder re-anchoring to the precast
+  after the hit). Slam runs failed on radial speed (12 studs/s of 22) from
+  switching headings: the kept heading now wins unless another is 15 studs
+  shorter; the step check looks 0.4 s further on (a criss cross reached the
+  step after the check). The criss cross that spawns ON the player comes
+  0.7-1.3 s after Jump Up; the hop window is 1.1-1.35 s (a gamble; often
+  misses). This is the one death per Champion fight still unsolved.
+- Bob's orbs: they close at ~30 studs/s against our 22. The burst never rests
+  while an orb is out, the lead starts the moment an orb exists (was: within
+  160), the pull is 0.2/stud, the handoff is 5 studs from the crystal (22 let
+  the orb turn and follow the bot back out - "it forgot the orb").
+- Odin: the ring arcs kill AS THEY APPEAR (a death 4 studs outside two 10-thick
+  bands at the instant a set spawned), flash visible ~1.5 s, then sit invisible
+  for 20 s; arc zones live 1.8 s, 12 thick. Rings every 12.5 studs on
+  alternating sides: the one radius clear of every set is ~96 from the arena
+  centre (thirdBossMiddlePart), between the 87.5 and 105 rings -> the Odin
+  profile has `ringBand`, the field pulls to CFG.ringBandRadius (96) at
+  CFG.ringBandWeight (0.3/stud). Untested at the time of writing. Missile box
+  24 x 44 (a missile 12 studs away killed with the 10x30 box clear).
