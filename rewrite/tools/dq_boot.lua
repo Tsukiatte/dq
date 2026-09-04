@@ -3,7 +3,14 @@
 task.spawn(function()
     task.wait(7)
     if _G.DungeonAutofarmState then return end   -- already running here (a manual load beat us to it)
-    pcall(function() loadstring(readfile("dq_rewrite.lua"))() end)
+    -- The staged build, and the last verified one behind it: a bundle that will not compile must never leave the
+    -- run with no bot at all.
+    local f = loadstring(readfile("dq_rewrite.lua"))
+    if not f then
+        warn("[DQ boot] dq_rewrite.lua does not compile; falling back to dq_rewrite_prev.lua")
+        f = loadstring(readfile("dq_rewrite_prev.lua"))
+    end
+    if f then pcall(f) end
     task.wait(2)
     if not workspace:FindFirstChild("dungeon") then return end   -- the lobby has nothing to record
     pcall(function() loadstring(readfile("dq_recorder6.lua"))() end)

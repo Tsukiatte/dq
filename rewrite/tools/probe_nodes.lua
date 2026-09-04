@@ -75,8 +75,12 @@ task.spawn(function()
             local now, rp = os.clock(), rt.Position
             local boxes = S.hazards(now)
             local cands = S.DG.cands
-            local refused, blame, total = 0, {}, #cands
+            local refused, blame, total, usable, warm = 0, {}, #cands, 0, 0
             for _, cd in ipairs(cands) do
+                if (cd.danger or 0) < 0.999 and (cd.endDanger or 0) < 0.999 then
+                    usable = usable + 1                                   -- nothing lethal on the way there or when we arrive
+                    if (cd.danger or 0) > 0.2 or (cd.endDanger or 0) > 0.2 then warm = warm + 1 end
+                end
                 if (cd.danger or 0) >= 0.999 or (cd.endDanger or 0) >= 0.999 then
                     refused = refused + 1
                     local x, z = rp.X + cd.ox, rp.Z + cd.oz
@@ -105,7 +109,7 @@ task.spawn(function()
             local top, topN = nil, 0
             for k, v in pairs(blame) do if v > topN then top, topN = k, v end end
             local st = S.DG.evalStats or {}
-            local e = { t = r1(now - N.started), nodes = total, refused = refused, valid = st.valid, noFloor = st.noFloor,
+            local e = { t = r1(now - N.started), nodes = total, refused = refused, usable = usable, warm = warm, valid = st.valid, noFloor = st.noFloor,
                 notWalkable = st.notWalkable, boxes = #boxes, tracked = liveN, top = top, topN = topN, orphans = #gone }
             N.samples[#N.samples + 1] = e
             if #N.samples > 400 then table.remove(N.samples, 1) end
@@ -114,9 +118,12 @@ task.spawn(function()
                 while #N.orphans > 200 do table.remove(N.orphans, 1) end
                 warn(string.format("[DQ nodes] %d live box(es) whose object is GONE: %s", #gone, table.concat(gone, "; ", 1, math.min(#gone, 3))))
             end
-            if total > 0 and (st.valid or 0) == 0 then
-                warn(string.format("[DQ nodes] no node is usable: %d of %d refused, most by %s (%d) | %d boxes, %d tracked, %d with no floor, %d unwalkable",
+            -- The line Chris wants when the ring goes solid red: what refused it, and whether anything was left at all.
+            if total > 0 and usable == 0 then
+                warn(string.format("[DQ nodes] EVERY node refused (%d of %d), most by %s (%d) | %d boxes live, %d tracked, %d no floor, %d unwalkable",
                     refused, total, tostring(top), topN, #boxes, liveN, st.noFloor or -1, st.notWalkable or -1))
+            elseif total > 0 and usable <= 3 then
+                warn(string.format("[DQ nodes] only %d of %d nodes left (%d of them warm), most refused by %s (%d)", usable, total, warm, tostring(top), topN))
             end
             if (e.t % 10) < 0.5 then pcall(writefile, "dq_nodes.json", HttpService:JSONEncode({ samples = N.samples, orphans = N.orphans })) end
         end
