@@ -286,3 +286,29 @@ sample and swept a phantom wall across the arena (first 0.4 s ignored, speed
 clamped to 40), and a still wall was boxed along the world X axis instead of
 the line between its two balls, so an angled wall had no box where it stood.
 The replayed run on 6.6.20 killed the Champion with no deaths at all.
+6.6.23 a keep-out pad of 45 studs round the Champion (spots closer cost);
+6.6.24 zone lead scales with the zone's radius, a slowed character may hop
+early; 6.6.25 anti-cheat kick nine: the game lowers WalkSpeed itself (ice
+spike slow) and puts a part under `workspace.stunParts/<player>` while stunned;
+the bot no longer forces WalkSpeed back up and stands still while stunned.
+6.6.26, the fan regression Chris saw: the Champion re-aims a POOL of parked
+passive beam Models. A re-aim never moves a full-line hitBox (its centre is the
+hub) and the sweep's re-track gate wanted the precast seen off first, so a
+Model re-cast within a second of its last hit went blind for the rest of the
+fight - the fan deaths had no beam box anywhere near. Every tracked Model is
+now watched (precast Transparency dropping, or a parked hitBox turning) and
+re-tracked that frame. Same bundle: a field spot on the far side of a wall box
+is never taken (the bot walked through Bob's wall to a "clean" spot behind
+it); the slam reflex leaves the 67-stud cube through its nearest face (54 to a
+corner - it ran the diagonal and died at 40 of 44 twice) and the head-start
+hop is tried for 0.6 s; Bob's circles late in the chain kill as they appear
+(predicted `at` is +0.1 not +0.6) and the circle strip is three nested bands
+warmer toward its axis so the field walks out sideways. recorder6's boxDepth
+now uses the radius for cylinders (it read a standing cylinder as a slab, so
+circle verdicts before this were wrong).
+6.6.27 streamer mode, a section in the Overlays window (CFG.streamer*): hides
+the nameplate's name/title/VIP and the HUD name (`playerStatus.Frame.playerName`),
+the health numbers/bar, `playerStatsLeaderboard` and Roblox's PlayerList, other
+players' nameplates, the chat; the character is a black 2x5x2 block (the spot
+marker's size) under `DungeonAutofarmVisuals`. Every property it touches is
+restored when the mode goes off (ST.saved).
