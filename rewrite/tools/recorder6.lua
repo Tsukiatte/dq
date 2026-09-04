@@ -13,6 +13,7 @@ local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local lp = Players.LocalPlayer
 local S = _G.DungeonAutofarmState
+R.botVersion = S and S.SCRIPT_VERSION or nil
 if _G.DQRec5 and _G.DQRec5.stop then pcall(_G.DQRec5.stop) end
 local R = { started = os.clock(), hits = {}, samples = {}, states = {}, conns = {}, trace = {}, verdicts = {}, blinkLog = {}, reflexLog = {}, slams = {}, rings = {},
     move = { n = 0, effSum = 0, dotSum = 0, stuck = 0, idle = 0 } }
@@ -123,6 +124,7 @@ local lastPos, lastT = nil, nil
 local lastBlinks, lastReflex = 0, nil
 task.spawn(function()
     while _G.DQRec5 == R and not R.stopped do
+        S = _G.DungeonAutofarmState   -- re-resolved every pass: a reloaded bot is a new table, and the old one is a corpse
         task.wait(0.1)
         local c = lp.Character
         local hum = c and c:FindFirstChildOfClass("Humanoid")
@@ -277,6 +279,7 @@ R.conns[#R.conns + 1] = lp.CharacterAdded:Connect(function(c) R.states[#R.states
 
 task.spawn(function()
     while _G.DQRec5 == R and not R.stopped do
+        S = _G.DungeonAutofarmState   -- re-resolved every pass: a reloaded bot is a new table, and the old one is a corpse
         task.wait(1)
         local e = S and S.BR and S.BR.target
         local rt = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
@@ -288,6 +291,7 @@ task.spawn(function()
 end)
 task.spawn(function()
     while _G.DQRec5 == R and not R.stopped do
+        S = _G.DungeonAutofarmState   -- re-resolved every pass: a reloaded bot is a new table, and the old one is a corpse
         task.wait(10)
         local spawns = {}
         for i = math.max(1, #R.spawns - 250), #R.spawns do
@@ -295,7 +299,7 @@ task.spawn(function()
             spawns[#spawns + 1] = { t = r1(sp.at - R.started), name = sp.name, class = sp.class, dist = sp.dist, size = sp.size, pos = sp.pos }
         end
         local blob = HttpService:JSONEncode({ savedAt = os.date("%H:%M:%S"), placeId = game.PlaceId,
-            version = S and S.SCRIPT_VERSION or "no bot",
+            version = S and S.SCRIPT_VERSION or "no bot", reloaded = (S and S.SCRIPT_VERSION) ~= R.botVersion or nil,
             settings = S and S.CFG and { blinkFloor = S.CFG.blinkFloor, blinkBossPerMinute = S.CFG.blinkBossPerMinute,
                 blinkMobsPerMinute = S.CFG.blinkMobsPerMinute, blinkMobCooldown = S.CFG.blinkMobCooldown,
                 stepBlockAt = S.CFG.stepBlockAt, tweenEscape = S.CFG.tweenEscape, targetPriority = S.CFG.targetPriority } or nil, target = S and S.BR and S.BR.target and S.BR.target.model.Name or nil,
@@ -319,6 +323,7 @@ task.spawn(function()
     local lp = game:GetService("Players").LocalPlayer
     local lastHp, warned = nil, false
     while _G.DQRec5 == R and not R.stopped do
+        S = _G.DungeonAutofarmState   -- re-resolved every pass: a reloaded bot is a new table, and the old one is a corpse
         task.wait(0.1)
         local mid = workspace:FindFirstChild("thirdBossMiddlePart")
         local c = lp.Character
