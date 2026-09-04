@@ -228,6 +228,9 @@ Measured this way (Northern Lands, Nightmare):
 | Champion jump slam | once | 1.98 s | precast from spawn, off at 2.15 s | 5 s |
 | Northern mage shot | once | 0.75-0.97 s | precast from spawn | |
 | Champion criss cross | no touch test on the client part | server-side, continuous; can spawn on the player and kill within 0.1 s | | 10 s |
+| Bob horizontal beam | once | 1.03-1.08 s (n=54) | precast from spawn, off at 1.23 s | 5 s |
+| Bob spread beam | once | 0.92-1.20 s (n=42) | precast from spawn, off at 1.35 s | 5 s |
+| Bob circle, ice spikes, wall | no touch test on the client parts | server-side; circle precast off at 1.18 s, spikes at 0.95-1.65 s | | 10 s / 18 s |
 
 The old seeds held the beam lethal for 3.5 s and the mage shot for 2.5 s;
 those windows, not the movement, are why the first boss looked unreadable and
