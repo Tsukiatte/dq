@@ -17,6 +17,7 @@ if _G.DQRec5 and _G.DQRec5.stop then pcall(_G.DQRec5.stop) end
 local R = { started = os.clock(), hits = {}, samples = {}, states = {}, conns = {}, trace = {}, verdicts = {}, blinkLog = {}, reflexLog = {},
     move = { n = 0, effSum = 0, dotSum = 0, stuck = 0, idle = 0 } }
 _G.DQRec5 = R
+R.file = string.format("dq_rec6_%s_%s.json", string.sub(game.JobId ~= "" and game.JobId or "local", 1, 8), os.date("%H%M%S"))
 local function r1(v) return math.floor(v * 10 + 0.5) / 10 end
 local function r2(v) return math.floor(v * 100 + 0.5) / 100 end
 local function v3(v) return { r1(v.X), r1(v.Y), r1(v.Z) } end
@@ -64,7 +65,7 @@ R.conns[#R.conns + 1] = workspace.DescendantAdded:Connect(function(inst)
     local p = inst:IsA("BasePart") and inst or (inst:IsA("Model") and (inst.PrimaryPart or inst:FindFirstChildWhichIsA("BasePart")))
     local d = (p and rt) and r1((Vector3.new(p.Position.X, 0, p.Position.Z) - Vector3.new(rt.Position.X, 0, rt.Position.Z)).Magnitude) or nil
     R.spawns[#R.spawns + 1] = { at = os.clock(), name = (top ~= inst and (top.Name .. "/") or "") .. inst.Name, class = inst.ClassName, dist = d,
-        pos = p and v3(p.Position) or nil, size = p and string.format("%.0fx%.0fx%.0f", p.Size.X, p.Size.Y, p.Size.Z) or nil }
+        pos = p and v3(p.Position) or nil, size = p and string.format("%.0fx%.0fx%.0f", p.Size.X, p.Size.Y, p.Size.Z) or nil, yaw = p and r1(math.deg(math.atan2(p.CFrame.LookVector.X, p.CFrame.LookVector.Z))) or nil }
     if #R.spawns > 400 then table.remove(R.spawns, 1) end
 end)
 pcall(function()
@@ -89,7 +90,7 @@ local function recentSpawns(t, deathPos)
         if t - sp.at > 4 then break end
         local dd = (sp.pos and deathPos) and r1(math.sqrt((sp.pos[1] - deathPos.X) ^ 2 + (sp.pos[3] - deathPos.Z) ^ 2)) or nil
         if not sp.name:lower():find("passivebeam") or (sp.dist or 99) < 12 or (dd or 99) < 12 then
-            out[#out + 1] = string.format("%.1fs %s(%s) d%s fromDeath%s %s", t - sp.at, sp.name, sp.class, tostring(sp.dist), tostring(dd), sp.size or "")
+            out[#out + 1] = string.format("%.1fs %s(%s) d%s fromDeath%s %s%s", t - sp.at, sp.name, sp.class, tostring(sp.dist), tostring(dd), sp.size or "", sp.yaw and (" yaw" .. sp.yaw) or "")
         end
     end
     return out
@@ -224,6 +225,7 @@ local function hookHumanoid(c)
                 grace = S and S.DG and S.DG.grace ~= math.huge and r1(S.DG.grace) or nil,
                 target = S and S.BR and S.BR.target and S.BR.target.model.Name or nil,
                 blinks = S and S.RT.blinks or 0, lastBlinkAgo = (S and S.RT.lastBlinkAt) and r1(t - S.RT.lastBlinkAt) or nil,
+                hopFail = (S and S.RT.hopFailAt and t - S.RT.hopFailAt < 4) and S.RT.hopFail or nil,
                 beams = (function()   -- the Champion's beams: yaw and age of the last twelve, and our bearing from the hub (mod 180, like the yaws)
                     local bl = S and S.RD and S.RD.beams
                     if not bl or #bl == 0 or not rt then return nil end
@@ -270,8 +272,10 @@ task.spawn(function()
             local sp = R.spawns[i]
             spawns[#spawns + 1] = { t = r1(sp.at - R.started), name = sp.name, class = sp.class, dist = sp.dist, size = sp.size, pos = sp.pos }
         end
-        pcall(writefile, "dq_rec6.json", HttpService:JSONEncode({ savedAt = os.date("%H:%M:%S"), placeId = game.PlaceId, target = S and S.BR and S.BR.target and S.BR.target.model.Name or nil,
-            hits = R.hits, samples = R.samples, states = R.states, verdicts = R.verdicts, move = R.move, blinks = R.blinkLog, reflexes = R.reflexLog, spawns = spawns }))
+        local blob = HttpService:JSONEncode({ savedAt = os.date("%H:%M:%S"), placeId = game.PlaceId, target = S and S.BR and S.BR.target and S.BR.target.model.Name or nil,
+            hits = R.hits, samples = R.samples, states = R.states, verdicts = R.verdicts, move = R.move, blinks = R.blinkLog, reflexes = R.reflexLog, spawns = spawns })
+        pcall(writefile, "dq_rec6.json", blob)
+        pcall(writefile, R.file, blob)   -- and one per server instance: a new place overwrote the boss fight within ten seconds
     end
 end)
 function R.stop() for _, c in ipairs(R.conns) do pcall(function() c:Disconnect() end) end R.stopped = true end

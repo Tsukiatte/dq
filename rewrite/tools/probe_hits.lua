@@ -6,6 +6,7 @@ local lp = game.Players.LocalPlayer
 if _G.DQHitProbe and _G.DQHitProbe.stop then pcall(_G.DQHitProbe.stop) end
 local H = { started = os.clock(), models = {}, samples = {}, conns = {} }
 _G.DQHitProbe = H
+H.file = string.format("dq_probe_%s_%s.json", string.sub(game.JobId ~= "" and game.JobId or "local", 1, 8), os.date("%H%M%S"))
 local function r2(v) return math.floor(v * 100 + 0.5) / 100 end
 local function partsOf(model)
     local list = {}
@@ -97,7 +98,9 @@ task.spawn(function()
         pcall(function()
             local out = H.report()
             out.placeId, out.savedAt = game.PlaceId, os.date("%H:%M:%S")
-            writefile("dq_probe.json", HttpService:JSONEncode(out))
+            local blob = HttpService:JSONEncode(out)
+            writefile("dq_probe.json", blob)
+            writefile(H.file, blob)
         end)
     end
 end)

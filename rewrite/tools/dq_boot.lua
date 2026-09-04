@@ -5,6 +5,8 @@ task.spawn(function()
     if _G.DungeonAutofarmState then return end   -- already running here (a manual load beat us to it)
     pcall(function() loadstring(readfile("dq_rewrite.lua"))() end)
     task.wait(2)
+    if not workspace:FindFirstChild("dungeon") then return end   -- the lobby has nothing to record
     pcall(function() loadstring(readfile("dq_recorder6.lua"))() end)
     pcall(function() loadstring(readfile("dq_probe_hits.lua"))() end)
+    pcall(function() loadstring(readfile("dq_probe_odin.lua"))() end)
 end)
