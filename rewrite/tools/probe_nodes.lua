@@ -13,9 +13,10 @@ _G.DQNodes = N
 local function r1(v) return math.floor(v * 10 + 0.5) / 10 end
 
 -- Signed depth, positive inside the box. Kept local so the probe does not depend on the bundle's internals.
-local function depth(b, x, z)
+local function depth(b, x, z, t)
+    t = t or 0
     if b.moving then
-        local along = b.offset + b.speed * math.max(os.clock() - b.pathStart, 0)
+        local along = b.offset + b.speed * math.max(os.clock() + t - b.pathStart, 0)
         local qx, qz = x - (b.ox + b.dx * along), z - (b.oz + b.dz * along)
         local a = math.abs(qx * b.dx + qz * b.dz) - b.halfL
         local s = math.abs(-qx * b.dz + qz * b.dx) - b.halfW
@@ -79,18 +80,24 @@ task.spawn(function()
                 if (cd.danger or 0) >= 0.999 or (cd.endDanger or 0) >= 0.999 then
                     refused = refused + 1
                     local x, z = rp.X + cd.ox, rp.Z + cd.oz
-                    local who, best = nil, -1e9
+                    local arrive = (cd.dist or 0) / 22   -- a node is refused for what is there when we get there
+                    local who, best, when = nil, -1e9, ""
                     for _, b in ipairs(boxes) do
                         if not b.weight then                      -- warm boxes cost, they do not refuse
-                            local d = depth(b, x, z)
-                            if d > best then best, who = d, b end
+                            for _, t in ipairs({ 0, arrive }) do
+                                local openAt = now + t
+                                if openAt >= (b.from or 0) - 0.05 and openAt <= (b.untilAt or 0) + 0.05 then
+                                    local d = depth(b, x, z, t)
+                                    if d > best then best, who, when = d, b, (t > 0.05 and " on arrival" or "") end
+                                end
+                            end
                         end
                     end
                     if who and best >= -2 then
-                        local key = who.name or "?"
+                        local key = (who.name or "?") .. when
                         blame[key] = (blame[key] or 0) + 1
                     else
-                        blame["(no box covers it)"] = (blame["(no box covers it)"] or 0) + 1
+                        blame["(nothing covers it: check the walk, not the spot)"] = (blame["(nothing covers it: check the walk, not the spot)"] or 0) + 1
                     end
                 end
             end
