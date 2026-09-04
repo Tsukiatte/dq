@@ -203,3 +203,43 @@ character that hovers.
 
 Configuration lives in `CFG` in `src/core.lua`; the comments beside each value
 say what it does and which run set it.
+
+## Update, late 2026-09-03: the real hit signal, and Chris's 6.x line
+
+Chris now runs a 6.x bundle written from the 5.1.72 rules ("6.6.0 Parked",
+bundle only, no source in this repo). My patches on it are the files
+`DungeonAutofarm-6.6.0.lua` (his), `-6.6.1`, `-6.6.2`, `-6.6.3` here, and the
+Potassium workspace `dq_rewrite.lua` is the latest of those. Port them to the
+6.x source: the notes in each `SCRIPT_CHANGELOG` entry say what and why.
+
+**How to know when an attack actually hits.** The server tests an attack's
+hitBox with a touch query at the moment of damage. That leaves a
+`TouchTransmitter` child on the hitBox part for one frame. Listening for it
+(`hitBox.ChildAdded`, class TouchTransmitter) gives the exact spawn-to-hit
+delay of every hitBox attack without dying. `tools/probe_hits.lua` measures
+it per attack name; 6.6.1+ learns each attack's window from it after three
+samples and overrides the seed.
+
+Measured this way (Northern Lands, Nightmare):
+
+| attack | hits | after the Model appears | telegraph | Model lifetime |
+|---|---|---|---|---|
+| Champion passive beam | once | 0.92 s (0.39-1.03, n=363) | pink line visible from spawn, fades by 1.1 s | 7 s, harmless after the hit |
+| Champion jump slam | once | 1.98 s | precast from spawn, off at 2.15 s | 5 s |
+| Northern mage shot | once | 0.75-0.97 s | precast from spawn | |
+| Champion criss cross | no touch test on the client part | server-side, continuous; can spawn on the player and kill within 0.1 s | | 10 s |
+
+The old seeds held the beam lethal for 3.5 s and the mage shot for 2.5 s;
+those windows, not the movement, are why the first boss looked unreadable and
+the fan had no gaps. Every death-derived window in the table above the update
+should be treated as superseded by a touch-test measurement where one exists.
+
+Other findings on the 6.6.0 run: the reflexes (slam, fan) ran headings that
+were safe but walled, so the character stood against rocks and died (fixed in
+6.6.3: a heading must pass the wall sweep, else the field's spot); the blink
+was allowed in mob fights with a second hop inside the cooldown, and seventeen
+hops in pairs three seconds apart got kick eight (6.6.2: mapped bosses only,
+six seconds apart, three a minute); the cast reach sat one stud past the
+standing distance (6.6.1: range plus six). Not touched: 6.6.0 movement
+effectiveness is lower than 5.1's (0.86-0.92 of commanded speed, 4-7 % stuck)
+and it died at 7-11 studs from warriors.
