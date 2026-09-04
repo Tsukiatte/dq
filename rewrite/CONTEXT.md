@@ -281,3 +281,8 @@ are approached only with a spell off cooldown (wait at 70 from a quiet mob);
 hopping twice), blink destinations clear for 0.75 s not the whole dwell (in the
 fan nothing passed a 1.5 s test, so the blink vanished exactly where it was
 needed), a box firing within a second counts as hot for the stand-still rule.
+6.6.21-6.6.22 Bob's wall: its placement jump read as a huge velocity for one
+sample and swept a phantom wall across the arena (first 0.4 s ignored, speed
+clamped to 40), and a still wall was boxed along the world X axis instead of
+the line between its two balls, so an angled wall had no box where it stood.
+The replayed run on 6.6.20 killed the Champion with no deaths at all.
