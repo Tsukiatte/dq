@@ -295,7 +295,14 @@ task.spawn(function()
             spawns[#spawns + 1] = { t = r1(sp.at - R.started), name = sp.name, class = sp.class, dist = sp.dist, size = sp.size, pos = sp.pos }
         end
         local blob = HttpService:JSONEncode({ savedAt = os.date("%H:%M:%S"), placeId = game.PlaceId, target = S and S.BR and S.BR.target and S.BR.target.model.Name or nil,
-            hits = R.hits, samples = R.samples, states = R.states, verdicts = R.verdicts, move = R.move, blinks = R.blinkLog, reflexes = R.reflexLog, rings = R.rings, spawns = spawns, slams = R.slams })
+            hits = R.hits, samples = R.samples, states = R.states, verdicts = R.verdicts, move = R.move, blinks = R.blinkLog, reflexes = R.reflexLog, rings = R.rings, spawns = spawns, errors = (function()
+                local out = {}
+                for k, v in pairs((S and S.RT and S.RT.errorLog) or {}) do
+                    out[#out + 1] = { msg = k, n = v.n, first = r1(v.first - R.started), last = r1(v.last - R.started) }
+                end
+                table.sort(out, function(a, b) return a.n > b.n end)
+                return out
+            end)(), slams = R.slams })
         pcall(writefile, "dq_rec6.json", blob)
         pcall(writefile, R.file, blob)   -- and one per server instance: a new place overwrote the boss fight within ten seconds
     end
