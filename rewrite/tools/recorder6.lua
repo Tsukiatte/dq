@@ -13,11 +13,11 @@ local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local lp = Players.LocalPlayer
 local S = _G.DungeonAutofarmState
-R.botVersion = S and S.SCRIPT_VERSION or nil
 if _G.DQRec5 and _G.DQRec5.stop then pcall(_G.DQRec5.stop) end
 local R = { started = os.clock(), hits = {}, samples = {}, states = {}, conns = {}, trace = {}, verdicts = {}, blinkLog = {}, reflexLog = {}, slams = {}, rings = {},
     move = { n = 0, effSum = 0, dotSum = 0, stuck = 0, idle = 0 } }
 _G.DQRec5 = R
+R.botVersion = S and S.SCRIPT_VERSION or nil   -- the copy we started with, to notice a reload under us
 R.file = string.format("dq_rec6_%s_%s.json", string.sub(game.JobId ~= "" and game.JobId or "local", 1, 8), os.date("%H%M%S"))
 local function r1(v) return math.floor(v * 10 + 0.5) / 10 end
 local function r2(v) return math.floor(v * 100 + 0.5) / 100 end
@@ -99,7 +99,10 @@ pcall(function()
                 local rt = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
                 local pos = typeof(args) == "Vector3" and args or (typeof(args) == "CFrame" and args.Position) or (type(args) == "table" and typeof(args[5]) == "CFrame" and args[5].Position) or nil
                 local d = (pos and rt) and r1((Vector3.new(pos.X, 0, pos.Z) - Vector3.new(rt.Position.X, 0, rt.Position.Z)).Magnitude) or nil
-                R.spawns[#R.spawns + 1] = { at = os.clock(), name = "EVENT " .. tostring(name), class = typeof(args), dist = d, pos = pos and v3(pos) or nil,
+                local raw = {}
+                if type(args) == "table" then for i = 1, math.min(#args, 6) do local a = args[i] raw[i] = typeof(a) .. ":" .. (typeof(a) == "CFrame" and string.format("%.0f,%.0f,%.0f", a.Position.X, a.Position.Y, a.Position.Z) or tostring(a):sub(1, 40)) end
+                else raw[1] = typeof(args) .. ":" .. tostring(args):sub(1, 60) end
+                R.spawns[#R.spawns + 1] = { at = os.clock(), name = "EVENT " .. tostring(name), class = typeof(args), dist = d, pos = pos and v3(pos) or nil, raw = table.concat(raw, " | "),
                     size = (type(args) == "table" and #args >= 4) and string.format("dist%.0f dur%.1f", tonumber(args[1]) or 0, tonumber(args[2]) or 0) or nil }
             end)
         end
@@ -298,7 +301,7 @@ task.spawn(function()
             local sp = R.spawns[i]
             spawns[#spawns + 1] = { t = r1(sp.at - R.started), name = sp.name, class = sp.class, dist = sp.dist, size = sp.size, pos = sp.pos }
         end
-        local blob = HttpService:JSONEncode({ savedAt = os.date("%H:%M:%S"), placeId = game.PlaceId,
+        local blob = HttpService:JSONEncode({ savedAt = os.date("%H:%M:%S"), placeId = game.PlaceId, placeVersion = game.PlaceVersion,
             version = S and S.SCRIPT_VERSION or "no bot", reloaded = (S and S.SCRIPT_VERSION) ~= R.botVersion or nil,
             settings = S and S.CFG and { blinkFloor = S.CFG.blinkFloor, blinkBossPerMinute = S.CFG.blinkBossPerMinute,
                 blinkMobsPerMinute = S.CFG.blinkMobsPerMinute, blinkMobCooldown = S.CFG.blinkMobCooldown,
