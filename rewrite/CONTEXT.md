@@ -409,3 +409,16 @@ is a kick risk (kick nine).
   profile has `ringBand`, the field pulls to CFG.ringBandRadius (96) at
   CFG.ringBandWeight (0.3/stud). Untested at the time of writing. Missile box
   24 x 44 (a missile 12 studs away killed with the 10x30 box clear).
+6.6.46-6.6.47, the spent-attack bug (Chris: detonated attacks still show live
+and it will not walk past them): `hazards()` emitted a Model's box for as long
+as the Model existed, and many attack Models LINGER long after they fire - the
+northern mage shot sits 7 s, Bob's horizontal and spread beams 5 s, the ice
+spikes 10 s. The window was right (the field ignored them) but the box stayed
+in the list and the drawing labelled anything past `from` as "live", so a
+volley left a stack of live-looking boxes across the path. A box now leaves the
+list the moment its window ends (`long` records excepted), predicted zones do
+the same instead of waiting for the 0.5 s prune, and a box shown past its
+window reads "done". Verified over 50 samples of a Champion fight: zero boxes
+past their window. Odin's bouncing orbs (a dozen 12-stud balls, 20 s each, no
+touch test ever) were boxed lethal for their whole life and walled the arena
+off; they are warm (0.5) now.
