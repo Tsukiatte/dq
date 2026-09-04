@@ -273,3 +273,11 @@ speed burst may last a whole slam. Northern Lands has a third boss after Bob in
 the same run: Odin (`thirdBoss*` attacks: bouncing orbs at 20-40 studs/s,
 missiles at 85, multirings, bounce walls). Unmapped; the bot reaches him with a
 minute or two left.
+6.6.18 fan radius 75 with every spot inside it costing while the fan is on, the
+fan reflex from anywhere inside at full burst; 6.6.19 range probe +5 to a cap
+of 90 and cast reach range+12 (a cast landed 52 % from 66-72 studs), and mobs
+are approached only with a spell off cooldown (wait at 70 from a quiet mob);
+6.6.20 one slam reflex per slam (the Jump Down event was restarting it and
+hopping twice), blink destinations clear for 0.75 s not the whole dwell (in the
+fan nothing passed a 1.5 s test, so the blink vanished exactly where it was
+needed), a box firing within a second counts as hot for the stand-still rule.
