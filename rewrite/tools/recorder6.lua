@@ -37,6 +37,7 @@ local function boxDepth(b, p, t)
         local c = b.cframe.Position
         return b.size.X * 0.5 - math.sqrt((p.X - c.X) ^ 2 + (p.Z - c.Z) ^ 2)
     end
+    if b.r then return b.r - math.sqrt((p.X - b.cx) ^ 2 + (p.Z - b.cz) ^ 2) end   -- cylinders and rounds carry a radius (the object-space test below read a standing cylinder as a 1-stud slab)
     local lpos = b.cframe:PointToObjectSpace(p)
     local sx, sz = b.size.X * 0.5, b.size.Z * 0.5
     if b.cyl then
