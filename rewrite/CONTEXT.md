@@ -246,3 +246,15 @@ six seconds apart, three a minute); the cast reach sat one stud past the
 standing distance (6.6.1: range plus six). Not touched: 6.6.0 movement
 effectiveness is lower than 5.1's (0.86-0.92 of commanded speed, 4-7 % stuck)
 and it died at 7-11 studs from warriors.
+
+Later bundles on 6.6.x, same evening (each a patch on the previous, notes in
+`SCRIPT_CHANGELOG`): 6.6.7 exact windows without lead for measured attacks
+(a beam is safe to cross until its one hit), effect parts never labelled,
+stopped spears expire; 6.6.8 field at 60 Hz with arrival checked every 0.15 s
+through the dwell; 6.6.9 range probed outward from a landed cast (a Q+E pair
+landed 8.5 % on Bob from 57 studs) and remembered across runs; 6.6.10-6.6.13
+Bob's orbs, settled as a pull on the field toward the spot behind the orb's
+crystal with the field's spot leading while an orb is out (a separate orb
+drive fought the dodging and went back and forth); 6.6.12 never stand on
+ground about to go hot (reflex, blocked walk, in-range, orb hold). Runs on
+6.6.7+ killed both bosses.
