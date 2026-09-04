@@ -294,7 +294,11 @@ task.spawn(function()
             local sp = R.spawns[i]
             spawns[#spawns + 1] = { t = r1(sp.at - R.started), name = sp.name, class = sp.class, dist = sp.dist, size = sp.size, pos = sp.pos }
         end
-        local blob = HttpService:JSONEncode({ savedAt = os.date("%H:%M:%S"), placeId = game.PlaceId, target = S and S.BR and S.BR.target and S.BR.target.model.Name or nil,
+        local blob = HttpService:JSONEncode({ savedAt = os.date("%H:%M:%S"), placeId = game.PlaceId,
+            version = S and S.SCRIPT_VERSION or "no bot",
+            settings = S and S.CFG and { blinkFloor = S.CFG.blinkFloor, blinkBossPerMinute = S.CFG.blinkBossPerMinute,
+                blinkMobsPerMinute = S.CFG.blinkMobsPerMinute, blinkMobCooldown = S.CFG.blinkMobCooldown,
+                stepBlockAt = S.CFG.stepBlockAt, tweenEscape = S.CFG.tweenEscape, targetPriority = S.CFG.targetPriority } or nil, target = S and S.BR and S.BR.target and S.BR.target.model.Name or nil,
             hits = R.hits, samples = R.samples, states = R.states, verdicts = R.verdicts, move = R.move, blinks = R.blinkLog, reflexes = R.reflexLog, rings = R.rings, spawns = spawns, errors = (function()
                 local out = {}
                 for k, v in pairs((S and S.RT and S.RT.errorLog) or {}) do
