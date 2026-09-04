@@ -88,7 +88,19 @@ function H.report()
     end
     return out
 end
-function H.stop() for _, c in ipairs(H.conns) do pcall(c.Disconnect, c) end for _, m in pairs(H.models) do for _, c in ipairs(m.conns) do pcall(c.Disconnect, c) end end end
+function H.stop() H.stopped = true for _, c in ipairs(H.conns) do pcall(c.Disconnect, c) end for _, m in pairs(H.models) do for _, c in ipairs(m.conns) do pcall(c.Disconnect, c) end end end
+-- The report goes to disk every 10 s (dq_probe.json): a teleport at the end of a run used to take it with it.
+task.spawn(function()
+    local HttpService = game:GetService("HttpService")
+    while _G.DQHitProbe == H and not H.stopped do
+        task.wait(10)
+        pcall(function()
+            local out = H.report()
+            out.placeId, out.savedAt = game.PlaceId, os.date("%H:%M:%S")
+            writefile("dq_probe.json", HttpService:JSONEncode(out))
+        end)
+    end
+end)
 local n = 0
 for _ in pairs(H.models) do n = n + 1 end
 return { ok = true, watching = n }

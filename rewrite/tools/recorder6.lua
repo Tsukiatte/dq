@@ -265,7 +265,13 @@ end)
 task.spawn(function()
     while _G.DQRec5 == R and not R.stopped do
         task.wait(10)
-        pcall(writefile, "dq_rec6.json", HttpService:JSONEncode({ hits = R.hits, samples = R.samples, states = R.states, verdicts = R.verdicts, move = R.move, blinks = R.blinkLog, reflexes = R.reflexLog }))
+        local spawns = {}
+        for i = math.max(1, #R.spawns - 250), #R.spawns do
+            local sp = R.spawns[i]
+            spawns[#spawns + 1] = { t = r1(sp.at - R.started), name = sp.name, class = sp.class, dist = sp.dist, size = sp.size, pos = sp.pos }
+        end
+        pcall(writefile, "dq_rec6.json", HttpService:JSONEncode({ savedAt = os.date("%H:%M:%S"), placeId = game.PlaceId, target = S and S.BR and S.BR.target and S.BR.target.model.Name or nil,
+            hits = R.hits, samples = R.samples, states = R.states, verdicts = R.verdicts, move = R.move, blinks = R.blinkLog, reflexes = R.reflexLog, spawns = spawns }))
     end
 end)
 function R.stop() for _, c in ipairs(R.conns) do pcall(function() c:Disconnect() end) end R.stopped = true end
