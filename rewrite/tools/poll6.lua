@@ -35,7 +35,7 @@ for i = #(R.spawns or {}), 1, -1 do
     if nowC - sp.at > 90 then break end
     if sp.name:sub(1, 5) == "EVENT" then
         if #out.recentEvents < 12 then out.recentEvents[#out.recentEvents + 1] = string.format("-%.0fs %s d%s %s", nowC - sp.at, sp.name, tostring(sp.dist), sp.size or "") end
-    else
+    elseif sp.name:sub(1, 8) ~= "dungeon/" and sp.name:sub(1, 4) ~= "Map/" then   -- mob debris and map parts are not attacks
         local key = sp.name .. " " .. tostring(sp.size)
         seen[key] = (seen[key] or 0) + 1
     end
