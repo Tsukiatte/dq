@@ -156,7 +156,9 @@ _G.DungeonAutofarmVersion = SCRIPT_VERSION
 -- walking speed (every kick shared speed above 16 held for seconds). Distances in studs, times in seconds.
 local CFG = {
     tweenWalk = 16, tweenEscape = 22, boostMaxRun = 1.5, boostRest = 1.2, boostUrgentRun = 2.5, boostReflexRun = 3.5, boostUrgentRest = 0.8,
-    tweenSlam = 24, tweenSprint = 28,   -- tweenSprint: the last resort that replaced the hop. Doomed, standing in something lethal, or a reflex with under a second left: this speed, briefly. The yank counter measures what the game tolerates; if pull-backs climb, this is the dial maxStepHeight = 2.4, maxDropHeight = 30,
+    -- tweenSprint: the last resort that replaced the hop. Doomed, standing in something lethal, or a reflex with under a
+    -- second left: this speed, briefly. The yank counter measures what the game tolerates; if pull-backs climb, this is the dial.
+    tweenSlam = 24, tweenSprint = 28, maxStepHeight = 2.4, maxDropHeight = 30,
     -- standing: abilities only, never within weapon reach of anything (Chris)
     mobStandoff = 26, rangedStandoff = 22, meleeMobMaxReach = 16, meleeBuffer = 4, bossStandoff = 38, autoStandoff = true, autoStandoffMax = 90,
     aggroHold = 70,   -- mobs only: with no ability off cooldown, wait this far from a mob that has not noticed us
