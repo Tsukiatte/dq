@@ -27,6 +27,24 @@ out.blinkLog = {}
 for i = math.max(1, #R.blinkLog - 6), #R.blinkLog do local b = R.blinkLog[i] if b then out.blinkLog[#out.blinkLog + 1] = string.format("t%.0f %sst grace%s near=%s", b.t, tostring(b.dist), tostring(b.grace), tostring(b.near)) end end
 out.reflexLog = {}
 for i = math.max(1, #R.reflexLog - 8), #R.reflexLog do local x = R.reflexLog[i] if x then out.reflexLog[#out.reflexLog + 1] = string.format("t%.0f %s", x.t, x.reflex) end end
+-- what the room is throwing: the last remote events and the distinct spawn names of the last 90 s (Odin is unmapped)
+out.recentEvents, out.recentSpawns = {}, {}
+local nowC, seen = os.clock(), {}
+for i = #(R.spawns or {}), 1, -1 do
+    local sp = R.spawns[i]
+    if nowC - sp.at > 90 then break end
+    if sp.name:sub(1, 5) == "EVENT" then
+        if #out.recentEvents < 12 then out.recentEvents[#out.recentEvents + 1] = string.format("-%.0fs %s d%s %s", nowC - sp.at, sp.name, tostring(sp.dist), sp.size or "") end
+    else
+        local key = sp.name .. " " .. tostring(sp.size)
+        seen[key] = (seen[key] or 0) + 1
+    end
+end
+for k, n in pairs(seen) do out.recentSpawns[#out.recentSpawns + 1] = k .. " x" .. n end
+table.sort(out.recentSpawns)
+out.learned = {}
+for name, h in pairs(S and S.RD.hitDelay or {}) do out.learned[#out.learned + 1] = string.format("%s n%d %.2f-%.2f", name, h.n, h.min, h.max) end
+table.sort(out.learned)
 -- deaths
 local deaths = 0
 for _, h in ipairs(R.hits) do if h.fatal then deaths = deaths + 1 end end
