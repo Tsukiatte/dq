@@ -14,7 +14,7 @@ local Players = game:GetService("Players")
 local lp = Players.LocalPlayer
 local S = _G.DungeonAutofarmState
 if _G.DQRec5 and _G.DQRec5.stop then pcall(_G.DQRec5.stop) end
-local R = { started = os.clock(), hits = {}, samples = {}, states = {}, conns = {}, trace = {}, verdicts = {}, blinkLog = {}, reflexLog = {}, slams = {},
+local R = { started = os.clock(), hits = {}, samples = {}, states = {}, conns = {}, trace = {}, verdicts = {}, blinkLog = {}, reflexLog = {}, slams = {}, rings = {},
     move = { n = 0, effSum = 0, dotSum = 0, stuck = 0, idle = 0 } }
 _G.DQRec5 = R
 R.file = string.format("dq_rec6_%s_%s.json", string.sub(game.JobId ~= "" and game.JobId or "local", 1, 8), os.date("%H%M%S"))
@@ -295,9 +295,58 @@ task.spawn(function()
             spawns[#spawns + 1] = { t = r1(sp.at - R.started), name = sp.name, class = sp.class, dist = sp.dist, size = sp.size, pos = sp.pos }
         end
         local blob = HttpService:JSONEncode({ savedAt = os.date("%H:%M:%S"), placeId = game.PlaceId, target = S and S.BR and S.BR.target and S.BR.target.model.Name or nil,
-            hits = R.hits, samples = R.samples, states = R.states, verdicts = R.verdicts, move = R.move, blinks = R.blinkLog, reflexes = R.reflexLog, spawns = spawns, slams = R.slams })
+            hits = R.hits, samples = R.samples, states = R.states, verdicts = R.verdicts, move = R.move, blinks = R.blinkLog, reflexes = R.reflexLog, rings = R.rings, spawns = spawns, slams = R.slams })
         pcall(writefile, "dq_rec6.json", blob)
         pcall(writefile, R.file, blob)   -- and one per server instance: a new place overwrote the boss fight within ten seconds
+    end
+end)
+
+-- Odin's ring sets: seven invisible half rings at fixed radii round thirdBossMiddlePart. Their parts are curved
+-- meshes, so a part's size gives the outer radius and nothing about how thick the band is. The one way to learn it
+-- is to note the radius the character is standing at whenever its health drops with a set live.
+task.spawn(function()
+    local lp = game:GetService("Players").LocalPlayer
+    local lastHp, warned = nil, false
+    while _G.DQRec5 == R and not R.stopped do
+        task.wait(0.1)
+        local mid = workspace:FindFirstChild("thirdBossMiddlePart")
+        local c = lp.Character
+        local rt = c and c:FindFirstChild("HumanoidRootPart")
+        local hum = c and c:FindFirstChildOfClass("Humanoid")
+        if mid and rt and hum then
+            local live = {}
+            for _, m in ipairs(workspace:GetChildren()) do
+                if m.Name == "thirdBossMultiRings" then
+                    for _, d in ipairs(m:GetChildren()) do
+                        if d:IsA("BasePart") and string.lower(d.Name) == "ring" then
+                            local R2 = math.max(d.Size.X, d.Size.Z) * 0.5
+                            local off = Vector3.new(d.Position.X - mid.Position.X, 0, d.Position.Z - mid.Position.Z)
+                            live[#live + 1] = { r = r1(R2), sx = r2(off.Magnitude > 1 and off.Unit.X or 0), sz = r2(off.Magnitude > 1 and off.Unit.Z or 0) }
+                        end
+                    end
+                end
+            end
+            local rad = r1((Vector3.new(rt.Position.X, 0, rt.Position.Z) - Vector3.new(mid.Position.X, 0, mid.Position.Z)).Magnitude)
+            local hp = hum.Health
+            if #live > 0 then
+                if not warned then warned = true end
+                if lastHp and hp < lastHp - 0.5 then
+                    local bx, bz = rt.Position.X - mid.Position.X, rt.Position.Z - mid.Position.Z
+                    local len = math.max(math.sqrt(bx * bx + bz * bz), 0.001)
+                    local on = {}
+                    for _, a in ipairs(live) do
+                        local dot = (bx / len) * a.sx + (bz / len) * a.sz
+                        on[#on + 1] = string.format("%.0f%s%+.2f", a.r, dot >= 0 and "L" or "f", r2(rad - a.r))
+                    end
+                    R.rings[#R.rings + 1] = { t = r1(os.clock() - R.started), at = rad, lost = r1(lastHp - hp), arcs = on }
+                    if #R.rings > 120 then table.remove(R.rings, 1) end
+                    warn(string.format("[DQ rings] hurt at radius %.1f, lost %.0f | %s", rad, lastHp - hp, table.concat(on, " ")))
+                end
+            else
+                warned = false
+            end
+            lastHp = hp
+        end
     end
 end)
 function R.stop() for _, c in ipairs(R.conns) do pcall(function() c:Disconnect() end) end R.stopped = true end
