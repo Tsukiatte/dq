@@ -358,3 +358,33 @@ the touch test; `tools/poll_odin.lua` dumps the probe report, events, spawn
 names and deaths while the target is Odin (data dies at the teleport).
 A death while `workspace.stunParts/<player>` exists is accepted: moving then
 is a kick risk (kick nine).
+6.6.34-6.6.40 (live rounds, 2026-09-04 00:00-01:00):
+- Bob: the pull toward the crystal is bounded (60 studs' worth) and fades on
+  hot ground; the orb bubble is 17 studs / 0.75 warm; an orb within 14 starts
+  a one-second straight run ("orb" reflex) toward the crystal that refuses
+  lanes. Three Bob deaths were the orb catching the bot (stun inside its
+  bubble, then a beam).
+- Mobs: the approach closes on the AoE group centre (aimPoint) so a cast at
+  the standoff lands among them.
+- Champion: Jump Up -> 1.2-1.3 s later a criss cross spawns ON the player
+  (d0.8-2.7 in five deaths, kills in 0.1 s) -> 0.8 s later the slam Model
+  lands on the player. Jump Up starts a straight tangential run ("jump"
+  reflex) and a hop at +1.1..1.35 s (the only reaction to the criss cross).
+  THE SLAM HITBOX FOLLOWS THE PLAYER during the jump (recorder traces: the box
+  depth stayed ~35 while the bot ran 30 studs); when it locks is not measured
+  yet - recorder6 now tracks the slam hitBox after spawn (poll6 `slams`:
+  age:movedFromSpawn/characterDistance). The slam hop and slam run ignore
+  warm lanes (all 48 hop spots read hot from criss cross lanes once).
+- Odin (probe_odin.lua, 2026-09-04): thirdBossMultiRings = eight INVISIBLE
+  static parts round the arena centre (thirdBossMiddlePart, ~30 studs from
+  Odin's root): center 25-wide cylinder + half-ring arcs of radii 25, 37.5,
+  50, 62.5, 75, 87.5, 105 on alternating sides; a new Model at a new yaw
+  every ~1 s, each alive 4-8 s; no touch test on them. Modelled as annulus
+  zones ("ring arc", 6 thick, own half) tied to the Model. thirdBossLineShot:
+  a 219-stud ray from Odin, 13 wide, pairs counter-rotating 12.5 deg/0.5 s,
+  one touch hit at 0.85-0.89 s (seeded exact). thirdBossBouncingOrb: 12-stud
+  balls, 20 s life, bounce (velocity-tracked). Sideways Missile events: 340
+  studs in 4 s (85 studs/s), 10x10x30 mesh. Bounce walls ~106 from the centre.
+  Orb Explosion zone 20 (the bot stood 7.6 from one and lived).
+- Tools: per-instance dumps dq_rec6_<job>_<time>.json / dq_probe_... /
+  dq_odin_...; poll_odin.lua; dq_boot skips the lobby and loads probe_odin.
