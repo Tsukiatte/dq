@@ -315,3 +315,17 @@ restored when the mode goes off (ST.saved).
 6.6.28: the drawing sweep (drawTick, every 3 s) destroys anything under the
 visuals root that is not the Hazards folder; the streamer block is spared by
 name. Anything else parented there needs the same exemption.
+6.6.29-6.6.31 (round watched live on 2026-09-03 night): 6.6.26 had called
+`depthOf` (a field.lua local) from brain.lua - the brain stage errored every
+frame of a slam and released the character, two slam deaths standing still;
+`S.depthOf` is exported now. Fan mode lasts 4 s past the last burst (it walked
+back in between bursts). No range cap from a missed cast, and both ability
+slots are seeded from the remembered range (Q and E are both "Geyser"; the
+name-keyed seed held one slot, the other started at 49 and dragged the standoff
+to 43). 6.6.31 travel: waypoints count height (a spiral stair's upper loop sat
+right overhead and the flat test called it reached; every stall then skipped
+further up the spiral while the body pushed into the stair mesh, 28 s stuck),
+a stall re-plans from here before skipping, navmesh Jump waypoints are jumped.
+Boot: `autoexec/dq_autoboot.lua` (Potassium) loads `workspace/dq_boot.lua` in
+Dungeon Quest places, which loads dq_rewrite + recorder6 + probe_hits after 7 s.
+Copies of both are in tools/. Delete the autoexec file to stop the auto-load.
