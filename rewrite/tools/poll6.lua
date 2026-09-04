@@ -60,6 +60,7 @@ for i = firstShown, #R.hits do
         h.t, h.fatal and "DEAD" or "hit", tostring(h.bossDist), tostring(h.state), h.reflex and ("reflex=" .. h.reflex .. " ") or "", h.lastBlinkAgo and ("blinkAgo=" .. h.lastBlinkAgo) or "",
         v.class or "?", v.name and (v.name .. "(" .. tostring(v.kind) .. ") depth" .. tostring(v.depth)) or (v.nearest and ("nearest " .. v.nearest.name .. " d" .. tostring(v.nearest.dist) .. " f" .. tostring(v.nearest.firesIn)) or ""),
         v.by and v.by > 0 and (" by " .. v.by .. "s") or "", table.concat(near, "; "))
+    if h.hopFail then head = head .. " | " .. h.hopFail end
     local lines = { head }
     -- the trace: every third sample of the last 3 s
     local tr = h.trace or {}
