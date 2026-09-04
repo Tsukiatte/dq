@@ -36,7 +36,14 @@ local function boxDepth(b, p, t)
     end
     if b.round then
         local c = b.cframe.Position
-        return b.size.X * 0.5 - math.sqrt((p.X - c.X) ^ 2 + (p.Z - c.Z) ^ 2)
+        local qx, qz = p.X - c.X, p.Z - c.Z
+        local dist = math.sqrt(qx * qx + qz * qz)
+        local d = b.size.X * 0.5 - dist
+        if b.ring then   -- an annulus arc (Odin's rings): between the radii, on its half
+            if qx * (b.sx or 0) + qz * (b.sz or 0) < 0 then return -999 end
+            d = math.min(d, dist - b.ring)
+        end
+        return d
     end
     if b.r then return b.r - math.sqrt((p.X - b.cx) ^ 2 + (p.Z - b.cz) ^ 2) end   -- cylinders and rounds carry a radius (the object-space test below read a standing cylinder as a 1-stud slab)
     local lpos = b.cframe:PointToObjectSpace(p)
