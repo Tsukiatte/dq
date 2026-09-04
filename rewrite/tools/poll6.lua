@@ -45,6 +45,9 @@ table.sort(out.recentSpawns)
 out.learned = {}
 for name, h in pairs(S and S.RD.hitDelay or {}) do out.learned[#out.learned + 1] = string.format("%s n%d %.2f-%.2f", name, h.n, h.min, h.max) end
 table.sort(out.learned)
+-- the slam box after spawn: age:movedFromSpawn/characterDistanceFromCentre
+out.slams = {}
+for i = math.max(1, #(R.slams or {}) - 3), #(R.slams or {}) do local sl = R.slams[i] if sl then out.slams[#out.slams + 1] = string.format("t%.0f gone%s | %s", sl.t, tostring(sl.gone), table.concat(sl.samples, " ")) end end
 -- deaths
 local deaths = 0
 for _, h in ipairs(R.hits) do if h.fatal then deaths = deaths + 1 end end

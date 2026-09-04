@@ -14,7 +14,7 @@ local Players = game:GetService("Players")
 local lp = Players.LocalPlayer
 local S = _G.DungeonAutofarmState
 if _G.DQRec5 and _G.DQRec5.stop then pcall(_G.DQRec5.stop) end
-local R = { started = os.clock(), hits = {}, samples = {}, states = {}, conns = {}, trace = {}, verdicts = {}, blinkLog = {}, reflexLog = {},
+local R = { started = os.clock(), hits = {}, samples = {}, states = {}, conns = {}, trace = {}, verdicts = {}, blinkLog = {}, reflexLog = {}, slams = {},
     move = { n = 0, effSum = 0, dotSum = 0, stuck = 0, idle = 0 } }
 _G.DQRec5 = R
 R.file = string.format("dq_rec6_%s_%s.json", string.sub(game.JobId ~= "" and game.JobId or "local", 1, 8), os.date("%H%M%S"))
@@ -71,6 +71,21 @@ R.conns[#R.conns + 1] = workspace.DescendantAdded:Connect(function(inst)
     local rt = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
     local p = inst:IsA("BasePart") and inst or (inst:IsA("Model") and (inst.PrimaryPart or inst:FindFirstChildWhichIsA("BasePart")))
     local d = (p and rt) and r1((Vector3.new(p.Position.X, 0, p.Position.Z) - Vector3.new(rt.Position.X, 0, rt.Position.Z)).Magnitude) or nil
+    if inst:IsA("BasePart") and inst.Name == "hitBox" and top.Name == "firstBossJumpSlam" then   -- the slam box after spawn: how far it moved from where it appeared, and how far the character is from its centre
+        task.spawn(function()
+            local origin, rec = inst.Position, { t = now(), samples = {} }
+            R.slams[#R.slams + 1] = rec
+            if #R.slams > 6 then table.remove(R.slams, 1) end
+            for i = 1, 26 do
+                task.wait(0.1)
+                if not inst.Parent then rec.gone = r1(i * 0.1) break end
+                local rt2 = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+                local moved = (Vector3.new(inst.Position.X, 0, inst.Position.Z) - Vector3.new(origin.X, 0, origin.Z)).Magnitude
+                local me = rt2 and (Vector3.new(inst.Position.X, 0, inst.Position.Z) - Vector3.new(rt2.Position.X, 0, rt2.Position.Z)).Magnitude or -1
+                rec.samples[#rec.samples + 1] = string.format("%.1f:%.0f/%.0f", i * 0.1, moved, me)
+            end
+        end)
+    end
     R.spawns[#R.spawns + 1] = { at = os.clock(), name = (top ~= inst and (top.Name .. "/") or "") .. inst.Name, class = inst.ClassName, dist = d,
         pos = p and v3(p.Position) or nil, size = p and string.format("%.0fx%.0fx%.0f", p.Size.X, p.Size.Y, p.Size.Z) or nil, yaw = p and r1(math.deg(math.atan2(p.CFrame.LookVector.X, p.CFrame.LookVector.Z))) or nil }
     if #R.spawns > 400 then table.remove(R.spawns, 1) end
@@ -280,7 +295,7 @@ task.spawn(function()
             spawns[#spawns + 1] = { t = r1(sp.at - R.started), name = sp.name, class = sp.class, dist = sp.dist, size = sp.size, pos = sp.pos }
         end
         local blob = HttpService:JSONEncode({ savedAt = os.date("%H:%M:%S"), placeId = game.PlaceId, target = S and S.BR and S.BR.target and S.BR.target.model.Name or nil,
-            hits = R.hits, samples = R.samples, states = R.states, verdicts = R.verdicts, move = R.move, blinks = R.blinkLog, reflexes = R.reflexLog, spawns = spawns })
+            hits = R.hits, samples = R.samples, states = R.states, verdicts = R.verdicts, move = R.move, blinks = R.blinkLog, reflexes = R.reflexLog, spawns = spawns, slams = R.slams })
         pcall(writefile, "dq_rec6.json", blob)
         pcall(writefile, R.file, blob)   -- and one per server instance: a new place overwrote the boss fight within ten seconds
     end
