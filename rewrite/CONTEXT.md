@@ -312,3 +312,6 @@ the health numbers/bar, `playerStatsLeaderboard` and Roblox's PlayerList, other
 players' nameplates, the chat; the character is a black 2x5x2 block (the spot
 marker's size) under `DungeonAutofarmVisuals`. Every property it touches is
 restored when the mode goes off (ST.saved).
+6.6.28: the drawing sweep (drawTick, every 3 s) destroys anything under the
+visuals root that is not the Hazards folder; the streamer block is spared by
+name. Anything else parented there needs the same exemption.
