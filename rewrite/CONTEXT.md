@@ -329,3 +329,32 @@ a stall re-plans from here before skipping, navmesh Jump waypoints are jumped.
 Boot: `autoexec/dq_autoboot.lua` (Potassium) loads `workspace/dq_boot.lua` in
 Dungeon Quest places, which loads dq_rewrite + recorder6 + probe_hits after 7 s.
 Copies of both are in tools/. Delete the autoexec file to stop the auto-load.
+6.6.32-6.6.33 (rounds watched live, 2026-09-04): the fan measured at last -
+every passive beam hitBox is 8 x 64 x 250 centred on ONE hub (full lines, so
+yaw mod 180 is right), the slow sweep is a pair 20 degrees apart stepping 20
+degrees every 0.5 s, and the fan is 18 lines 10 degrees apart within 0.4 s.
+At 86 studs the gaps are 5 studs; at 90 about 7; the rocks are near 100 and
+the arena kills past ~128. Chain predictions are skipped during a burst (they
+painted phantom lanes), the beam is `slim = 2`, fanRadius 90. Other fixes,
+one per death: the range seed ran before the Tools existed and never again
+(every run started at 46-49 - now retried, and a slot first seen by its cast
+starts from the remembered range); mages within 90 are aggro (it stood still
+"waiting for cooldown" and a volley landed), mage shot pad 3; the slam run
+ends four studs clear of the box and never heads past 105 from the boss (it
+ran to 140 and the arena killed it); Bob's circles march out 26 a step and
+shrink 6 (the one-circle fallback grew them both ways into 100-wide phantoms);
+hot ground keeps its heading (five reversals in 3 s let the wall walk over
+it). 6.6.33: the cast gate used the aim point, which is the centroid of the
+mob group inside the AoE - at a 74 standoff it sat at 85 against a reach of
+81 and NOTHING WAS CAST for minutes ("strafing back and forth"); the gate is
+the nearer of aim point and body, and the cast aims at the nearest body when
+the centroid is out of reach. Measured hit windows persist in the config
+(`learnedHits`, seeded into RD.hitDelay at start). Odin: profile with
+arenaPull; his remote events on `northernBossSpecficEvents` are only Bouncing
+Orb Beam, Orb Explosion (90-stud ball, zone radius 48) and Sideways Missile -
+the Curse/Mark/Link/Lava "Third Boss" events in mapSpecificLocals belong to
+other maps' third bosses. Everything else of his is server Models learned by
+the touch test; `tools/poll_odin.lua` dumps the probe report, events, spawn
+names and deaths while the target is Odin (data dies at the teleport).
+A death while `workspace.stunParts/<player>` exists is accepted: moving then
+is a kick risk (kick nine).
