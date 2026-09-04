@@ -264,3 +264,12 @@ deleted a second after they stop (two thresholds made spear boxes flash);
 spike zones +6 studs and 1.2 s (they slow the character, which is what then
 gets it killed), the blink's walk test on measured speed, exact windows opening
 0.3 s before the earliest measured hit.
+6.6.16 lane danger limited to three seconds ahead of a moving body (Bob's slow
+wall had painted the whole entrance), blink destinations checked clear for the
+whole dwell; 6.6.17 fan radius 70 (85 was the rocks, where the slam then landed
+on a cornered bot), the reflex takes the most open safe heading of ten, corners
+included, an eight-stud head-start hop on the slam's first frame, and the
+speed burst may last a whole slam. Northern Lands has a third boss after Bob in
+the same run: Odin (`thirdBoss*` attacks: bouncing orbs at 20-40 studs/s,
+missiles at 85, multirings, bounce walls). Unmapped; the bot reaches him with a
+minute or two left.
